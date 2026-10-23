@@ -1,0 +1,342 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
+ * The layout of the editing screens, in the manner of a video editor: the picture large at the top, the timeline under it,
+ * and the clip list and its form in a panel at the side that opens from the "Properties and clip list" button. Nothing here
+ * scrolls the whole page: the preview takes what is left, and the timeline and the panel scroll inside their own boxes.
+ *
+ * Nothing is taken out of the page. The panel is hidden only while it is closed, and everything that sends focus to it
+ * (F6, Enter on a clip, the button) opens it first. The hints that the controls point to with aria-describedby stay in the
+ * page for a screen reader and are written out under Keyboard shortcuts for everyone else.
+ */
+
+.os-ed {
+  --os-ed-height: 80vh;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(11rem, 1fr) minmax(12rem, 34%);
+  grid-template-areas:
+    "say say say bar"
+    "callouts preview split side"
+    "timeline timeline timeline timeline";
+  height: var(--os-ed-height);
+  min-height: 34rem;
+  gap: 0.5rem;
+}
+
+.os-ed > .os-cl-announce,
+.os-ed > :first-child {
+  grid-area: say;
+}
+
+.os-ed-bar {
+  grid-area: bar;
+  align-self: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.os-ed-preview {
+  grid-area: preview;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.os-ed-timeline {
+  grid-area: timeline;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--os-cl-line);
+  padding-top: 0.25rem;
+}
+
+.os-ed-list {
+  grid-area: side;
+  min-height: 0;
+  width: var(--os-ed-list-width, min(38rem, 46vw));
+  overflow: auto;
+  border-left: 1px solid var(--os-cl-line);
+  padding-left: 0.75rem;
+}
+
+.os-ed-list[hidden],
+.os-ed-split[hidden] {
+  display: none;
+}
+
+/* The splitter between the picture and the Properties panel: a bar that can be dragged, or moved with the arrow keys. */
+.os-ed-split {
+  grid-area: split;
+  width: 0.5rem;
+  cursor: col-resize;
+  background: var(--os-cl-line);
+  border-radius: 2px;
+  touch-action: none;
+}
+
+.os-ed-split:hover {
+  background: var(--os-cl-focus, Highlight);
+}
+
+.os-ed-split:focus-visible {
+  outline: 3px solid var(--os-cl-focus, Highlight);
+  outline-offset: 1px;
+  background: var(--os-cl-focus, Highlight);
+}
+
+/* ---- the preview takes the room that is left ---- */
+
+.os-ed .os-pv {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.os-ed .os-pv-figure {
+  flex: 1;
+  min-height: 0;
+  margin: 0.25rem 0 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.os-ed .os-pv-stage {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* ---- the timeline and the preview controls, close together ---- */
+
+.os-ed .os-cl-status {
+  /* A fixed three lines, scrolling if a sentence is longer: a long sentence must not push the picture and the timeline about. */
+  box-sizing: border-box;
+  height: 4.1rem;
+  min-height: 0;
+  overflow-y: auto;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  padding: 0.25rem 0.5rem;
+  margin: 0;
+}
+
+/* The titles stay for screen reader headings; the controls and the picture say what each part is. */
+.os-ed .os-pv > .os-cl-title,
+.os-ed .os-tl > .os-cl-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.os-ed .os-pv-controls .os-cl-button,
+.os-ed .os-tl-timefield .os-cl-button {
+  font-size: 0.875rem;
+  padding: 0.15rem 0.5rem;
+  min-height: 0;
+}
+
+.os-ed .os-tl-timefield label {
+  white-space: nowrap;
+}
+
+.os-ed .os-tl-timefield .os-cl-field,
+.os-ed .os-tl-timefield .os-cl-field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.os-ed .os-tl-timefield input,
+.os-ed .os-tl-timefield select {
+  min-height: 0;
+  padding: 0.15rem 0.4rem;
+  width: auto;
+  max-width: 9rem;
+}
+
+.os-ed .os-tl-timefield input[type="text"] {
+  width: 7rem;
+}
+
+.os-ed .os-tl-timefield .os-cl-field,
+.os-ed .os-tl-timefield .os-cl-row-buttons {
+  flex: none;
+}
+
+.os-ed .os-cl-title {
+  font-size: 0.95rem;
+  margin: 0 0 0.25rem;
+}
+
+.os-ed .os-tl .os-cl-hint {
+  /* Still there for aria-describedby; written out under Keyboard shortcuts. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.os-ed .os-tl-timefield {
+  gap: 0.5rem 1rem;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.os-ed .os-tl-timefield .os-cl-button {
+  padding: 0.2rem 0.6rem;
+}
+
+.os-ed .os-tl-addtrack {
+  align-items: center;
+}
+
+.os-ed .os-tl-addtrack .os-cl-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.os-ed {
+  --os-tl-lane-h: 3rem;
+}
+
+/* A track's name stays on one line, so a lane is never taller than its clips; the whole name is in the hover text and in what a screen reader says. */
+.os-ed .os-tl-lane-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.os-ed .os-tl-lane-name {
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
+
+@media (max-width: 52rem) {
+  .os-ed {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "say"
+      "bar"
+      "preview"
+      "callouts"
+      "timeline"
+      "side";
+    grid-template-rows: auto auto minmax(12rem, 1fr) auto auto auto;
+    height: auto;
+  }
+  .os-ed-split {
+    display: none;
+  }
+  .os-ed-list {
+    width: auto;
+    border-left: 0;
+    padding-left: 0;
+    max-height: 60vh;
+  }
+}
+
+/* ---- the callout bar under the picture ---- */
+
+.os-ed-callouts {
+  grid-area: callouts;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 0.5rem;
+  border-right: 1px solid var(--os-cl-line);
+}
+
+/*
+ * When the window is short the gallery wraps into extra columns beside the picture instead of scrolling. The buttons keep
+ * their order (down the first column, then the next), so Up and Down on the toolbar still walk them in reading order.
+ */
+@media (min-width: 52rem) {
+  .os-ed {
+    --os-co-cols: 1;
+  }
+  .os-ed-callouts {
+    width: calc(var(--os-co-cols) * 8.25rem + 0.5rem);
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  .os-ed .os-co {
+    box-sizing: border-box;
+    height: 100%;
+    flex-wrap: wrap;
+    align-content: flex-start;
+  }
+  .os-ed .os-co .os-co-button,
+  .os-ed .os-co .os-co-title,
+  .os-ed .os-co .os-tl-sep {
+    width: 8rem;
+  }
+}
+
+@media (min-width: 60rem) and (max-height: 56rem) {
+  .os-ed {
+    --os-co-cols: 2;
+  }
+}
+
+@media (min-width: 75rem) and (max-height: 36rem) {
+  .os-ed {
+    --os-co-cols: 3;
+  }
+}
+
+/* The reduced-motion box sits in the controls row, small, instead of taking a row of its own. */
+.os-ed .os-pv-controls {
+  gap: 0.25rem 0.75rem;
+}
+
+.os-ed .os-pv-controls .os-cl-check {
+  margin: 0;
+  min-height: 0;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+@media (min-width: 52rem) {
+  .os-ed .os-pv-controls .os-cl-check {
+    white-space: nowrap;
+  }
+}
+
+.os-ed .os-pv-controls .os-cl-check input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* Narrow: the callouts go under the picture, in a row that wraps. */
+@media (max-width: 52rem) {
+  .os-ed-callouts {
+    border-right: 0;
+    padding-right: 0;
+  }
+  .os-ed .os-co {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .os-ed .os-co .os-tl-sep {
+    display: none;
+  }
+}
