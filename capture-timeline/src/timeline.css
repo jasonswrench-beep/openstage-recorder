@@ -1,0 +1,600 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
+ * Styles for the timeline. They use the colour tokens of clip-list.css and add the colours of the tracks. A track is
+ * never told apart by colour alone: its name and kind are written at the start of its lane. Muted clips are hatched and
+ * say "muted". The chosen clips have a thick outline, the one with the focus a thicker edge, the playhead is a line.
+ * Dark mode and Windows high contrast (forced colours) are handled; nothing animates.
+ */
+
+:root {
+  --os-tl-gutter: 8rem;
+  --os-tl-ruler-h: 2.25rem;
+  --os-tl-lane-h: 3.5rem;
+  --os-tl-screen: #cfe2ff;
+  --os-tl-webcam: #e4d6ff;
+  --os-tl-audio: #d3f0d6;
+  --os-tl-media: #ffe6bf;
+  --os-tl-overlay: #ffd6df;
+  --os-tl-zoom: #fff1a8;
+  --os-tl-playline: #b00020;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --os-tl-screen: #1d3557;
+    --os-tl-webcam: #3a2a5c;
+    --os-tl-audio: #1e4a2b;
+    --os-tl-media: #5c4010;
+    --os-tl-overlay: #5c2230;
+    --os-tl-zoom: #55500f;
+    --os-tl-playline: #ff6b81;
+  }
+}
+
+:root[data-theme="dark"] {
+  --os-tl-screen: #1d3557;
+  --os-tl-webcam: #3a2a5c;
+  --os-tl-audio: #1e4a2b;
+  --os-tl-media: #5c4010;
+  --os-tl-overlay: #5c2230;
+  --os-tl-zoom: #55500f;
+  --os-tl-playline: #ff6b81;
+}
+
+.os-tl {
+  max-width: none;
+}
+
+.os-tl-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.os-tl-addtrack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+  max-width: 100%;
+}
+
+.os-tl-addtrack select {
+  max-width: 100%;
+}
+
+.os-tl-frame {
+  border: 1px solid var(--os-cl-line);
+  border-radius: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.os-tl-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  scroll-padding-left: var(--os-tl-gutter);
+}
+
+.os-tl-canvas {
+  position: relative;
+  min-width: 100%;
+}
+
+.os-tl-rulerrow {
+  display: flex;
+  height: var(--os-tl-ruler-h);
+  box-sizing: border-box;
+  border-bottom: 2px solid var(--os-cl-line);
+  background: var(--os-cl-head-bg);
+}
+
+.os-tl-corner,
+.os-tl-lane-name {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  flex: none;
+  width: var(--os-tl-gutter);
+  box-sizing: border-box;
+  padding: 0.25rem 0.5rem;
+  border-right: 2px solid var(--os-cl-line);
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.os-tl-corner {
+  display: flex;
+  align-items: center;
+  background: var(--os-cl-head-bg);
+}
+
+.os-tl-lane-name {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--os-cl-bg);
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.os-tl-lane-kind {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--os-cl-muted);
+}
+
+.os-tl-ruler {
+  position: relative;
+  flex: none;
+  height: 100%;
+  cursor: pointer;
+}
+
+.os-tl-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  padding-left: 4px;
+  border-left: 1px solid var(--os-cl-line);
+  font-size: 0.75rem;
+  line-height: var(--os-tl-ruler-h);
+  color: var(--os-cl-muted);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.os-tl-lane {
+  display: flex;
+  height: var(--os-tl-lane-h);
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--os-cl-line);
+}
+
+.os-tl-track {
+  position: relative;
+  flex: none;
+  height: 100%;
+  touch-action: none;
+}
+
+.os-tl-clip {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.375rem;
+  overflow: hidden;
+  border: 2px solid var(--os-cl-line);
+  border-radius: 0.25rem;
+  background: var(--os-tl-screen);
+  color: var(--os-cl-fg);
+  cursor: grab;
+  user-select: none;
+}
+
+.os-tl-lane[data-kind="webcam"] .os-tl-clip { background-color: var(--os-tl-webcam); }
+.os-tl-lane[data-kind="audio"] .os-tl-clip { background-color: var(--os-tl-audio); }
+.os-tl-lane[data-kind="media"] .os-tl-clip { background-color: var(--os-tl-media); }
+.os-tl-lane[data-kind="overlay"] .os-tl-clip { background-color: var(--os-tl-overlay); }
+.os-tl-lane[data-kind="zoom"] .os-tl-clip { background-color: var(--os-tl-zoom); }
+
+.os-tl-clip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.os-tl-badge {
+  flex: none;
+  padding: 0 0.3rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Muted clips are hatched, and say so. */
+.os-tl-muted {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(128, 128, 128, 0.4) 6px 9px);
+}
+
+/* Chosen clips have a thick outline; the one with the focus also has a thicker, darker edge. */
+.os-tl-clip[aria-selected="true"] {
+  outline: 3px solid var(--os-cl-accent);
+  outline-offset: 1px;
+}
+
+.os-tl-clip.os-tl-primary {
+  border-width: 4px;
+  border-color: var(--os-cl-fg);
+}
+
+.os-tl-clip:focus-visible {
+  outline: 3px solid var(--os-cl-focus);
+  outline-offset: 2px;
+}
+
+.os-tl-dragging {
+  cursor: grabbing;
+  z-index: 4;
+}
+
+.os-tl-lane.os-tl-drop-ok {
+  outline: 3px dashed var(--os-cl-accent);
+  outline-offset: -3px;
+}
+
+.os-tl-lane.os-tl-drop-no {
+  outline: 3px dotted var(--os-cl-attention);
+  outline-offset: -3px;
+  cursor: not-allowed;
+}
+
+/* The two grips of the chosen clip, and the playhead line, sit over the lanes. */
+.os-tl-grips {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.os-tl-grip {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  width: 0.875rem;
+  height: calc(var(--os-tl-lane-h) - 12px);
+  margin: 6px 0 0 -0.4375rem;
+  border: 2px solid var(--os-cl-fg);
+  border-radius: 0.25rem;
+  background: var(--os-cl-accent);
+  pointer-events: auto;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.os-tl-grip:focus-visible {
+  outline: 3px solid var(--os-cl-focus);
+  outline-offset: 2px;
+}
+
+.os-tl-playline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 4;
+  width: 0;
+  border-left: 3px solid var(--os-tl-playline);
+  pointer-events: none;
+}
+
+/* The marked stretch: a shaded band over every track, edged with dashed lines (so it is not told apart by colour alone), and the
+   line a drag has jumped to. They sit over the lanes and never take the pointer. */
+.os-tl-band {
+  position: absolute;
+  top: var(--os-tl-ruler-h);
+  bottom: 0;
+  z-index: 3;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--os-cl-attention, #b00020) 22%, transparent);
+  border-left: 2px dashed var(--os-cl-attention, #b00020);
+  border-right: 2px dashed var(--os-cl-attention, #b00020);
+  pointer-events: none;
+}
+
+.os-tl-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 0;
+  border-left: 2px dashed var(--os-cl-attention, #b00020);
+  pointer-events: none;
+}
+
+.os-tl-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 4;
+  width: 0;
+  border-left: 2px solid var(--os-cl-accent);
+  pointer-events: none;
+}
+
+.os-tl-stretchline {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+}
+
+.os-tl-trackform {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+  padding: 0.5rem;
+  border: 1px solid var(--os-cl-line);
+  border-radius: 0.25rem;
+}
+
+.os-tl-trackform[hidden] {
+  display: none;
+}
+
+.os-tl-trackform-title {
+  margin: 0;
+  flex: 1 1 100%;
+}
+
+.os-tl-tool[aria-pressed="true"] {
+  background: var(--os-cl-selected-bg);
+  border-color: var(--os-cl-fg);
+}
+
+@media (forced-colors: active) {
+  .os-tl-band,
+  .os-tl-mark {
+    border-color: Highlight;
+    background: transparent;
+  }
+  .os-tl-guide {
+    border-color: Highlight;
+  }
+  .os-tl-tool[aria-pressed="true"] {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+  }
+}
+
+@media (max-width: 40rem) {
+  :root {
+    --os-tl-gutter: 5rem;
+  }
+}
+
+@media (forced-colors: active) {
+  .os-tl-clip {
+    background: Canvas;
+    border-color: CanvasText;
+    color: CanvasText;
+  }
+  .os-tl-clip[aria-selected="true"] {
+    background: Highlight;
+    color: HighlightText;
+    outline-color: Highlight;
+  }
+  .os-tl-clip.os-tl-primary {
+    border-color: CanvasText;
+  }
+  .os-tl-grip {
+    background: Highlight;
+    border-color: CanvasText;
+  }
+  .os-tl-playline {
+    border-left-color: CanvasText;
+  }
+  .os-tl-tick {
+    color: CanvasText;
+  }
+}
+
+/* ---- the tool bar and the zoom slider: one row above the tracks ---- */
+
+.os-tl-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin: 0 0 0.25rem;
+}
+
+.os-tl-tools,
+.os-tl-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  flex-wrap: wrap;
+}
+
+.os-tl-tool {
+  font: inherit;
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--os-cl-fg);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  min-height: 2rem;
+  cursor: pointer;
+}
+
+.os-tl-tool:hover {
+  background: var(--os-cl-selected-bg);
+  border-color: var(--os-cl-line);
+}
+
+/* A tool that cannot do anything now is dimmed, and says why when it is pressed; it stays in the bar so the bar never changes shape. */
+.os-tl-tool[aria-disabled="true"] {
+  color: var(--os-cl-muted);
+  opacity: 0.6;
+}
+
+.os-tl-tool .os-tl-icon {
+  display: block;
+  flex: none;
+}
+
+.os-tl-sep {
+  align-self: stretch;
+  width: 1px;
+  margin: 0.25rem 0.375rem;
+  background: var(--os-cl-line);
+}
+
+.os-tl-zoomslider {
+  width: min(12rem, 30vw);
+  accent-color: var(--os-cl-accent);
+  margin: 0 0.25rem;
+}
+
+.os-tl-zoomslider[aria-disabled="true"] {
+  opacity: 0.5;
+}
+
+@media (forced-colors: active) {
+  .os-tl-tool {
+    border-color: ButtonText;
+  }
+  .os-tl-tool[aria-disabled="true"] {
+    color: GrayText;
+    border-color: GrayText;
+  }
+  .os-tl-sep {
+    background: ButtonText;
+  }
+}
+
+/* ---- pictures along the clips of a screen, a webcam or an imported video ---- */
+
+.os-tl-strip {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--os-cl-head-bg);
+}
+
+.os-tl-tile {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 56px; /* TILE_PX in thumbnails.ts */
+  background-size: cover;
+  background-position: center;
+  border-right: 1px solid var(--os-cl-line);
+  box-sizing: border-box;
+}
+
+/* With pictures behind it, the name sits on its own solid patch at the top left, so it can always be read. */
+.os-tl-hasstrip {
+  align-items: flex-start;
+  padding: 0;
+}
+
+.os-tl-hasstrip .os-tl-clip-name {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  padding: 0 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  background-color: var(--os-tl-screen);
+  color: var(--os-cl-fg);
+  border-radius: 0 0 0.25rem 0;
+}
+
+.os-tl-lane[data-kind="webcam"] .os-tl-hasstrip .os-tl-clip-name { background-color: var(--os-tl-webcam); }
+.os-tl-lane[data-kind="media"] .os-tl-hasstrip .os-tl-clip-name { background-color: var(--os-tl-media); }
+
+.os-tl-hasstrip .os-tl-badge {
+  position: relative;
+  z-index: 1;
+  background: var(--os-cl-bg);
+  margin: 0 0 0 0.25rem;
+}
+
+.os-tl-muted .os-tl-strip {
+  opacity: 0.45;
+}
+
+@media (forced-colors: active) {
+  .os-tl-hasstrip .os-tl-clip-name {
+    background-color: Canvas;
+    color: CanvasText;
+  }
+  .os-tl-clip[aria-selected="true"] .os-tl-clip-name {
+    background-color: Highlight;
+    color: HighlightText;
+  }
+}
+
+/* A transition's edge on a clip: a small corner wedge, drawn in the text colour so it shows on every track colour. */
+.os-tl-trans {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0.75rem;
+  pointer-events: none;
+  background: linear-gradient(to right, var(--os-cl-fg), transparent);
+  opacity: 0.55;
+}
+.os-tl-trans-in { left: 0; }
+.os-tl-trans-out { right: 0; transform: scaleX(-1); }
+
+/* ---- the playhead time sits in the bar, and Add track is a menu button at the end of the tool bar ---- */
+
+.os-tl-timefield {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+}
+
+.os-tl-menuholder {
+  position: relative;
+  display: inline-flex;
+}
+
+.os-tl-menu {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  min-width: 11rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem;
+  border: 1px solid var(--os-cl-line);
+  border-radius: 0.25rem;
+  background: var(--os-cl-bg, Canvas);
+  color: var(--os-cl-fg);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.2);
+}
+
+.os-tl-menu[hidden] {
+  display: none;
+}
+
+.os-tl-menuitem {
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  padding: 0.3rem 0.6rem;
+  border: 0;
+  border-radius: 0.2rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.os-tl-menuitem:hover,
+.os-tl-menuitem:focus-visible {
+  background: var(--os-cl-hover, rgb(0 0 0 / 0.08));
+  outline: 2px solid var(--os-cl-focus, #1a56db);
+  outline-offset: -2px;
+}
+
+.os-tl-zoomslider {
+  width: 9rem;
+}
