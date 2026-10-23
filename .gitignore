@@ -1,0 +1,26 @@
+# Build output
+target/
+dist/
+build/
+node_modules/
+
+# Downloaded model weights, if any are ever used. Never commit these.
+models/
+
+# Personal Claude Code instructions, not shared with the project
+CLAUDE.local.md
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Also ignored by GitHub's Rust template
+**/*.rs.bk
+*.pdb
+**/mutants.out*/
+rustc-ice-*.txt
+
+# Python bytecode
+__pycache__/
+*.pyc

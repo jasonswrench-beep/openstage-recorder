@@ -1,0 +1,4 @@
+# Build the C runtime into the program, so that a computer that has only had Windows installed (and not Microsoft's Visual C++ runtime) can start it.
+# (The Universal C Runtime that this leaves out is part of Windows 10 and 11.) tools/check_imports.py checks the finished program.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

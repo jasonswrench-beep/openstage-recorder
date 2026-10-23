@@ -1,0 +1,238 @@
+# OpenStage Capture: Project Format
+
+**Status:** v0.3 (matches the code in `capture/crates/openstage-capture-project`)
+**Format name:** `openstage-capture-project`
+**Schema version:** `0.2.5` (projects at `0.1.x`, `0.2.0`, `0.2.1`, `0.2.2`, `0.2.3` and `0.2.4` still open unchanged: see section 7)
+
+A recording lives in its own folder, named `something.capture`, **beside** the course (the `.osproj`), never inside it. This matters: OpenStage's publisher zips the project into `source/`, and raw footage and the interaction log (which can contain private information) must never ship to learners. Only the exported, edited video becomes part of the course.
+
+## 1. Layout
+
+```
+lesson.capture/
+  capture.json                  the manifest (small, rarely changes)
+  edit.json                     the edit decisions (trims, splits, where clips sit); absent until the first edit
+  takes/
+    take-001/                   a real screen recording
+      take.json                 the only record of this take's state; lists its media files
+      events.jsonl              markers, and (only when the author turned it on) what they did with the mouse and keyboard (append-only)
+      screen.mp4                the picture and the mixed sound, as one crash-safe fragmented MP4
+      mic.wav                   the microphone alone (when a microphone was recorded)
+      system.wav                the computer's own sound alone (when it was recorded)
+    take-002/                   a take of the built-in test source (used by the tests)
+      take.json
+      events.jsonl
+      segments/
+        seg-000001.seg          complete, checksummed pieces of the recording
+        seg-000002.seg
+        seg-000003.part         a piece still being written (or left by a crash)
+```
+
+A take holds its media in **one of two ways**. A real screen recording is one `screen.mp4` file written by Windows' own video tools, plus one separate `.wav` sound file for each sound that was recorded. The built-in test source (which makes fake picture and sound so the recorder can be tested anywhere) uses the segment files described in section 4. `take.json` says which: a take with a `media` list is a file take; a take without one is a segment take.
+
+## 2. The manifest: `capture.json`
+
+```json
+{
+  "format": "openstage-capture-project",
+  "schemaVersion": "0.1.0",
+  "id": "cap-...",
+  "title": "Lesson 1",
+  "language": "en-US",
+  "created": "2026-10-13T12:00:00Z",
+  "tracks": {
+    "captions": [],
+    "transcript": null,
+    "audioDescription": [],
+    "altText": []
+  },
+  "edit": null
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `format` | Always `openstage-capture-project`. A different value is refused. |
+| `schemaVersion` | `0.1.x` files are readable by this version. Anything else is refused with a plain message. Every change to the format bumps this and ships a migration. |
+| `id` | A unique id for the project. |
+| `title`, `language` | Set when the project is made. `language` is a BCP 47 tag, for captions and speech. |
+| `created` | UTC time, ISO 8601. |
+| `tracks` | The accessibility tracks. They exist from version one so captions, transcript, audio description, and alt text are never an afterthought. Their contents are defined in later versions; in 0.1 they are empty. |
+| `edit` | Reserved and unused: the edit decision list is the separate file `edit.json`, described in `capture-edit-format.md`. Its presence is the truth, so the two cannot disagree. Stays `null`. |
+
+**The manifest never lists takes.** The folder `takes/` is the list. This keeps a crash from leaving two records that disagree.
+
+## 3. A take: `take.json`
+
+```json
+{
+  "id": 1,
+  "state": "complete",
+  "startedAt": "2026-10-13T12:00:00Z",
+  "endedAt": "2026-10-13T12:00:12Z",
+  "setAsideAt": null,
+  "sources": ["screen:1"],
+  "target": null,
+  "flushMs": 2000,
+  "durationMs": 12000,
+  "maxLossMs": null,
+  "segments": 3,
+  "media": [
+    { "file": "screen.mp4", "kind": "screen", "container": "fragmented-mp4",
+      "mix": { "microphoneGainDb": 0, "systemGainDb": -10 },
+      "region": { "display": 1, "x": 100, "y": 200, "width": 1280, "height": 720 } },
+    { "file": "mic.wav", "kind": "microphone", "container": "wav" },
+    { "file": "system.wav", "kind": "system-audio", "container": "wav" },
+    { "file": "webcam.mp4", "kind": "webcam", "container": "fragmented-mp4",
+      "camera": { "name": "NexiGo Iris 4K Webcam" } },
+    { "file": "events.jsonl", "kind": "interactions", "container": "jsonl",
+      "interactions": { "display": 1, "keys": true } }
+  ]
+}
+```
+
+| `state` | Meaning |
+|---|---|
+| `recording` | Being recorded now, **or the program stopped before finishing** (a crash). `recover` repairs these. |
+| `complete` | Finished cleanly. |
+| `recovered` | Repaired after an interruption. `maxLossMs` says the most that could have been lost. |
+| `setAside` | The author chose Start again. The take is **kept, never erased**. |
+
+| Field | Meaning |
+|---|---|
+| `sources` | What was recorded: `screen:1` is Display 1; `synthetic` is the test source. |
+| `flushMs` | The most recording a crash can cost with this kind of media. Segment takes force data to disk this often (1000 by default). For `fragmented-mp4` takes it is 2000: Windows closes a fragment about every second, and a measured crash on Windows 11 lost 1.1 seconds. |
+| `durationMs` | How long the recording ran, not counting time spent paused. For a recovered file take it is an **estimate** (about one second per whole fragment); the exact length is read when the video is opened. |
+| `segments` | How many media files the take holds (segment files, or video files). |
+| `media` | New in 0.2. The take's media files, named relative to the take's folder, each with a `kind` and a `container`. Kinds: `screen` (in a `fragmented-mp4`; its optional `mix` says how the sound inside it was mixed, see section 4, and its optional `region` says which part of the display it shows, see below: a setup box and then short, self-contained fragments, so a file cut off by a crash plays up to the last whole fragment), `microphone` and `system-audio` (each a `wav`, new in 0.2.1: see section 4) `webcam` (a `fragmented-mp4` of its own, new in 0.2.4, with an optional `camera` that names the camera: see "The webcam" in section 4) and `interactions` (the take's `events.jsonl` as `jsonl`, new in 0.2.5, listed **only when the author turned interaction recording on**, with an `interactions` object: see section 6). Absent in older projects. A reader ignores kinds it does not know. |
+
+**`region`** (new in 0.2.3) is present on the video's entry only when less than the whole display was recorded. `display` is the display's number (1 is the main display, as in `sources`); `x` and `y` are how many pixels the picture's top left corner is from the display's top left corner; `width` and `height` are the size of the video in pixels, which is the size actually recorded (an odd size entered by the author is made one pixel smaller, because H.264 needs an even size, and this field holds the smaller size). Anything recorded in display coordinates, such as the cursor and clicks, is placed on the video by subtracting `x` and `y`. A reader that does not know `region` shows the video as it is. The program also refuses a region that reaches past the display or is smaller than 64 by 64 pixels before anything is recorded.
+
+`take.json` is written atomically (to a temporary file, then renamed), so a crash never leaves half a file. It is the **only** place a take's state is recorded. Take folders are numbered `take-001`, `take-002`, and so on; numbers are never reused.
+
+## 4. Screen recordings: one crash-safe MP4
+
+A real screen recording is one file, `screen.mp4`, written by Windows' Media Foundation as a **fragmented MP4**: the setup box (`ftyp`, `moov`) is written first, then a short fragment (a `moof` box describing it and an `mdat` box holding the video) about once a second. Every fragment is complete on its own, so a file that stops in the middle of a fragment still plays up to the one before.
+
+The picture is H.264 at a steady 30 pictures per second (the newest picture of the screen repeats while the screen does not change). The video's clock is **recording time**: pausing stops it, so the video has no gap where a pause was.
+
+### The webcam
+
+When a webcam is recorded (it is off unless the author asks for it) it goes into a file of its own, `webcam.mp4`, beside `screen.mp4`, listed with `kind` `webcam` and a `camera` whose `name` is the camera's name as Windows gives it. It is never drawn into the screen video: where it appears (a small picture in a corner, full screen, or not at all) is decided when the video is edited. The edit format's `webcam` track plays it.
+
+It is a fragmented MP4 like the screen video, crash-safe in the same way and repaired by `recover` in the same way. It has no sound track: the voice is in `mic.wav` and in the mix inside `screen.mp4`. The size is the camera's own, chosen as the closest the camera offers to 1280 by 720 at 30 pictures a second (a camera that offers only slower modes gives a slower video, between 10 and 30 a second); it is not mirrored, which is a matter for a preview only.
+
+**The webcam is placed by the time its pictures were taken, not the time they arrived.** A webcam picture reaches the program a tenth of a second or more after it was taken. Each picture carries the time the camera says it was taken, on the clock Windows also uses for sound; the recorder places it on the recording clock by that time, and writes the video a little behind the clock to make room for the pictures still on their way, waiting up to 0.4 seconds at a pause and at the end for the last ones. A picture whose time stamp cannot be believed (one that seems to arrive before it was taken, or more than 3 seconds after) is placed when it arrived, and the recording summary says how many were. The video has a picture for every 1/30 second (or the camera's rate) of recording time from the start, and, like the screen video, no gap where a pause was. Pictures taken during a pause are thrown away.
+
+A camera that stops during a recording does not stop the recording. The webcam video ends where the camera stopped, so it is shorter than the recording; the screen and the sound carry on.
+
+### Sound
+
+Sound is recorded as 16-bit stereo at 48,000 samples per second and is stored **twice**:
+
+1. **Mixed, inside `screen.mp4`**, as one AAC sound track (128 kilobits per second) beside the picture. This is what every player plays. It is the microphone and the computer's sound added together.
+2. **Separately, as WAV files**: `mic.wav` (the microphone alone) and `system.wav` (the computer's own sound alone, including a screen reader's speech). The editor needs them apart, for example to remove an echo when the microphone also heard the speakers. A take lists a WAV file only if that sound was recorded.
+
+The mix inside the video can be adjusted without touching the originals: `microphoneGainDb` and `systemGainDb` (whole decibels from -40 to 20, 0 meaning as heard; about 6 decibels is half or double the volume) are applied only to the mix, and `take.json` records them in the video's `mix`. `mic.wav` and `system.wav` always hold the sound exactly as heard, so the editor can start again from them and set the balance by ear. Windows' own MP4 writer accepts only one sound stream per file (one picture, one sound), which is why the two sounds are kept apart as WAV files and not as two tracks inside the MP4.
+
+Every sound track is as long as the recording, to within a few hundredths of a second. The recording clock stands still while paused, so sound heard during a pause is thrown away, and so is any sound heard while the recorder was still starting up. If the computer plays nothing, Windows sends no sound at all for that time; the recorder fills the gap with silence so the track keeps its length.
+
+A WAV file normally records its length only when it is finished, so one cut off by a crash would claim to be empty. These are written differently: about once a second the recorder writes the sound to the operating system and only then updates the length in the file's header. So the header is never ahead of the sound, and a recorder that is killed costs at most about a second of it. About every 10 seconds it also has the disk itself take the sound. Each sound file is written by a thread of its own, so none of this ever holds up the recording: a real computer once made a single write wait two seconds behind the disk taking the same file's earlier sound, and the recorder lost two seconds of the computer's sound with it. If the disk is slow, sound waits in memory (a few hundred kilobytes a second) until it is written, so a killed recorder can then cost more than a second. A power cut or a crash of the whole computer can therefore cost more than a killed recorder, as it can for the MP4, which Windows writes without waiting for the disk either; what has been tested is the recorder being killed. `recover` also cuts a half-written sound frame off the end and corrects the header, and leaves a file that is already fine byte for byte as it was.
+
+A WAV file counts its length in 32 bits, which is a little under 4 GiB: about 6 hours of this sound. The recorder stops with a plain message rather than writing a file it could not describe.
+
+If a sound device stops in the middle of a recording (a microphone is unplugged, a headset is switched), the take ends with a plain message and everything recorded until then is kept.
+
+### Recovery
+
+`openstage-capture recover --project <folder>` does this for every take in state `recording` that lists an MP4 file:
+
+1. Look at the outermost boxes of the file. Find the last safe point: after the setup box, or after a whole fragment (`moof` and its complete `mdat`).
+2. Cut the file back to that point. Only an unfinished last fragment, or a few stray bytes, are ever removed. A file that is already clean is left alone.
+3. A file that does not exist is reported. A file with no usable start (not even the setup box) is **left exactly as it is** and reported.
+4. Repair each `wav` sound file the take lists: cut a half-written sound frame off the end and correct the header's lengths. A file that is already fine is left byte for byte as it was; one that is missing or not a sound file this program wrote is reported and left alone.
+5. Trim a half-written final line from `events.jsonl`.
+6. Write `take.json` with state `recovered`, an estimated `durationMs`, and `maxLossMs`.
+
+It is safe to run again. In a real test on Windows 11 the recording ran 8.1 seconds, the program was killed without warning, and 7.0 seconds survived and played without any repair.
+
+## 5. Segments (the test source)
+
+Segment takes are written in short pieces called segments (2 seconds each by default). Each piece is complete and checksummed on its own, so a crash costs seconds, not the take.
+
+### Files
+
+- `seg-000001.part`: being written.
+- `seg-000001.seg`: complete. The `.part` file is renamed to `.seg` only after it is flushed to disk.
+
+### Contents
+
+A segment file is:
+
+```
+8 bytes   magic: "OSCSEG0\n"
+then zero or more records:
+  4 bytes   payload length   (unsigned, little-endian)
+  4 bytes   CRC-32 of payload (unsigned, little-endian)
+  8 bytes   media time in ms (unsigned, little-endian)
+  n bytes   payload
+```
+
+The first byte of each payload says what kind of data it is: `1` picture, `2` microphone sound, `3` system sound (including screen reader speech). The rest is the data for that kind. (Release 1 will define the data formats when real capture arrives; version 0.1 stores the test source's data.)
+
+### Flushing
+
+Data is forced to disk every `flushMs` (1000 ms by default). **A crash loses at most that much.** The requirement allows 10 seconds; this is stricter.
+
+### Recovery
+
+`openstage-capture recover --project <folder>` does this for every take in state `recording`:
+
+1. For each `.part` file, keep every complete record whose checksum is right; stop at the first damaged or cut-off record; cut the file off there and rename it to `.seg`. A `.part` file that holds only the 8-byte start marker and no records is removed (it held no data). A `.part` file that does not start with the marker is **kept** and renamed to `seg-NNNNNN.part.unreadable`, and the author is told in plain language.
+2. Count the complete segments and read the recording length from the last one.
+3. Remove a half-written final line from `events.jsonl`.
+4. Write `take.json` with state `recovered`, the length, and `maxLossMs`.
+
+It is safe to run again: takes that are already fine are left alone. A take folder with a missing or unreadable `take.json` is rebuilt from the recording itself, with a plain-language note. **Nothing is ever deleted except a segment file that held no data at all.** The cut-off end of a damaged segment is the only recorded data that can be dropped, and `maxLossMs` states how much that can be.
+
+## 6. The interaction log: `events.jsonl`
+
+One JSON object per line, only ever appended to. `t` is milliseconds of recording time, never goes backwards from one line to the next, and does not advance while paused.
+
+```json
+{"t":0,"type":"window","title":"Untitled - Notepad","process":"notepad.exe","bounds":{"x":80,"y":40,"width":800,"height":600}}
+{"t":40,"type":"cursorMove","x":640,"y":470}
+{"t":1200,"type":"click","x":640,"y":480,"button":"left"}
+{"t":1200,"type":"element","name":"Save","role":"button"}
+{"t":2100,"type":"key","key":"s","modifiers":["ctrl"]}
+{"t":3400,"type":"marker","label":"look here"}
+```
+
+| `type` | Fields |
+|---|---|
+| `cursorMove` | `x`, `y`. Written when the cursor has moved, no more often than every 33 ms; the last place it reached is always written. |
+| `click` | `x`, `y`, `button` (`left`, `right`, `middle`, `back`, `forward`). Button presses only. |
+| `element` | `name`, `role` of the item that was clicked, from Windows' accessibility information, written right after the `click` it belongs to with the same `t`. `role` is in English whatever the language of Windows (`button`, `edit`, `menu item`, `link`, ...). Written only when the item has a name. Only the name is read, never the contents of a field. |
+| `key` | `key`, `modifiers`. One line per press (a key held down is one press). `key` names the key, not the character: letters are lower case, digits are `0` to `9`, the symbols are named as on a US keyboard (`semicolon`, `comma`, `minus`, `slash`, `backtick`, `left-bracket`, `quote`, ...), others are `enter`, `tab`, `escape`, `space`, `backspace`, `delete`, `left`, `up`, `f1` to `f24`, `numpad-0` to `numpad-9` and so on. `modifiers` lists any of `ctrl`, `alt`, `shift`, `win`, in that order. The modifier keys on their own are never lines. **Never written for a password field. A letter, digit, symbol or space typed on its own is written only when the recorder is sure the keyboard is aimed at an ordinary text field; when it cannot tell, those are not written at all.** Keys that cannot spell a secret (`enter`, the arrows, `f5`) and shortcuts (`ctrl+s`) are written unless the keyboard is known to be in a password field. Ctrl and Alt held together count as typing, not as a shortcut, because that is how many keyboards make their third symbol on a key. |
+| `window` | `title`, `process` (the program's file name), and optionally `bounds` (`x`, `y`, `width`, `height`: where the window sits, in the same pixels as the cursor; absent when Windows would not say). Written when the window in front, its title or its place changes, no more often than every 250 ms; the last change is always written. The first line of a take says which window was in front when recording began. Titles are written exactly as Windows gives them, and some programs put what is typed, or the page being viewed, in the title (Notepad shows the first words of a new document; a browser shows the page's name), so a title can reveal private things even when no keys are kept. |
+| `marker` | `label`. The author's own note. |
+
+**Positions** are pixels of the display named in the `interactions` entry of `take.json`, counted from that display's top left corner. They can be negative or past the display's size when the cursor is on another display. When the whole display is recorded they are pixels of the video; with a `region` subtract the region's `x` and `y`; for a recorded window subtract the `x` and `y` of the `bounds` of the latest `window` line for that window.
+
+**The `interactions` entry** in `take.json`'s media list (`kind` `interactions`, file `events.jsonl`, container `jsonl`) has `display` (the number the positions are measured on) and `keys` (false when the author chose to leave the keys out, so a reader can tell an empty log from one that was never asked to hold keys). It is absent when the author did not turn interaction recording on; the file may still exist and hold markers.
+
+**It is off unless the author turns it on** (`record --interactions no-keys` or `on`). With `no-keys` the recorder installs no keyboard hook at all. The author is told in words, with a sound and in every state report while it is on; nothing is noted while recording is paused. What is noted can be read back in words and deleted (`openstage-capture interactions`): deleting removes every line except `marker` and any line that cannot be read, and removes the take's `interactions` entry; the video and the sound are not touched. Deleting a take that is still being recorded is refused.
+
+A line that cannot be read, such as one cut short by a crash, is skipped when reading and trimmed by `recover`. The recorder writes the log from a thread of its own and forces it to the disk about every `flushMs`, so that a drive that is slow to confirm a save (the owner's drive took up to 0.8 seconds, several times a minute) cannot hold up the picture or the sound. The price is that on such a drive a crash can lose more of the log than `flushMs`; the video and sound files are not affected, because they are written elsewhere. The log can contain private information (the title of every window in front, the names of what was clicked, the keys pressed), so it lives in the capture project and is never published. It is the raw material for step lists, alt text, suggested zooms and cursor effects.
+
+## 7. Versions
+
+`0.2.0` added one optional field (`media` in `take.json`). `0.2.1` adds two kinds of media to that list (`microphone` and `system-audio`, in `wav` files) and puts the mixed sound inside `screen.mp4`. `0.2.2` adds the optional `mix` on the video's entry in that list. `0.2.3` adds the optional `region` on the video's entry. `0.2.4` adds the `webcam` kind of media and the optional `camera` on its entry. `0.2.5` adds the `interactions` kind of media (the take's `events.jsonl`), the optional `interactions` object on its entry, and the optional `bounds` on a `window` line of the log. Projects at `0.1.x`, `0.2.0`, `0.2.1`, `0.2.2`, `0.2.3` and `0.2.4` open unchanged, so no migration is needed; the version is bumped so that a program can tell which projects can hold sound files. (A program that predates `0.2.1` opens such a project but does not know about its sound files; `recover` from that program would leave them as they are.) A project with any other version is refused with a plain message.
+
+## 8. Rules this format keeps
+
+- Nothing the author recorded is erased by the software. Start again sets a take aside.
+- A crash costs at most `flushMs` of recording (1 second for segment takes, 2 for screen recordings, sound files included); the interaction log can lose more on a drive that is very slow, see section 6).
+- A newer, unknown schema is refused with a plain message, never half-read.
+- Raw footage and the interaction log stay out of published courses.
+- Narration is text. Nothing in this format stores narration as audio only.

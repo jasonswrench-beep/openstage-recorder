@@ -1,0 +1,30 @@
+OpenStage Recorder
+Copyright 2026 Jason S. Wrench and the OpenStage Author contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+---
+
+Third-party components:
+
+Rust libraries (built into the recording program)
+  Each is listed with its version and licence in capture/THIRD-PARTY.md, which is made by
+  capture/tools/check_rules.py and checked on every change. All are on the allowed licence list
+  (Apache-2.0, MIT, BSD, ISC, Zlib, Unlicense, CC0 and similar).
+
+Windows' own capture and encoding services
+  Screen and window capture, sound capture and MP4 encoding use services that Windows already
+  provides. Nothing from them is included in this repository. FFmpeg is not used.
+
+Any further bundled library, font, icon or model is listed here with its licence before it ships.
+Open weights are not automatically open source: check each one.
