@@ -24,3 +24,9 @@ rustc-ice-*.txt
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Made by `npm run build` in app/, and by the Tauri build
+app/web/main.js
+app/web/style.css
+app/web/icon.svg
+app/src-tauri/gen/
