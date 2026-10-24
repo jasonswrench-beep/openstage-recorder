@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the Recorder window may do: show dialogs, show a folder in the file manager, set its title, and close itself.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:default", "opener:default", "core:window:allow-set-title", "core:window:allow-close", "core:window:allow-destroy"]
+}

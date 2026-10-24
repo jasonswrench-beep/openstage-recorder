@@ -22,6 +22,21 @@ Rust libraries (built into the recording program)
   capture/tools/check_rules.py and checked on every change. All are on the allowed licence list
   (Apache-2.0, MIT, BSD, ISC, Zlib, Unlicense, CC0 and similar).
 
+JavaScript packages (bundled into the app window)
+  @tauri-apps/api, @tauri-apps/plugin-dialog and @tauri-apps/plugin-opener: MIT OR Apache-2.0,
+  from the Tauri project. They are the only JavaScript libraries in the page.
+
+Rust libraries of the app window (app/src-tauri, the Tauri framework and what it uses)
+  259 libraries for Windows, checked by app/tools/check_app_licences.py. All but five are on the allowed
+  licence list. The five are under the Mozilla Public License 2.0, which applies to the files of those
+  libraries and not to this program: cssparser, cssparser-macros, dtoa-short, option-ext and selectors.
+  They come in through Tauri, are used unmodified, and their source is published on crates.io. The full
+  list with versions and licences is made by the check before a release is built.
+
+The application icon
+  app/branding/OpenRecorder.svg is the picture of a film camera that the project owner supplied for this
+  app. The icon files in app/src-tauri/icons and app/web/icon.svg are made from it.
+
 Windows' own capture and encoding services
   Screen and window capture, sound capture and MP4 encoding use services that Windows already
   provides. Nothing from them is included in this repository. FFmpeg is not used.
