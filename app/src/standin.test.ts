@@ -90,12 +90,21 @@ test("the list of sources, the windows and the check are in the shapes the scree
   assert.equal(check.exit?.code, 0);
 });
 
-test("making a video reports its progress and what it made", async () => {
+test("making a video reports its progress and what it made, from a saved edit", async () => {
   const b = makePreviewBackend({ speed: SPEED });
+  await b.recordingWriteEdit(LIBRARY, "Demo.capture", "{}");
   const job = await runOneShot(b, ["render", "--project", `${LIBRARY}\\Demo.capture`, "--out", `${LIBRARY}\\Demo.capture\\exports\\Demo.mp4`]);
   assert.equal(job.exit?.code, 0);
   assert.ok(job.lines.some((l) => l.includes('"progress"')));
   assert.ok(job.lines.some((l) => l.includes('"check":"export"')));
+});
+
+test("like the real video maker, the pretend one has nothing to make a video from until an edit is saved", async () => {
+  const b = makePreviewBackend({ speed: SPEED });
+  const job = await runOneShot(b, ["render", "--project", `${LIBRARY}\\Demo.capture`, "--out", `${LIBRARY}\\Demo.capture\\exports\\Demo.mp4`]);
+  assert.equal(job.exit?.code, 1);
+  assert.ok(job.lines.some((l) => l.includes("There is no edit to export")));
+  assert.equal(job.lines.some((l) => l.includes('"check":"export"')), false);
 });
 
 test("a recorder that is not installed is said so, and starting it fails politely", async () => {
@@ -119,4 +128,18 @@ test("the edit of a recording can be saved and read back", async () => {
   assert.equal(await b.recordingRead(LIBRARY, "Edit me.capture", "edit.json"), undefined);
   await b.recordingWriteEdit(LIBRARY, "Edit me.capture", '{"x":1}');
   assert.equal(await b.recordingRead(LIBRARY, "Edit me.capture", "edit.json"), '{"x":1}');
+});
+
+test("an older edit can be kept once under its own name, never replaced, and never under another name", async () => {
+  const b = makePreviewBackend({ speed: SPEED });
+  const c = new RecorderController(b);
+  await c.start(practice(), recordingPath(LIBRARY, "Keep me"));
+  await until("recording", () => c.session.phase === "recording");
+  await c.act("stop");
+  await until("finished", () => c.session.phase === "finished");
+  await b.recordingKeepEdit(LIBRARY, "Keep me.capture", "edit-before-take-2.json", '{"old":1}');
+  assert.equal(await b.recordingRead(LIBRARY, "Keep me.capture", "edit-before-take-2.json"), '{"old":1}');
+  await assert.rejects(() => b.recordingKeepEdit(LIBRARY, "Keep me.capture", "edit-before-take-2.json", '{"old":2}'), /already in the recording/);
+  assert.equal(await b.recordingRead(LIBRARY, "Keep me.capture", "edit-before-take-2.json"), '{"old":1}');
+  await assert.rejects(() => b.recordingKeepEdit(LIBRARY, "Keep me.capture", "capture.json", "{}"), /not a name/);
 });

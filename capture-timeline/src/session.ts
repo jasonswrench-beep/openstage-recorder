@@ -21,6 +21,7 @@ import {
   TRANSITION_KINDS,
   TRANSITION_NAMES,
   hasNeighbour,
+  setPlacement,
   setTransition,
   type Clip,
   type Transition,
@@ -104,6 +105,7 @@ import {
   type TrackKind,
 } from "../../capture-edit/src/index.ts";
 import { snapTargets, snapTo } from "./snap.ts";
+import { WEBCAM_SIZES, WEBCAM_WHERES, webcamChoice, webcamRect, type WebcamSize, type WebcamWhere } from "./webcam-place.ts";
 
 /** What a command says back: a sentence for the author, and whether it worked. */
 export interface Outcome {
@@ -162,6 +164,8 @@ export interface Details {
   readonly hasTextAlternative: boolean;
   readonly transitionIn?: Transition;
   readonly transitionOut?: Transition;
+  /** A webcam clip: where its small picture sits and how big, as the choices the form offers (`custom` if it was set some other way). */
+  readonly webcam?: { readonly where: WebcamWhere | "custom"; readonly size: WebcamSize | "custom" };
 }
 
 /** A track the primary row could be moved to, or is on now. */
@@ -352,6 +356,7 @@ export class EditSession {
       hasPicture: found !== undefined && !["microphone", "system-audio", "audio"].includes(findSource(this.#history.model, found.clip.source)?.kind ?? "audio"),
       ...(found?.clip.transitionIn === undefined ? {} : { transitionIn: found.clip.transitionIn }),
       ...(found?.clip.transitionOut === undefined ? {} : { transitionOut: found.clip.transitionOut }),
+      ...(found !== undefined && sourceKind === "webcam" ? { webcam: webcamChoice(found.clip.placement) } : {}),
     };
   }
 
@@ -1295,6 +1300,31 @@ export class EditSession {
     }
     const kind: TransitionKind = hasNeighbour(this.#history.model, c.clipId) ? "cross-fade" : "fade";
     return this.#run((m) => setTransition(m, c.clipId, "in", kind));
+  }
+
+  /** The chosen row, if it is a clip of a webcam recording. */
+  #webcamClip(): { clipId: string; clip: Clip } | Outcome {
+    const row = this.#one();
+    if ("ok" in row) return row;
+    const found = findClip(this.#history.model, row.clipId);
+    if (found === undefined) return this.#notAClip(row, "Only a webcam clip has a small picture to place.");
+    if (findSource(this.#history.model, found.clip.source)?.kind !== "webcam") {
+      return no(`${quote(found.clip.name)} is not a webcam recording, so it has no small picture to place.`);
+    }
+    return { clipId: row.clipId, clip: found.clip };
+  }
+
+  /**
+   * Where the webcam's small picture sits and how big, as the form's two choices. The default choice (small and medium in the bottom right)
+   * takes the place away, so the clip is drawn as it is by default, filling the picture when nothing else is showing.
+   */
+  setWebcamPlace(where: string, size: string): Outcome {
+    const c = this.#webcamClip();
+    if ("ok" in c) return c;
+    const chosenWhere = WEBCAM_WHERES.find((w) => w.value === where)?.value;
+    const chosenSize = WEBCAM_SIZES.find((s) => s.value === size)?.value;
+    if (chosenWhere === undefined || chosenSize === undefined) return no("That is not one of the choices for the webcam's picture.");
+    return this.#run((m) => setPlacement(m, c.clipId, webcamRect(chosenWhere, chosenSize)));
   }
 
   /** Choose how the chosen clip arrives or leaves: a transition's name, or "none" to take it away. */

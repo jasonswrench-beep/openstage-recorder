@@ -9,6 +9,7 @@ class Fake implements RecordingBackend {
   files: Record<string, string> = {};
   folders: Record<string, string[]> = {};
   written: string[] = [];
+  kept: [string, string][] = [];
   asked: string[] = [];
   fail = false;
   async recordingRead(dir: string, name: string, rel: string): Promise<string | undefined> {
@@ -24,6 +25,10 @@ class Fake implements RecordingBackend {
   async recordingWriteEdit(_dir: string, _name: string, text: string): Promise<void> {
     if (this.fail) throw new Error("refused");
     this.written.push(text);
+  }
+  async recordingKeepEdit(_dir: string, _name: string, file: string, text: string): Promise<void> {
+    if (this.fail) throw new Error("refused");
+    this.kept.push([file, text]);
   }
   async recordingMediaUrl(_dir: string, _name: string, rel: string): Promise<string> {
     if (this.fail) throw new Error("refused");
@@ -45,12 +50,16 @@ test("a recording is read, listed and written through the recordings folder and 
   assert.ok(fake.asked.every((a) => a.includes("D:/recordings Demo.capture")), "every question names the recordings folder and the recording, never a path");
 });
 
-test("only edit.json can be written, and only the media of a take can be played", async () => {
+test("only edit.json and the kept copy of an older edit can be written, and only the media of a take can be played", async () => {
   const fake = new Fake();
   const f = recordingFolder(fake, "D:/recordings", "Demo.capture");
-  for (const path of ["capture.json", "takes/take-001/take.json", "../edit.json", "edit.json/x", "Edit.json", ""]) {
+  for (const path of ["capture.json", "takes/take-001/take.json", "../edit.json", "edit.json/x", "Edit.json", "", "edit-before-take-.json", "edit-before-take-12345.json", "../edit-before-take-1.json", "edit-before-take-1.json.tmp", "Edit-before-take-1.json"]) {
     assert.equal(await f.writeText(path, "{}"), false, path);
   }
+  assert.deepEqual(fake.written, []);
+  assert.deepEqual(fake.kept, []);
+  assert.equal(await f.writeText("edit-before-take-2.json", "{\"old\":1}"), true);
+  assert.deepEqual(fake.kept, [["edit-before-take-2.json", "{\"old\":1}"]], "the kept copy goes to its own call, never to edit.json");
   assert.deepEqual(fake.written, []);
   assert.equal(await f.mediaUrl("takes/take-001/screen.mp4"), "asset://localhost/takes/take-001/screen.mp4");
   assert.equal(await f.mediaUrl("takes/take-12/mic.wav"), "asset://localhost/takes/take-12/mic.wav");

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-// OpenStage Recorder: the window. A heading, the Record screen, and (in the next step) the editor for a recording.
+// OpenStage Recorder: the window. A heading, the Record screen, and the editing screen for a recording.
 
 import { h } from "../../capture-timeline/src/dom.ts";
 import { backend, errorText } from "./backend.ts";
 import { RecorderController } from "./capturecontroller.ts";
+import { mountEditView, type EditView } from "./editview.ts";
 import { mountRecorderView } from "./recorderview.ts";
 import { loadSettings, saveSettings, type StoredSettings } from "./settings.ts";
 
@@ -30,6 +31,30 @@ async function main(): Promise<void> {
     saveSettings(stored);
   };
 
+  // The editing screen takes the page while it is open. The Record screen stays where it is, out of sight, so nothing the author set is lost.
+  let editing: EditView | undefined;
+  let returnTo: HTMLElement | null = null;
+  const openEditor = (name: string, newestTake?: boolean): void => {
+    if (editing !== undefined) return;
+    returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    view.element.hidden = true;
+    main.classList.add("is-editing");
+    editing = mountEditView(main, { backend, library, name, ...(newestTake === true ? { newestTake: true } : {}), leave: closeEditor });
+    void backend.setTitle(`OpenStage Recorder: editing ${name.replace(/\.capture$/i, "")}`);
+  };
+  const closeEditor = (): void => {
+    editing?.destroy();
+    editing = undefined;
+    main.classList.remove("is-editing");
+    view.element.hidden = false;
+    void backend.setTitle("OpenStage Recorder");
+    // Back to the button that was used to start editing, if it is still there to use.
+    const target = returnTo;
+    returnTo = null;
+    if (target !== null && target.isConnected && target.closest("[hidden]") === null) target.focus();
+    else view.focus();
+  };
+
   const view = mountRecorderView(main, {
     backend,
     controller,
@@ -47,14 +72,10 @@ async function main(): Promise<void> {
       keep();
       return picked;
     },
-    editRecording() {
-      // The editor for a recording is the next part to be built here. Until it is, say so, and do nothing else.
-      const status = main.querySelector<HTMLElement>("[role=status]");
-      if (status) status.textContent = "Editing a recording is not built into this app yet. The recording is kept safely in its folder, and nothing was changed.";
-    },
+    editRecording: openEditor,
   });
 
-  backend.guardClose(() => (controller.busy ? "A recording is still going. Closing the window stops it. Close anyway?" : null));
+  backend.guardClose(() => (controller.busy ? "A recording is still going. Closing the window stops it. Close anyway?" : editing?.closeQuestion() ?? null));
   view.focus();
   if (library === "") {
     const status = main.querySelector<HTMLElement>("[role=status]");

@@ -317,17 +317,6 @@ await check("a recording of the same name warns that it will add a take, and the
   assertMatch(await page.locator('[id$="-folder"]').textContent(), /^This preview keeps only pretend recordings, inside this page, until you close it\. The real app keeps recordings in: C:\\Users\\You\\Videos\\OpenStage Recorder$/, "the preview says what is kept and where the real app would keep it");
 });
 
-await check("Edit this recording is honest that the editor is not built yet, and changes nothing", async (page, t) => {
-  await startPractice(page, t, { name: "Edit me" });
-  await t.waitNow(/^Recording take 1/);
-  await page.waitForTimeout(150);
-  await page.getByRole("button", { name: "Stop" }).click();
-  await page.getByRole("heading", { name: "Finished" }).waitFor();
-  await page.getByRole("button", { name: "Edit the recording I just made" }).click();
-  assertMatch(await t.said(), /not built into this app yet.*nothing was changed/, "it says so");
-  assertEqual(await t.standIn(() => [...window.__openstageStandIn.files.keys()].filter((k) => k.endsWith("edit.json"))), [], "no edit file was made");
-});
-
 // ---- the check ----
 
 await check("checking this computer lists what it found and says in a sentence how it went", async (page, t) => {
@@ -393,6 +382,268 @@ for (const scheme of ["light", "dark"]) {
     }
   }, { colorScheme: scheme });
 }
+
+// ---- editing a recording ----
+
+/** Make a pretend recording with the keyboard-free shortcuts and come back to the Record screen with it in the list. */
+async function makeRecording(page, t, { name = "Edit demo", webcam = false } = {}) {
+  await page.getByLabel("Name of the recording").fill(name);
+  await page.getByLabel(/^Countdown/).fill("0");
+  if (webcam) {
+    await page.getByLabel(/^Practice/).uncheck();
+    const value = await page.getByLabel("A webcam", { exact: true }).evaluate((el) => [...el.options].find((o) => /Pretend webcam/.test(o.textContent))?.value);
+    await page.getByLabel("A webcam", { exact: true }).selectOption(value);
+  } else {
+    await page.getByLabel(/^Practice/).check();
+  }
+  await page.getByRole("button", { name: "Start recording" }).focus();
+  await t.key("Enter");
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  await page.waitForTimeout(150);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  await page.getByRole("button", { name: "Done" }).click();
+}
+
+const openEdit = async (page, t) => {
+  await page.getByRole("button", { name: "Edit this recording", exact: true }).focus();
+  await t.key("Enter");
+  await page.getByRole("heading", { level: 2, name: /^Edit the recording: / }).waitFor();
+  await page.waitForFunction(() => /^Opened the recording/.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
+};
+const editSaid = async (page) => {
+  await page.waitForTimeout(150);
+  return (await page.locator(".os-cl-status").first().textContent()) ?? "";
+};
+
+await check("Edit the recording I just made opens the editing screen on a new edit of that take, changes nothing on disk, and Back returns to the button", async (page, t) => {
+  await startPractice(page, t, { name: "Edit me" });
+  await t.waitNow(/^Recording take 1/);
+  await page.waitForTimeout(150);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  await page.getByRole("button", { name: "Edit the recording I just made" }).focus();
+  await t.key("Enter");
+  await page.getByRole("heading", { level: 2, name: "Edit the recording: Edit me" }).waitFor();
+  await page.waitForFunction(() => /^Opened the recording/.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
+  assertMatch(await editSaid(page), /Started a new edit from your newest recording, take 1\./, "it says what it made the edit from");
+  assertEqual(await t.standIn(() => [...window.__openstageStandIn.files.keys()].filter((k) => k.endsWith("edit.json"))), [], "no edit file is made until the edit is saved");
+  await page.getByRole("button", { name: "Back to recordings" }).click();
+  assertEqual(await t.focusLabel(), "Edit the recording I just made", "the focus is back on the button that was used");
+});
+
+const stateText = async (page) => (await page.locator('[id$="-state"]').first().textContent()) ?? "";
+const saved = (page, file) => page.evaluate((f) => window.__openstageStandIn.files.get(f), file);
+
+await check("Edit opens the editing screen for a recording, says what it opened, puts the focus in the timeline, and Back returns to the button", async (page, t) => {
+  await makeRecording(page, t);
+  assertEqual(await t.focusLabel(), "Start recording", "Done gives the focus back to Start");
+  await openEdit(page, t);
+  assertMatch(await editSaid(page), /^Opened the recording Edit demo, \d+ seconds? long\. Tracks and clips: 2 clips on 2 tracks/, "what was opened is said");
+  assertEqual(await page.getByRole("heading", { level: 2, name: "Edit the recording: Edit demo" }).count(), 1, "the screen has its own heading");
+  assertEqual(await page.getByRole("heading", { level: 2, name: "Record", exact: true }).isVisible(), false, "the Record screen is put away while editing");
+  assertEqual(await page.evaluate(() => document.activeElement?.closest(".os-ed-timeline") !== null), true, "the focus is in the timeline");
+  assertEqual(await page.title(), "OpenStage Recorder: editing Edit demo", "the window's title says what is being edited");
+  assertEqual(await page.locator(".app-main.is-editing").count(), 1, "the page takes the whole width");
+  await page.getByRole("button", { name: "Back to recordings" }).focus();
+  await t.key("Enter");
+  assertEqual(await page.locator(".os-ed").count(), 0, "the editing screens are gone");
+  assertEqual(await page.getByRole("heading", { level: 2, name: "Record", exact: true }).isVisible(), true, "the Record screen is back");
+  assertEqual(await t.focusLabel(), "Edit this recording", "the focus is back on the button that was used");
+  assertEqual(await page.title(), "OpenStage Recorder", "the title is back");
+});
+
+await check("only Blur is offered among the callouts, with Zoom, and no text, shape, arrow or blackout tool", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  assertEqual(await page.locator(".os-ed-callouts button").allTextContents(), ["Blur", "Zoom on a part", "Draw a zoom"], "the callout bar");
+  const everything = (await page.locator(".os-ed button").allTextContents()).join(" | ");
+  for (const word of ["Text", "Title", "Lower third", "Highlight", "Circle", "Arrow", "Cover", "Picture", "Video", "Sound"]) {
+    assert(!new RegExp(`(^|\\| )${word}( |\\||$)`).test(everything), `${word} is offered`);
+  }
+});
+
+await check("a webcam clip has Where and How big boxes, they are named, change the edit in one undo step, and are saved and read back", async (page, t) => {
+  await makeRecording(page, t, { name: "Webcam demo", webcam: true });
+  await openEdit(page, t);
+  await page.locator('.os-tl-lane[data-kind="webcam"] .os-tl-clip').first().click();
+  await page.getByRole("button", { name: "Properties and clip list" }).click();
+  const where = page.getByLabel("Webcam picture: where", { exact: true });
+  const size = page.getByLabel("Webcam picture: how big", { exact: true });
+  await where.waitFor();
+  assertEqual(await where.inputValue(), "bottom-right", "starts in the default corner");
+  assertEqual(await size.inputValue(), "medium", "starts at the default size");
+  assertEqual(await page.getByRole("group", { name: "Where the webcam picture sits" }).count(), 1, "the boxes are a named group");
+  assertMatch((await where.getAttribute("aria-describedby")) ?? "", /-cam-hint$/, "the boxes point at their hint");
+  await where.focus();
+  await page.keyboard.press("Escape");
+  assertEqual(await page.evaluate(() => document.activeElement?.getAttribute("role")), "row", "Escape in the box returns to the clip's row in the list");
+  await where.selectOption("top-left");
+  assertMatch(await editSaid(page), /./, "something is said");
+  await size.selectOption("large");
+  assertEqual([await where.inputValue(), await size.inputValue()], ["top-left", "large"], "the choices are kept");
+  await page.keyboard.press("Control+s");
+  assertMatch(await editSaid(page), /^Saved the edit in Webcam demo\.capture\./, "the save is said");
+  const text = await saved(page, "Webcam demo.capture/edit.json");
+  assert(text !== undefined && /"placement":\{"x":250,"y":450,"width":3500,"height":3500\}/.test(text.replace(/\s+/g, "")), "the place is in the saved edit");
+  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await openEdit(page, t);
+  await page.locator('.os-tl-lane[data-kind="webcam"] .os-tl-clip').first().click();
+  await page.getByRole("button", { name: "Properties and clip list" }).click();
+  assertEqual([await where.inputValue(), await size.inputValue()], ["top-left", "large"], "the saved place is read back");
+  await where.selectOption("bottom-right");
+  await size.selectOption("medium");
+  await page.keyboard.press("Control+s");
+  await editSaid(page);
+  const back = await saved(page, "Webcam demo.capture/edit.json");
+  assert(back !== undefined && !/placement/.test(back), "the default choice takes the place out of the edit");
+});
+
+await check("a clip that is not a webcam has no webcam boxes", async (page, t) => {
+  await makeRecording(page, t, { webcam: true });
+  await openEdit(page, t);
+  await page.locator('.os-tl-lane[data-kind="screen"] .os-tl-clip').first().click();
+  await page.getByRole("button", { name: "Properties and clip list" }).click();
+  assertEqual(await page.getByLabel("Webcam picture: where", { exact: true }).isVisible(), false, "no boxes on a screen clip");
+  assertEqual(await page.locator(".os-cl-webcam").evaluate((el) => el.hidden), true, "the group is put away");
+});
+
+await check("changes are said to be unsaved, Ctrl+S saves and says so, and leaving with changes asks first", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  assertEqual(await stateText(page), "There are no unsaved changes.", "nothing is changed yet");
+  assertEqual(await saved(page, "Edit demo.capture/edit.json"), undefined, "nothing is saved yet");
+  await t.key("t");
+  assertMatch(await editSaid(page), /fade/, "the change is said");
+  assertEqual(await stateText(page), "There are changes that are not saved.", "the change is not saved yet");
+  await t.key("Control+s");
+  assertMatch(await editSaid(page), /^Saved the edit in Edit demo\.capture\./, "the save is said");
+  assertEqual(await stateText(page), "There are no unsaved changes.", "and it is saved");
+  assert((await saved(page, "Edit demo.capture/edit.json"))?.includes("transition") === true, "the edit is in edit.json");
+  await t.key("Control+z");
+  assertEqual(await stateText(page), "There are changes that are not saved.", "undoing makes it differ from what was saved");
+  const asked = [];
+  let answer = false;
+  page.on("dialog", async (d) => { asked.push(d.message()); if (answer) await d.accept(); else await d.dismiss(); });
+  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.waitForTimeout(150);
+  assertEqual(asked, ["There are changes to this edit that are not saved. Leave and lose them?"], "leaving is asked about");
+  assertEqual(await page.locator(".os-ed").count(), 1, "answering no keeps the editing screen");
+  answer = true;
+  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.locator(".os-ed").waitFor({ state: "detached" });
+  assertEqual(await t.focusLabel(), "Edit this recording", "the focus is back on the button that was used");
+});
+
+await check("a recording with a newer take asks which edit to open, and keeping the older edit lets the new one be saved", async (page, t) => {
+  await makeRecording(page, t, { name: "Which demo" });
+  await openEdit(page, t);
+  await t.key("t");
+  await t.key("Control+s");
+  await editSaid(page);
+  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.evaluate(() => window.__openstageStandIn.files.set("Which demo.capture/takes/take-002/take.json", JSON.stringify({ id: 2, state: "complete", durationMs: 5000, media: [{ file: "screen.mp4", kind: "screen" }, { file: "mic.wav", kind: "microphone" }] })));
+  await page.getByRole("button", { name: "Edit this recording", exact: true }).focus();
+  await t.key("Enter");
+  await page.getByRole("heading", { name: "Which edit do you want?" }).waitFor();
+  assertEqual(await t.focusLabel(), "Open my saved edit", "the focus is on the first answer");
+  assertEqual(await page.getByRole("button", { name: /^Start a new edit of the newest recording \(take 2\)/ }).count(), 1, "the other answer is offered");
+  const before = await saved(page, "Which demo.capture/edit.json");
+  await page.getByRole("button", { name: /^Start a new edit of the newest recording/ }).click();
+  await page.waitForFunction(() => /Started a new edit from your newest recording, take 2\./.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
+  assertMatch(await editSaid(page), /The edit saved before is kept: when you save this one, the old one is first copied to edit-before-take-2\.json\./, "the copy is promised");
+  await t.key("Control+s");
+  assertMatch(await editSaid(page), /^Saved the edit in Which demo\.capture\./, "the new edit is saved");
+  assertEqual(await saved(page, "Which demo.capture/edit-before-take-2.json"), before, "the older edit is kept as it was");
+  assert((await saved(page, "Which demo.capture/edit.json")) !== before, "edit.json is now the new edit");
+});
+
+await check("Make a video saves the edit first, shows progress, says it has no captions, and the focus moves to Show the video", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  assertEqual(await saved(page, "Edit demo.capture/edit.json"), undefined, "nothing has been saved yet, so the video maker would have nothing to read");
+  await page.getByRole("button", { name: "Make a video from this edit" }).focus();
+  await t.key("Enter");
+  await page.getByRole("button", { name: "Show the video in its folder" }).waitFor();
+  assert((await saved(page, "Edit demo.capture/edit.json")) !== undefined, "the edit was saved first");
+  const said = (await page.locator('[id$="-say"]').textContent()) ?? "";
+  assertMatch(said, /^The video was made\. Made Edit demo\.mp4: 12\.0 seconds long, 1920 by 1080, with sound\./, "what was made is said");
+  assertMatch(said, /This video has no captions\. OpenStage Recorder does not make them yet\. If the people who watch it need captions, make them in another program and put them with the video where you share it\.$/, "the no-captions words close it");
+  assertEqual(await t.focusLabel(), "Show the video in its folder", "the focus moved to the next thing to do");
+  assertEqual(await page.locator("progress").isHidden(), true, "the progress bar is gone");
+  assertEqual(await page.getByRole("button", { name: "Cancel the video" }).isHidden(), true, "Cancel is gone");
+  assert((await page.locator('[id$="-say"]').getAttribute("role")) === "status", "the line is a status for a screen reader");
+  const args = await page.evaluate(() => window.__openstageStandIn.started.at(-1));
+  assertEqual(args.includes("--reduce-motion"), false, "motion is not reduced unless asked for");
+  await page.getByRole("button", { name: "Show the video in its folder" }).click();
+  await page.waitForTimeout(100);
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.revealed.at(-1)), "Edit demo.capture/exports/Edit demo.mp4", "it asks to show the video inside the recording's exports folder");
+  assertMatch((await page.locator('[id$="-say"]').textContent()) ?? "", /^Could not show the folder\. This is a pretend recording/, "the pretend recording explains why it cannot");
+});
+
+await check("the reduce-motion box is ticked for someone whose computer asks for less motion, and it reaches the video maker", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  const box = page.getByLabel(/^Use cuts instead of animated zooms/);
+  assertEqual(await box.isChecked(), true, "ticked from the computer's own setting");
+  await page.getByRole("button", { name: "Make a video from this edit" }).click();
+  await page.getByRole("button", { name: "Show the video in its folder" }).waitFor();
+  assertEqual((await page.evaluate(() => window.__openstageStandIn.started.at(-1))).includes("--reduce-motion"), true, "--reduce-motion is passed");
+}, { reducedMotion: "reduce" });
+
+await check("a video can be cancelled, and nothing is said about captions when there is no video", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  await page.evaluate(() => { window.__openstageStandIn.holdRender = true; });
+  await page.getByRole("button", { name: "Make a video from this edit" }).click();
+  await page.getByRole("button", { name: "Cancel the video" }).waitFor();
+  assertEqual(await page.getByRole("button", { name: "Make a video from this edit" }).getAttribute("aria-disabled"), "true", "Make is marked as not available while a video is made");
+  await page.getByRole("button", { name: "Make a video from this edit" }).focus();
+  await t.key("Enter");
+  assertMatch((await page.locator('[id$="-say"]').textContent()) ?? "", /A video is already being made/, "pressing it again says so");
+  await page.getByRole("button", { name: "Cancel the video" }).click();
+  await page.waitForFunction(() => /did not finish, so there is no video/.test(document.querySelector('[id$="-say"]')?.textContent ?? ""));
+  const said = (await page.locator('[id$="-say"]').textContent()) ?? "";
+  assert(!/captions/.test(said), "no words about captions without a video");
+  assertEqual(await page.getByRole("button", { name: "Show the video in its folder" }).isHidden(), true, "nothing to show");
+  assertEqual(await page.getByRole("button", { name: "Make a video from this edit" }).getAttribute("aria-disabled"), null, "Make is available again");
+});
+
+await check("a video that is being made is asked about before leaving, and leaving stops it", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  await page.evaluate(() => { window.__openstageStandIn.holdRender = true; });
+  await page.getByRole("button", { name: "Make a video from this edit" }).click();
+  await page.getByRole("button", { name: "Cancel the video" }).waitFor();
+  const asked = [];
+  page.on("dialog", async (d) => { asked.push(d.message()); await d.dismiss(); });
+  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.waitForTimeout(150);
+  assertEqual(asked, ["A video is still being made. Stop it and leave?"], "leaving is asked about");
+  assertEqual(await page.locator(".os-ed").count(), 1, "answering no keeps the editing screen");
+});
+
+await check("every box, choice and button on the editing screen has a name, and the screen fits 320 pixels without sideways scrolling", async (page, t) => {
+  await makeRecording(page, t, { webcam: true });
+  await openEdit(page, t);
+  await page.locator('.os-tl-lane[data-kind="webcam"] .os-tl-clip').first().click();
+  await page.getByRole("button", { name: "Properties and clip list" }).click();
+  const unnamed = await page.evaluate(() => {
+    const named = (el) => {
+      if (el.getAttribute("aria-label")) return true;
+      const by = el.getAttribute("aria-labelledby");
+      if (by && by.split(/\s+/).some((id) => (document.getElementById(id)?.textContent ?? "").trim() !== "")) return true;
+      if (el.labels && [...el.labels].some((l) => l.textContent.trim() !== "")) return true;
+      return el.tagName === "BUTTON" && el.textContent.trim() !== "";
+    };
+    return [...document.querySelectorAll("main input, main select, main textarea, main button")].filter((el) => !el.hidden && el.offsetParent !== null && !named(el)).map((el) => el.id || el.outerHTML.slice(0, 80));
+  });
+  assertEqual(unnamed, [], "controls with no name");
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.waitForTimeout(200);
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert(over <= 0, `the page is ${over} pixels wider than the window`);
+}, { viewport: { width: 1100, height: 1800 } });
 
 await check("Windows high contrast (forced colours): the choices and Start are still there and the page still works", async (page, t) => {
   await page.getByRole("button", { name: "Start recording" }).waitFor();

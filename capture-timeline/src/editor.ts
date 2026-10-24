@@ -5,6 +5,7 @@
  */
 
 import { Announcer } from "./announcer.ts";
+import type { CalloutKind } from "../../capture-edit/src/index.ts";
 import { h } from "./dom.ts";
 import { mountCalloutBar, type AddMedia, type CalloutBar } from "./callout-panel.ts";
 import { mountItemForm, type ItemFormOptions, type ItemFormPanel } from "./item-form.ts";
@@ -25,6 +26,8 @@ export interface EditorOptions {
   listOpen?: boolean;
   /** How a picture, video or sound is chosen and brought into the course. Without it the buttons for files are left out. */
   addMedia?: AddMedia;
+  /** Which ready-made callouts the bar under the picture offers (text, title, lower third, highlight, circle, arrow, blur, cover). Without it, all of them. Zoom is always offered. */
+  callouts?: readonly CalloutKind[];
   /** Suggests alt text for a shape or arrow, shown beside its alt text box for the author to use or ignore (story D6). Without it nothing is suggested. */
   suggestAlt?: ItemFormOptions["suggestAlt"];
 }
@@ -157,6 +160,7 @@ export function mountEditor(container: HTMLElement, session: EditSession, option
     onDrawingChange: (fn) => preview.onDrawingChange(fn),
     onAdded: showAdded,
     ...(options.addMedia === undefined ? {} : { addMedia: options.addMedia }),
+    ...(options.callouts === undefined ? {} : { kinds: options.callouts }),
   });
 
   const regions = [

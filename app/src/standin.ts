@@ -22,6 +22,8 @@ export interface StandInControls {
   revealed: string[];
   /** Every set of options the recorder was started with. */
   started: string[][];
+  /** Make the next video never finish by itself, so Cancel can be tried (a real video of a long recording takes minutes). */
+  holdRender: boolean;
 }
 
 declare global {
@@ -67,13 +69,17 @@ class PretendRecorder {
   paused = false;
   private timers = new Set<ReturnType<typeof setTimeout>>();
   private ticker: ReturnType<typeof setInterval> | undefined;
-  private mode: "record" | "other" = "other";
+  private mode: "record" | "render" | "other" = "other";
   private take = 1;
   private elapsed = 0;
   private folder = "";
   private title = "";
   private lastTakeMs = 0;
   private takes: { take: number; ms: number; state: string }[] = [];
+  /** The `--camera` the recording was started with: `none`, or the number of a camera. */
+  private camera = "none";
+  /** A video that never finishes by itself: it runs until it is stopped. */
+  holdRender = false;
 
   private readonly speed: number;
   private readonly files: Map<string, string>;
@@ -96,14 +102,14 @@ class PretendRecorder {
     for (const l of [...this.lineListeners]) l(text);
   }
 
-  private end(code: number): void {
+  private end(code: number | null, killed = false): void {
     clearInterval(this.ticker);
     this.ticker = undefined;
     for (const t of this.timers) clearTimeout(t);
     this.timers.clear();
     this.running = false;
     this.paused = false;
-    const exit: StreamExit = { code, killed: false, stderr_tail: "" };
+    const exit: StreamExit = { code, killed, stderr_tail: "" };
     for (const l of [...this.exitListeners]) l(exit);
   }
 
@@ -114,6 +120,8 @@ class PretendRecorder {
     };
     this.running = true;
     this.paused = false;
+    this.mode = "other";
+    this.camera = opt("--camera") ?? "none";
     this.later(() => this.emit({ event: "hello", protocol: "0.1", program: "openstage-capture", programVersion: "0.1.0", platform: "pretend" }), 5);
     switch (args[0]) {
       case "probe":
@@ -136,7 +144,7 @@ class PretendRecorder {
         this.later(() => this.end(0), 20);
         break;
       case "render":
-        this.render(opt("--out") ?? "video.mp4");
+        this.render(opt("--out") ?? "video.mp4", opt("--project") ?? "");
         break;
       case "record":
         this.record(opt("--project") ?? "", opt("--title") ?? "Recording", Number(opt("--countdown-ms") ?? "0"));
@@ -146,10 +154,20 @@ class PretendRecorder {
     }
   }
 
-  private render(out: string): void {
+  private render(out: string, project: string): void {
+    this.mode = "render";
     const name = lastPart(out);
+    // Like the real video maker, it reads the saved edit.json, and has nothing to make a video from without one.
+    if (!this.files.has(`${lastPart(project)}/edit.json`)) {
+      this.later(() => {
+        this.emit({ event: "check", check: "edit", ok: false, message: `There is no edit to export: ${project}/edit.json does not exist. To export a recording as it was made, use --take <number>.` });
+        this.end(1);
+      }, 20);
+      return;
+    }
     this.later(() => this.emit({ event: "check", check: "edit", ok: true, message: "Exporting the edit in edit.json, 12.0 seconds long." }), 20);
     [0, 40, 80].forEach((percent, i) => this.later(() => this.emit({ event: "progress", task: "export", percent, message: `Exporting: ${percent} percent.` }), 60 + i * 60));
+    if (this.holdRender) return;
     this.later(() => {
       this.emit({ event: "check", check: "export", ok: true, message: `Made ${name}: 12.0 seconds long, 1920 by 1080, with sound.` });
       this.end(0);
@@ -192,7 +210,7 @@ class PretendRecorder {
     this.files.set(`${name}/capture.json`, JSON.stringify({ format: "openstage-capture-project", title: this.title }));
     for (const t of this.takes) {
       const dir = `${name}/takes/take-${String(t.take).padStart(3, "0")}`;
-      this.files.set(`${dir}/take.json`, JSON.stringify({ id: t.take, state: t.state, durationMs: t.ms, media: [{ file: "screen.mp4", kind: "screen" }, { file: "mic.wav", kind: "microphone" }] }));
+      this.files.set(`${dir}/take.json`, JSON.stringify({ id: t.take, state: t.state, durationMs: t.ms, media: [{ file: "screen.mp4", kind: "screen" }, { file: "mic.wav", kind: "microphone" }, ...(this.camera === "none" ? [] : [{ file: "webcam.mp4", kind: "webcam" }])] }));
     }
   }
 
@@ -245,6 +263,11 @@ class PretendRecorder {
 
   stop(): void {
     if (!this.running) return;
+    if (this.mode === "render") {
+      // The real shell asks the program to stop, waits, and ends it by force. What the app sees is a program that was ended, with no result.
+      this.end(null, true);
+      return;
+    }
     if (this.mode !== "record") {
       this.end(0);
       return;
@@ -274,6 +297,7 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     files,
     revealed: [],
     started: [],
+    holdRender: false,
   };
   if (typeof window !== "undefined") window.__openstageStandIn = controls;
   const recorder = new PretendRecorder(speed, files);
@@ -304,6 +328,11 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     async recordingWriteEdit(_dir, name, text) {
       files.set(fileKey(name, "edit.json"), text);
     },
+    async recordingKeepEdit(_dir, name, file, text) {
+      if (!/^edit-before-take-\d{1,4}\.json$/.test(file)) throw new Error(`${file} is not a name this app keeps an older edit under.`);
+      if (files.has(fileKey(name, file))) throw new Error(`A copy of an older edit named ${file} is already in the recording, so another was not made and nothing was saved.`);
+      files.set(fileKey(name, file), text);
+    },
     async recordingMediaUrl() {
       throw new Error("The pretend recorder makes no pictures or sounds to play.");
     },
@@ -323,6 +352,8 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
         throw new Error(message);
       }
       controls.started.push(args);
+      recorder.holdRender = controls.holdRender;
+      controls.holdRender = false;
       recorder.start(args);
     },
     async streamSend(text) {
