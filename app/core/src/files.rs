@@ -147,21 +147,56 @@ pub fn recording_folders_at(library: &Path, name: &str, rel: &str) -> Result<Vec
     Ok(out)
 }
 
-/// Write `edit.json` into a recording, and nothing else ever. It has to be a JSON object, and it is put in place whole or not at all.
-pub fn write_recording_edit_at(library: &Path, name: &str, text: &str) -> Result<(), String> {
-    let base = recording_at(library, name)?;
+/// An edit has to be small enough and a JSON object.
+fn edit_text_ok(text: &str) -> Result<(), String> {
     if text.len() as u64 > MAX_RECORDING_TEXT {
         return Err("That edit is larger than an edit should be.".into());
     }
     if !serde_json::from_str::<serde_json::Value>(text).map(|v| v.is_object()).unwrap_or(false) {
         return Err("The edit is not in a form that can be saved.".into());
     }
-    let temp = base.join("edit.json.tmp");
+    Ok(())
+}
+
+/// Put text in a file of a recording whole or not at all: written beside it first, then renamed into place.
+fn put_whole(base: &Path, file: &str, text: &str) -> Result<(), String> {
+    let temp = base.join(format!("{file}.tmp"));
     fs::write(&temp, text).map_err(|e| format!("Could not save the edit: {e}"))?;
-    fs::rename(&temp, base.join("edit.json")).map_err(|e| {
+    fs::rename(&temp, base.join(file)).map_err(|e| {
         let _ = fs::remove_file(&temp);
         format!("Could not save the edit: {e}")
     })
+}
+
+/// Write `edit.json` into a recording. It has to be a JSON object, and it is put in place whole or not at all. The only other file the page
+/// may write is the kept copy of an older edit (`keep_recording_edit_at`).
+pub fn write_recording_edit_at(library: &Path, name: &str, text: &str) -> Result<(), String> {
+    let base = recording_at(library, name)?;
+    edit_text_ok(text)?;
+    put_whole(&base, "edit.json", text)
+}
+
+/// The name of the copy of an older edit, kept when a new edit of the newest take replaces it: `edit-before-take-<number>.json`.
+pub fn kept_edit_name_ok(file: &str) -> bool {
+    file.strip_prefix("edit-before-take-")
+        .and_then(|rest| rest.strip_suffix(".json"))
+        .is_some_and(|n| (1..=4).contains(&n.len()) && n.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// Keep a copy of the edit that a new edit of the newest take is about to replace, as `edit-before-take-<number>.json` in the recording.
+/// It never replaces a file that is already there, so an older copy is never lost; the author is told and nothing is saved.
+pub fn keep_recording_edit_at(library: &Path, name: &str, file: &str, text: &str) -> Result<(), String> {
+    if !kept_edit_name_ok(file) {
+        return Err(format!("{file} is not a name this app keeps an older edit under."));
+    }
+    let base = recording_at(library, name)?;
+    edit_text_ok(text)?;
+    if fs::symlink_metadata(base.join(file)).is_ok() {
+        return Err(format!(
+            "A copy of an older edit named {file} is already in the recording, so another was not made and nothing was saved. Move or rename that file, then save again."
+        ));
+    }
+    put_whole(&base, file, text)
 }
 
 /// The `takes` folder of a recording, if it has one: the only part of a recording the page is allowed to play from.
@@ -324,6 +359,45 @@ mod tests {
             read_recording_text_at(&library, "Demo.capture", "takes/take-001/../take-001/events.jsonl").is_err(),
             "no climbing"
         );
+        let _ = fs::remove_dir_all(&library);
+    }
+
+    #[test]
+    fn an_older_edit_is_kept_under_its_own_name_and_never_replaced() {
+        let library = temp_library("kept");
+        let folder = recording_in(&library, "Demo.capture");
+        for good in ["edit-before-take-1.json", "edit-before-take-0002.json", "edit-before-take-9999.json"] {
+            assert!(kept_edit_name_ok(good), "{good}");
+        }
+        for bad in [
+            "edit.json",
+            "edit-before-take-.json",
+            "edit-before-take-12345.json",
+            "edit-before-take-1x.json",
+            "edit-before-take-1.json.tmp",
+            "../edit-before-take-1.json",
+            "edit-before-take-1/../x.json",
+            "capture.json",
+            "",
+        ] {
+            assert!(!kept_edit_name_ok(bad), "{bad:?}");
+            assert!(keep_recording_edit_at(&library, "Demo.capture", bad, "{}").is_err(), "{bad:?}");
+        }
+        keep_recording_edit_at(&library, "Demo.capture", "edit-before-take-2.json", "{\"version\":1}").unwrap();
+        assert_eq!(fs::read_to_string(folder.join("edit-before-take-2.json")).unwrap(), "{\"version\":1}");
+        assert!(!folder.join("edit-before-take-2.json.tmp").exists(), "no half-written file is left");
+        let again =
+            keep_recording_edit_at(&library, "Demo.capture", "edit-before-take-2.json", "{\"version\":2}").unwrap_err();
+        assert!(again.contains("already in the recording"), "{again}");
+        assert_eq!(
+            fs::read_to_string(folder.join("edit-before-take-2.json")).unwrap(),
+            "{\"version\":1}",
+            "the older copy is untouched"
+        );
+        assert!(keep_recording_edit_at(&library, "Demo.capture", "edit-before-take-3.json", "not json").is_err());
+        assert!(!folder.join("edit-before-take-3.json").exists(), "a refused copy leaves nothing");
+        assert!(keep_recording_edit_at(&library, "Missing.capture", "edit-before-take-1.json", "{}").is_err());
+        assert!(keep_recording_edit_at(&library, "../Demo.capture", "edit-before-take-1.json", "{}").is_err());
         let _ = fs::remove_dir_all(&library);
     }
 

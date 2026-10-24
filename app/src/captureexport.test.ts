@@ -2,7 +2,7 @@
 // Tests for making a video from an edit: the options, what the recorder's lines mean while it works, and how it went.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyExportLine, exportPlan, initialExport, summariseExport, type ExportState } from "./captureexport.ts";
+import { NO_CAPTIONS, applyExportLine, exportPlan, finishedWords, initialExport, summariseExport, type ExportState } from "./captureexport.ts";
 import type { StreamExit } from "./recorder.ts";
 
 const line = (event: Record<string, unknown>): string => JSON.stringify(event);
@@ -121,5 +121,32 @@ test("progress is kept within 0 to 100, and what is not understood changes nothi
   const before = initialExport();
   for (const l of ["", "nonsense", "[1]", "5", line({ event: "recovered" }), line({ event: 5 }), line({ event: "check", ok: true }), line({ event: "check", check: "x", ok: "yes", message: "m" }), line({ event: "check", check: "x", ok: true, message: "" })]) {
     assert.deepEqual(applyExportLine(before, l), { state: before, say: [] }, l);
+  }
+});
+
+test("a video that was made always comes with the plain words that it has no captions", () => {
+  const { state } = play([line({ event: "check", check: "export", ok: true, message: "Exported 6.0 seconds." })]);
+  const done = finishedWords(state, exit());
+  assert.equal(done.made, true);
+  assert.equal(done.sentence, `The video was made. Exported 6.0 seconds. ${NO_CAPTIONS}`);
+  assert.match(NO_CAPTIONS, /^This video has no captions\./);
+  assert.equal(NO_CAPTIONS.includes("\u2014"), false, "no em dash in the words");
+});
+
+test("the no-captions words are said even when a check found a problem with a video that was made, and the runner's own trouble comes before them", () => {
+  const { state } = play([
+    line({ event: "check", check: "export", ok: true, message: "Exported 6.0 seconds." }),
+    line({ event: "check", check: "video-readback", ok: false, message: "The video is 2 seconds shorter than it should be." }),
+  ]);
+  const done = finishedWords(state, exit(), "It took longer than expected.");
+  assert.equal(done.made, true);
+  assert.match(done.sentence, /look at the list before using it\. It took longer than expected\. This video has no captions\./);
+});
+
+test("when no video was made nothing is said about captions", () => {
+  const { state } = play([line({ event: "check", check: "export", ok: false, message: "The disk is full." })]);
+  for (const done of [finishedWords(state, exit({ code: 1 })), finishedWords(initialExport(), null), finishedWords(initialExport(), exit({ killed: true, code: null }))]) {
+    assert.equal(done.made, false);
+    assert.equal(done.sentence.includes("captions"), false);
   }
 });

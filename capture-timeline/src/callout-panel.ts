@@ -8,7 +8,7 @@
  * so, and what to use instead); "Zoom on a part" does the same without one.
  */
 
-import { CALLOUTS, type ImportedFile } from "../../capture-edit/src/index.ts";
+import { CALLOUTS, type CalloutKind, type ImportedFile } from "../../capture-edit/src/index.ts";
 import type { Announcer } from "./announcer.ts";
 import { h, nextId } from "./dom.ts";
 import type { EditSession } from "./session.ts";
@@ -35,6 +35,8 @@ export interface CalloutBarOptions {
   readonly onAdded: () => void;
   /** How a file is chosen and brought into the course. Without it (a plain browser), the buttons for files are not shown. */
   readonly addMedia?: AddMedia;
+  /** Which ready-made callouts the bar offers, in the order of the gallery. Without it, all of them. (A product that does not offer, say, arrows leaves them out.) */
+  readonly kinds?: readonly CalloutKind[];
 }
 
 /** The middle quarter of the picture, in the picture's own shape: where "Zoom on a part" starts. */
@@ -59,7 +61,7 @@ export function mountCalloutBar(container: HTMLElement, session: EditSession, op
 
   const bar = h("div", { class: "os-co", role: "toolbar", "aria-label": "Add to the picture at the playhead", "aria-orientation": "vertical", id });
   bar.append(h("span", { class: "os-co-title", "aria-hidden": "true" }, "Add at the playhead"));
-  for (const info of CALLOUTS) {
+  for (const info of CALLOUTS.filter((c) => options.kinds === undefined || options.kinds.includes(c.kind))) {
     bar.append(
       add(info.label, `${info.hint}. Added at the playhead.`, () => {
         const outcome = session.addCalloutHere(info.kind);

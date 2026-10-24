@@ -1,6 +1,6 @@
 # OpenStage Recorder: plan
 
-Nothing is built yet except the base: the recording engine and the editing parts, copied from OpenStage Author (`IMPORT-MANIFEST.md` lists every file). The app itself does not exist.
+The base (the recording engine and the editing parts, copied from OpenStage Author; `IMPORT-MANIFEST.md` lists every file), the window, the Record screen and the editing screen are built. The cursor highlight and the installer are not. Only the Record screen has been run on Windows; the editing screen has been run in a browser with a pretend recorder, not on Windows.
 
 ## Where the work stands
 
@@ -12,11 +12,11 @@ Written 2026-10-23, and updated 2026-10-24. Checked on Linux, and run once on Wi
 | The window's Rust shell (`app/src-tauri`) and the rules it keeps (`app/core`) | Built. The rules are tested on Linux. **Run on Windows once, on 2026-10-23**, built by `OPEN RECORDER.bat`: it opened, found the recording program, registered the keys that work from any program, and made one real recording |
 | The Record screen (`app/src`): what to record (a screen, one window, part of a screen), the sound, a webcam to choose, the countdown, start, pause, marker, stop, start again, the check of the computer, the list of recordings | Built and checked in a browser with a pretend recorder: keyboard only, names for a screen reader, contrast, forced colours, 320 pixels wide |
 | How loud your voice and the computer's sound are in the video | Two boxes on the Record screen, in whole decibels from -40 to 20, passed to the recorder. Added after the first real recording showed the computer's sound 13 decibels louder than the voice, with advice only a command line could follow |
-| Editing a recording | **Not connected yet.** The editing screens are in the base; the button says so |
-| The webcam controls beyond choosing a camera (turn it on or off, where the small picture sits) | Not built |
-| Blur and zoom in the editor | The edit model and the exporter already do them; the simple editor screen that offers them is not built |
+| Editing a recording (`app/src/editview.ts`): open it, cut, transitions, blur, zoom, the webcam's place, save, back; and make a video with progress and cancel | **Built 2026-10-24 and checked in a browser with a pretend recorder** (keyboard only, names for a screen reader, what is announced, saving, the video, 320 pixels wide). **Not run on Windows yet**, and not heard with a screen reader |
+| The webcam controls beyond choosing a camera | Built: "Webcam picture: where" (four corners, or fills the picture) and "how big" (small, medium, large) in a webcam clip's form. Turning the webcam on or off before recording is "A webcam" on the Record screen, as before |
+| Blur and zoom in the editor | Built: the bar under the picture offers Blur, Zoom on a part and Draw a zoom, and no text, shape, arrow or blackout tool |
 | The cursor highlight | Not built anywhere |
-| A message at the end of an export that the video has no captions | Not built |
+| A message at the end of an export that the video has no captions | Built: said in the status line with the result whenever a video was made, and not said when there is none. Not heard with a screen reader |
 | The icon | Supplied by the owner (`app/branding/OpenRecorder.svg`). In use for the window, the program file and the page. The icon files are made from it by `app/tools/make-icons.mjs` |
 | The installer | Not built |
 
@@ -31,6 +31,34 @@ Made by the owner with the app on a Windows computer with 32 processor cores, fr
 - The program used about 46 percent of one core, which the recorder projected as 11.5 percent of a 4-core laptop, against a target of 10 percent. That needs a real measurement on a modest laptop.
 
 Not yet tried in the app: one window, part of a screen, the webcam, a long recording, the keys with another program in front, and any screen reader.
+
+## The editing screen: design, and what was built (2026-10-24)
+
+What the owner asked for: cutting, transitions, blur and zoom, and the webcam as an option. Captions are made outside the program, and the text, shape and arrow tools are not wanted.
+
+What is already in the editing screens copied from OpenStage Author, and what is not:
+
+| Wanted | In the copied screens | What this product does |
+|---|---|---|
+| Cut, split, trim, join, move, undo | Yes (clip list, timeline, keys) | Nothing to add |
+| Transitions | Yes: "Arrives with" and "Leaves with" in a clip's form | Nothing to add |
+| Zoom | Yes: "Zoom on a part" and "Draw a zoom" in the bar under the picture | Nothing to add |
+| Blur | Yes, as one button of the bar under the picture, beside seven others | Keep Blur. Hide Text, Title, Lower third, Highlight box, Circle, Arrow and Cover (blackout) with a new optional setting on the editor, `callouts`, whose default shows all of them, so OpenStage Author is unchanged. Also left out here: Picture, Video and Sound from a file |
+| The webcam on or off before recording | Yes: "A webcam" on the Record screen | A clearer note beside it |
+| Where the webcam's small picture sits, and how big | The edit format and the exporter support it (`placement`), and the preview draws it, **but no screen sets it** | New: two boxes in a webcam clip's form, "Where" (bottom right, bottom left, top right, top left, fill the picture) and "Size" (small, medium, large). Medium in the bottom right is exactly the default, so the edit is not changed unless the author changes it. No dragging, so it works by keyboard and in words |
+
+Two changes are therefore made inside `capture-timeline/`, a copied folder: the `callouts` setting and the webcam boxes. Both are listed in `EXTRACTED-FROM-OPENSTAGE.md` so they can be carried back.
+
+Taken from OpenStage's recording editor dialog for the edit view: opening a recording (and asking which edit to open when takes were recorded after the saved one), saving, the video maker with progress and cancel, and the cuts-instead-of-zooms choice. Left out: putting the video on a slide, captions and audio description, steps, alt text from clicks, adding media from files.
+
+### Two faults found while building it, both also in OpenStage Author
+
+Found by reading the code before checking the screens, and then caught by a browser check written for each.
+
+1. **A new edit of the newest recording could never be saved when an edit had been saved before.** The screen first copies the older edit to `edit-before-take-N.json`, but the folder only allowed `edit.json` to be written, so the copy was refused, and with it the save. Nothing was lost (it refuses), but the new edit stayed unsaved. Here the shell has a second command that writes only that file, never over an existing one (`recording_keep_edit`), with tests in Rust and in the browser.
+2. **"Make a video" on a recording that had never been edited and saved was refused by the video maker** ("There is no edit to export"), because the screen saved only when something had changed. Here the edit is saved first whenever the saved file is not the edit on the screen. The pretend recorder now refuses the same way the real video maker does, so a browser check would catch it coming back.
+
+Both faults are in OpenStage Author's `editor/src/editrecording.ts` and `recordingfolder.ts` as copied (main, commit `01fc056`). I have not changed that repository and will not without the owner's yes.
 
 ## What it is
 

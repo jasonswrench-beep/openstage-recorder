@@ -29,6 +29,7 @@ import { Announcer } from "./announcer.ts";
 import { COMMANDS, commandFor, isTextField } from "./commands.ts";
 import { h, nextId, type Attrs } from "./dom.ts";
 import type { EditSession, Outcome } from "./session.ts";
+import { WEBCAM_SIZES, WEBCAM_WHERES } from "./webcam-place.ts";
 
 export interface PanelOptions {
   /** Where messages are said. Without it the panel makes its own line at the top. */
@@ -162,6 +163,17 @@ export function mountClipList(container: HTMLElement, session: EditSession, opti
   ];
   transitionFields.inKind.replaceChildren(...kindOptions(IN_KINDS));
   transitionFields.outKind.replaceChildren(...kindOptions(OUT_KINDS));
+  const webcamWhere = h("select", { id: `${id}-camwhere`, class: "os-cl-input", "aria-describedby": `${id}-cam-hint` });
+  const webcamSize = h("select", { id: `${id}-camsize`, class: "os-cl-input", "aria-describedby": `${id}-cam-hint` });
+  webcamWhere.replaceChildren(...WEBCAM_WHERES.map((w) => h("option", { value: w.value }, w.label)));
+  webcamSize.replaceChildren(...WEBCAM_SIZES.map((s) => h("option", { value: s.value }, s.label)));
+  const webcamBox = h(
+    "div",
+    { class: "os-cl-fields os-cl-webcam", role: "group", "aria-label": "Where the webcam picture sits" },
+    h("div", { class: "os-cl-field" }, h("label", { for: `${id}-camwhere` }, "Webcam picture: where"), webcamWhere),
+    h("div", { class: "os-cl-field" }, h("label", { for: `${id}-camsize` }, "Webcam picture: how big"), webcamSize),
+    h("p", { class: "os-cl-hint", id: `${id}-cam-hint` }, "The webcam is a small picture over the screen recording. When no screen recording is showing at that moment, it fills the picture instead. The size does not matter if it fills the whole picture."),
+  );
   const muted = h("input", { id: `${id}-muted`, type: "checkbox" });
   const mutedLabel = h("label", { class: "os-cl-check", for: `${id}-muted` }, muted, " Muted");
   const formError = h("p", { class: "os-cl-error", id: `${id}-error` });
@@ -197,6 +209,7 @@ export function mountClipList(container: HTMLElement, session: EditSession, opti
     soundFields,
     altBox,
     textBox,
+    webcamBox,
     transitionBox,
     mutedLabel,
     formError,
@@ -368,6 +381,7 @@ export function mountClipList(container: HTMLElement, session: EditSession, opti
       trackField.hidden = true;
       soundFields.hidden = true;
       transitionBox.hidden = true;
+      webcamBox.hidden = true;
       altBox.hidden = true;
       textBox.hidden = true;
       mutedLabel.hidden = true;
@@ -390,6 +404,16 @@ export function mountClipList(container: HTMLElement, session: EditSession, opti
       decorative.checked = details.decorative;
     }
     hasText.checked = details.hasTextAlternative;
+    webcamBox.hidden = details.webcam === undefined;
+    if (details.webcam !== undefined) {
+      for (const [select, value] of [[webcamWhere, details.webcam.where], [webcamSize, details.webcam.size]] as const) {
+        // A place that was set some other way is shown as it is, and kept until a choice is made.
+        const other = select.querySelector<HTMLOptionElement>("option[value=custom]");
+        if (value === "custom" && other === null) select.prepend(h("option", { value: "custom", disabled: true }, "Set some other way (kept as it is)"));
+        if (value !== "custom") other?.remove();
+        if (document.activeElement !== select) select.value = value;
+      }
+    }
     transitionBox.hidden = !details.hasPicture;
     if (details.hasPicture) {
       const ti = details.transitionIn;
@@ -648,6 +672,22 @@ export function mountClipList(container: HTMLElement, session: EditSession, opti
   for (const [select, which] of [[transitionFields.inKind, "in"], [transitionFields.outKind, "out"]] as const) {
     select.addEventListener("change", () => {
       const outcome = session.setTransitionKind(which, select.value);
+      say(outcome.message);
+      if (!outcome.ok) syncForm();
+    });
+    select.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        focusSelected();
+      }
+    });
+  }
+  for (const select of [webcamWhere, webcamSize]) {
+    select.addEventListener("change", () => {
+      // One of the two may be showing "set some other way"; choosing the other one starts from the default for it.
+      const where = webcamWhere.value === "custom" ? "bottom-right" : webcamWhere.value;
+      const size = webcamSize.value === "custom" ? "medium" : webcamSize.value;
+      const outcome = session.setWebcamPlace(where, size);
       say(outcome.message);
       if (!outcome.ok) syncForm();
     });

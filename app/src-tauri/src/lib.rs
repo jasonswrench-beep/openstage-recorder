@@ -57,6 +57,12 @@ fn recording_write_edit(dir: String, name: String, text: String) -> Result<(), S
     files::write_recording_edit_at(Path::new(&dir), &name, &text)
 }
 
+/// Keep a copy of the edit a new edit is about to replace, as `edit-before-take-<number>.json`. The only other file the page can write.
+#[tauri::command]
+fn recording_keep_edit(dir: String, name: String, file: String, text: String) -> Result<(), String> {
+    files::keep_recording_edit_at(Path::new(&dir), &name, &file, &text)
+}
+
 /// Let the page play the videos and sounds of one recording straight from disk, with seeking. Only that recording's `takes` folder is
 /// opened up, for the rest of the session, and only after the recording has been found inside the recordings folder.
 #[tauri::command]
@@ -216,6 +222,7 @@ pub fn run() {
             recording_read,
             recording_folders,
             recording_write_edit,
+            recording_keep_edit,
             allow_recording_media,
             reveal_recording,
             capture_check,
