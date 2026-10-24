@@ -1,0 +1,215 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
+ * The page around the Recorder's screens. The colours are the editing screens' own tokens (clip-list.css), so the whole app changes
+ * together between light, dark and Windows high contrast. Nothing here moves, fades or animates.
+ */
+
+html {
+  background: var(--os-cl-bg);
+}
+
+body {
+  margin: 0;
+  color: var(--os-cl-fg);
+  background: var(--os-cl-bg);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.app-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--os-cl-line);
+  background: var(--os-cl-head-bg);
+}
+
+.app-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+
+.app-icon {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.app-header h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.app-preview {
+  margin: 0.25rem 0 0;
+  color: var(--os-cl-attention);
+  font-weight: 600;
+}
+
+.app-main {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.app-main:focus {
+  outline: none;
+}
+
+.rv-status {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 1.5rem;
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--os-cl-line);
+  border-radius: 0.25rem;
+  background: var(--os-cl-head-bg);
+}
+
+.rv-status:empty {
+  visibility: hidden;
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+}
+
+.rv-said {
+  display: block;
+}
+
+.rv-section {
+  margin: 0 0 1.5rem;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid var(--os-cl-line);
+}
+
+.rv-section h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.rv-section h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.rv-fieldset {
+  min-width: 0;
+  margin: 0 0 1rem;
+  padding: 0.5rem 1rem 1rem;
+  border: 1px solid var(--os-cl-line);
+  border-radius: 0.25rem;
+}
+
+.rv-fieldset legend {
+  padding: 0 0.5rem;
+  font-weight: 600;
+}
+
+.rv-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.rv-control > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rv-section select.os-cl-input,
+.rv-section input.os-cl-input[type="text"] {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.rv-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.rv-check input[type="checkbox"] {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.2rem;
+}
+
+.rv-section .os-cl-field {
+  min-width: 0;
+  margin: 0 0 0.75rem;
+}
+
+.rv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.rv-primary {
+  background: var(--os-cl-accent);
+  color: var(--os-cl-on-accent);
+  font-weight: 600;
+}
+
+.rv-primary:hover {
+  background: var(--os-cl-accent);
+  text-decoration: underline;
+}
+
+[aria-disabled="true"] {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.rv-pretend {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--os-cl-attention);
+  border-radius: 0.25rem;
+  color: var(--os-cl-attention);
+  font-weight: 600;
+}
+
+.rv-note {
+  margin: 0.5rem 0;
+  color: var(--os-cl-muted);
+}
+
+.rv-list {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.rv-pass {
+  color: var(--os-cl-fg);
+}
+
+.rv-problem {
+  color: var(--os-cl-attention);
+}
+
+@media (forced-colors: active) {
+  .rv-primary {
+    border: 2px solid ButtonText;
+  }
+  [aria-disabled="true"] {
+    opacity: 1;
+    color: GrayText;
+  }
+}

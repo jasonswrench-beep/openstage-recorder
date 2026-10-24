@@ -16,7 +16,8 @@ Not a course tool. Not a full or professional video editor. Not a cloud service.
 
 - Change those four folders only when the product needs it, and say so in the summary. Every change there is a difference that someone has to carry across later.
 - Never edit OpenStage Author's own repository from here without the owner's yes.
-- New work for this product goes in new folders (the app shell, the recorder controls), not inside the copied ones, unless there is no other way.
+- New work for this product goes in new folders (`app/` is the window and the screens), not inside the copied ones, unless there is no other way.
+- `app/` took parts from OpenStage's editor. `docs/recorder/EXTRACTED-FROM-OPENSTAGE.md` says which, and what changed.
 
 ## Non-negotiable rules
 
