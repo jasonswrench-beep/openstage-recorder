@@ -124,3 +124,22 @@ export function summariseExport(s: ExportState, exit: StreamExit | null): Export
   const why = s.problem !== "" ? s.problem : failed[0]?.text ?? "";
   return { ok: false, sentence: `The video could not be made.${why === "" ? "" : ` ${why}`}` };
 }
+
+/** Said whenever a video has been made. This product makes no captions yet, and an author must hear that now, not find out when a viewer asks. */
+export const NO_CAPTIONS =
+  "This video has no captions. OpenStage Recorder does not make them yet. If the people who watch it need captions, make them in another program and put them with the video where you share it.";
+
+export interface FinishedWords {
+  /** Whether a finished video now exists. */
+  made: boolean;
+  /** Everything to say when the job ends: how it went, any trouble the recorder named, and, when a video was made, that it has no captions. */
+  sentence: string;
+}
+
+/** The words for the end of the job. `problem` is what the job runner itself had to report (a time limit, a recorder that would not start). */
+export function finishedWords(s: ExportState, exit: StreamExit | null, problem = ""): FinishedWords {
+  const summary = summariseExport(s, exit);
+  const made = exit !== null && exit.code === 0 && s.made;
+  const how = problem === "" ? summary.sentence : `${summary.sentence} ${problem}`;
+  return { made, sentence: made ? `${how} ${NO_CAPTIONS}` : how };
+}

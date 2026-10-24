@@ -12,6 +12,7 @@ A recording lives in its own folder, named `something.capture`, **beside** the c
 lesson.capture/
   capture.json                  the manifest (small, rarely changes)
   edit.json                     the edit decisions (trims, splits, where clips sit); absent until the first edit
+  edit-before-take-2.json       a copy of an older edit, kept when a new edit of take 2 replaced it (the number is the take). Never replaced or removed by the program
   takes/
     take-001/                   a real screen recording
       take.json                 the only record of this take's state; lists its media files

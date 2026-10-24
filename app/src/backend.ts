@@ -35,6 +35,11 @@ export interface RecorderBackend {
   recordingFolders(dir: string, name: string, rel: string): Promise<string[]>;
   /** Save the edit of a recording as its edit.json, whole or not at all. The only file ever written in a recording. */
   recordingWriteEdit(dir: string, name: string, text: string): Promise<void>;
+  /**
+   * Keep a copy of the edit that a new edit of the newest take is about to replace, as `edit-before-take-<number>.json`. The only other file
+   * ever written in a recording. It never replaces a copy that is already there: it refuses, and says why.
+   */
+  recordingKeepEdit(dir: string, name: string, file: string, text: string): Promise<void>;
   /** An address a video or sound of a take can be played from, with seeking. Only `takes/take-001/<file>` can be asked for. */
   recordingMediaUrl(dir: string, name: string, rel: string): Promise<string>;
   /** Show a recording, or a file inside it (`exports/Name.mp4`), in the file manager. */
@@ -93,6 +98,7 @@ const tauriBackend: RecorderBackend = {
   },
   recordingFolders: (dir, name, rel) => invoke<string[]>("recording_folders", { dir, name, rel }),
   recordingWriteEdit: (dir, name, text) => invoke<void>("recording_write_edit", { dir, name, text }),
+  recordingKeepEdit: (dir, name, file, text) => invoke<void>("recording_keep_edit", { dir, name, file, text }),
   async recordingMediaUrl(dir, name, rel) {
     // The shell opens up only this recording's takes folder, and only for the rest of the session.
     if (!TAKE_MEDIA.test(rel)) throw new Error("That file is not in a take of the recording.");

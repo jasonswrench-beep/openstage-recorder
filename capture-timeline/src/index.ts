@@ -12,3 +12,4 @@ export * from "./preview-panel.ts";
 export * from "./callout-panel.ts";
 export * from "./item-form.ts";
 export * from "./picture-edit.ts";
+export * from "./webcam-place.ts";

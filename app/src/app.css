@@ -61,6 +61,15 @@ body {
   outline: none;
 }
 
+/* The editing screens want the whole width of the window: a timeline is wider than a form. */
+.app-main.is-editing {
+  max-width: none;
+}
+
+.ev-host {
+  min-width: 0;
+}
+
 .rv-status {
   position: sticky;
   top: 0;
