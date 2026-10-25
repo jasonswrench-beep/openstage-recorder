@@ -8,7 +8,7 @@ It has no courses, slides, quizzes or publishing. It is its own product, made by
 
 ## Where this stands
 
-**The app exists as far as the Record screen.** The recording engine and the editing parts were taken from OpenStage Author. On top of them there is now a window (`app/`) with the Record screen: choose an app, a screen or part of a screen, start, pause, mark, stop, and see the recordings made. **Editing a recording is not connected to it yet**, and the webcam controls, blur, zoom and the cursor highlight are still to do. The window has been run once on a Windows computer (2026-10-23), where it made a real 13.6 second recording of a screen, a microphone and the computer's sound; see below. No screen reader has been used on it.
+**The app is written for everything in the first scope, and has been tried on Windows only as far as the Record screen.** The recording engine and the editing parts were taken from OpenStage Author. On top of them there is a window (`app/`) with the Record screen (choose an app, a screen or part of a screen, start, pause, mark, stop) and an editing screen for a recording (cut, transitions, blur, cover, zoom, where the webcam sits, balance of your voice and the computer's sound, save, and make an MP4 that says plainly it has no captions). The window was run once on a Windows computer (2026-10-23), where it made a real 13.6 second recording of a screen, a microphone and the computer's sound. **The editing screen and the video maker have not been run on Windows**, only in a browser against a pretend recorder. No screen reader has been used on any of it.
 
 | Part | What it is | State |
 |---|---|---|
@@ -23,7 +23,7 @@ The layout and the paths of the first four are the same as in OpenStage Author o
 
 ## What is not built yet
 
-The editor screen for a recording (with the tools this product does not offer left out), the webcam controls beyond choosing a camera, the cursor highlight, an installer. `docs/recorder/plan.md` says what each is and the order.
+The cursor highlight. The installer is set up but has never been built or run (`docs/recorder/INSTALLER-AND-SIGNING.md`), and is not signed. `docs/recorder/plan.md` says what each is and the order.
 
 ## Trying it
 
@@ -31,6 +31,7 @@ On Windows, double-click one of these, in the `app` folder. Both ask before they
 
 - `OPEN RECORDER PREVIEW.bat` shows the Record screen in your web browser with a pretend recorder. Nothing real is recorded. Use it to try the screen with a keyboard or a screen reader.
 - `OPEN RECORDER.bat` builds the app and the recording program the first time, then opens the real thing. It was run once, on 2026-10-23, and built and opened the app.
+- `BUILD INSTALLER.bat` builds one installer file, named like `OpenStage Recorder_0.1.0_x64-setup.exe`, in `app\installer`, which installs the app for your own user with no administrator password. **Never run yet.** It is not signed, so Windows will show a blue "Windows protected your PC" box the first time. `docs/recorder/INSTALLER-AND-SIGNING.md` has what to check and what signing would change.
 
 ## Checking it
 

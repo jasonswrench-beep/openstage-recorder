@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "OpenStage Author project",
+    "copyright": "Copyright 2026 Jason S. Wrench and the OpenStage Author contributors",
+    "shortDescription": "A light screen recorder for Windows, with a simple editor",
+    "longDescription": "OpenStage Recorder records a screen, one window or part of a screen, with your voice, the computer's sound and a webcam if you choose. A simple editor cuts the recording, adds transitions, blur, cover and zoom, balances the sounds, and makes an MP4. It is free and open source under the Apache License 2.0.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "resources": {
+      "../../capture/target/release/openstage-capture.exe": "openstage-capture.exe",
+      "../../LICENSE": "LICENSE.txt",
+      "../../NOTICE": "NOTICE.txt",
+      "../../capture/THIRD-PARTY.md": "THIRD-PARTY.md"
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "languages": ["English"]
+      }
+    }
+  }
+}
