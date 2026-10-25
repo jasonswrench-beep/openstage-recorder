@@ -57,4 +57,4 @@ Before adding any dependency, check its licence. Permissive (MIT, BSD, Apache 2.
 - Anything that needs running should be delivered as a double-clickable script, not as a terminal command to copy.
 - Avoid em dashes in prose written for this project.
 - When a decision could reasonably go either way, say so and ask rather than picking silently.
-- Commit and push only when the owner says so.
+- Commit and push each finished slice to `main` without asking: the owner gave this standing permission on 2026-10-25. A slice is finished when its checks pass (type check, unit tests, browser checks, rules and licence checks, and the documents updated in the same commit; the only checks allowed to fail are the two `capture-timeline` browser checks that already fail in OpenStage Author's own copy, listed as item 6 in `docs/recorder/CARRY-BACK-TO-OPENSTAGE.md`). Never commit work that fails any other check, never rewrite history, and never push anywhere but `main`. Say plainly in the summary what was committed. Anything outside a finished slice, such as a change to OpenStage Author's repository, still needs the owner's yes.
