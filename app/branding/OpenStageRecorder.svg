@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" role="img" aria-labelledby="title description">
-  <title id="title">OpenRecorder — Open Frame icon</title>
+  <title id="title">OpenStage Recorder icon, Open Frame design</title>
   <desc id="description">A coral movie camera with twin film reels, an open reel outline, a rounded camera body, and a projecting lens. Editable vector artwork. Transparent outside the navy rounded tile.</desc>
   <defs>
     <linearGradient id="navy" x1="0" y1="0" x2="768" y2="1024" gradientUnits="userSpaceOnUse">
@@ -15,7 +15,7 @@
   <g id="Tile" inkscape:label="Navy tile">
     <rect id="navy-tile" x="0" y="0" width="1024" height="1024" rx="164" fill="url(#navy)"/>
   </g>
-  <g id="Symbol" inkscape:label="OpenRecorder symbol" fill="none" stroke="url(#accent)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round">
+  <g id="Symbol" inkscape:label="OpenStage Recorder symbol" fill="none" stroke="url(#accent)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round">
       <path id="film-reel-left-open" d="M374 200 A104 104 0 1 0 424 250"/>
     <circle id="film-reel-right" cx="570" cy="294" r="104"/>
     <circle id="reel-hub-left" cx="330" cy="294" r="16" fill="url(#accent)" stroke="none"/>

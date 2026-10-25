@@ -144,7 +144,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
       h("p", { class: "rv-note" }, "A webcam, and your voice, are recorded only if you choose them. The computer's own sound includes a screen reader's speech."),
       field(id("micgain"), `Your voice in the video: louder or quieter, in decibels (${MIN_GAIN_DB} to ${MAX_GAIN_DB})`, micGain),
       field(id("systemgain"), `The computer's sound in the video: louder or quieter, in decibels (${MIN_GAIN_DB} to ${MAX_GAIN_DB})`, systemGain),
-      h("p", { class: "rv-note" }, "0 leaves a sound as it is heard. A negative number makes it quieter: every 6 decibels is about half as loud, and 6 above is about twice as loud. If the recorder tells you, after a recording, that the computer's sound drowns your voice, put the number it gives in the computer's sound box for the next one. The separate sound files of the recording are never changed by this.")));
+      h("p", { class: "rv-note" }, "0 leaves a sound as it is heard. A negative number makes it quieter: every 6 decibels is about half as loud, and 6 above is about twice as loud. If the recorder tells you, after a recording, that the computer's sound drowns your voice, put the number it gives in the computer's sound box for the next one. The separate sound files of the recording are never changed by this. When you edit the recording, these numbers are where each sound starts, and you can change them again there, under Sound balance.")));
 
   const problem = h("p", { id: id("problem"), class: "rv-note" });
   const start = h("button", { type: "button", id: id("start"), class: "os-cl-button rv-primary", "aria-describedby": id("problem") }, "Start recording");

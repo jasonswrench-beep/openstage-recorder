@@ -237,6 +237,20 @@ export function parseDecibels(text: string): { ok: true; db: number } | { ok: fa
   return { ok: true, db };
 }
 
+/** The two sounds a recording keeps on tracks of their own, which can be balanced against each other. */
+export type BalanceSound = "microphone" | "system-audio";
+
+/** What the balance says about one of them. */
+export interface SoundBalance {
+  /** How many clips of this sound there are. */
+  readonly clips: number;
+  /** How many decibels louder (plus) or quieter (minus) than heard they all are, if they are all the same. Left out when there are no clips, or they differ. */
+  readonly db?: number;
+}
+
+/** How each sound is called in what is said. */
+export const SOUND_NAMES: Readonly<Record<BalanceSound, string>> = { microphone: "Your voice", "system-audio": "The computer's sound" };
+
 export class EditSession {
   readonly #history: History;
   #playheadMs = 0;
@@ -1257,6 +1271,42 @@ export class EditSession {
     const parsed = parseDecibels(text);
     if (!parsed.ok) return no(parsed.message);
     return this.#run((m) => setVolume(m, row.clipId, parsed.db));
+  }
+
+  // ---- the balance between the recording's own sounds ----
+
+  #soundClips(sound: BalanceSound): Clip[] {
+    const model = this.#history.model;
+    return model.tracks.flatMap((t) => t.clips).filter((c) => findSource(model, c.source)?.kind === sound);
+  }
+
+  /** How loud every clip of one of the recording's own sounds is: all the same, or not. */
+  soundBalance(sound: BalanceSound): SoundBalance {
+    const clips = this.#soundClips(sound);
+    const first = clips[0];
+    const same = first !== undefined && clips.every((c) => c.volumeDb === first.volumeDb);
+    return { clips: clips.length, ...(same ? { db: first.volumeDb } : {}) };
+  }
+
+  /**
+   * Set how loud every clip of the microphone, or of the computer's own sound, is, from what the author typed, in whole decibels from -40 to 20.
+   * One command is one undo step, whatever the number of clips. A clip's own Volume box still sets just that clip.
+   */
+  setSoundBalance(sound: BalanceSound, text: string): Outcome {
+    const name = SOUND_NAMES[sound];
+    const clips = this.#soundClips(sound);
+    if (clips.length === 0) return no(`There is no ${sound === "microphone" ? "microphone" : "computer sound"} in this edit to balance.`);
+    const parsed = parseDecibels(text);
+    if (!parsed.ok) return no(parsed.message);
+    const how = parsed.db === 0 ? "as it was heard" : `${Math.abs(parsed.db)} decibels ${parsed.db < 0 ? "quieter" : "louder"} than it was heard`;
+    if (clips.every((c) => c.volumeDb === parsed.db)) return ok(`${name} is already ${how}.`);
+    const ids = new Set(clips.map((c) => c.id));
+    return this.#runEach(
+      "set sound balance",
+      this.rows.filter((r) => ids.has(r.clipId)),
+      (m, row) => setVolume(m, row.clipId, parsed.db),
+      (worked) => `${name} is now ${how}, in ${worked === 1 ? "its one clip" : `all ${worked} clips`}.`,
+    );
   }
 
   /** Set how long a clip's sound fades in, from what the author typed. */

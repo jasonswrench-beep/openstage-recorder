@@ -17,5 +17,5 @@ const app = readFileSync("src/app.css", "utf-8");
 const screens = ["clip-list", "timeline", "preview", "layout"].map((n) => readFileSync(`../capture-timeline/src/${n}.css`, "utf-8")).join("\n");
 writeFileSync("web/style.css", `${screens}\n\n/* ---- the app ---- */\n${app}`);
 // The icon, from its source, for the page: the picture beside the heading and the tab icon.
-copyFileSync("branding/OpenRecorder.svg", "web/icon.svg");
+copyFileSync("branding/OpenStageRecorder.svg", "web/icon.svg");
 console.log("Built web/main.js, web/style.css and web/icon.svg");

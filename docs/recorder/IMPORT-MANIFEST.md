@@ -9,8 +9,8 @@ What was copied into OpenStage Recorder from OpenStage Author, and from which co
 | Source commit | `01fc056b2e121295c798a86f001f3f48c1620e3a` |
 | Source commit date | 2026-10-23T18:32:44-04:00 |
 | Files copied | 246 |
-| Files changed after copying | 6: `capture-timeline/src/callout-panel.ts`, `editor.ts`, `index.ts`, `panel.ts`, `session.ts` and `docs/capture/capture-project-format.md`. What changed and why is in `EXTRACTED-FROM-OPENSTAGE.md`, under "Changes made inside the copied folders". The checksums in the table below are of the files as copied |
-| Files added to the copied folders after copying | 2: `capture-timeline/src/webcam-place.ts` and `capture-timeline/test/webcam-place.test.ts` (not in the table below) |
+| Files changed after copying | 9: `capture-edit/src/fromTakes.ts`, `capture-edit/test/fromTakes.test.ts`, `capture-timeline/src/callout-panel.ts`, `editor.ts`, `index.ts`, `panel.ts`, `project.ts`, `session.ts` and `docs/capture/capture-project-format.md`. What changed and why is in `EXTRACTED-FROM-OPENSTAGE.md`, under "Changes made inside the copied folders". The checksums in the table below are of the files as copied |
+| Files added to the copied folders after copying | 3: `capture-timeline/src/webcam-place.ts`, `capture-timeline/test/webcam-place.test.ts` and `capture-timeline/test/balance.test.ts` (not in the table below) |
 
 ## What was copied
 

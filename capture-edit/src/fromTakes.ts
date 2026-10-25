@@ -8,8 +8,8 @@
  * turns what they say into an edit, so it can be tested without a folder.
  */
 
-import { addClip, addTrack, type Result } from "./ops.ts";
-import { createModel, type Model, type SourceInfo, type SourceKind, type TrackKind } from "./model.ts";
+import { addClip, addTrack, setVolume, type Result } from "./ops.ts";
+import { MAX_VOLUME_DB, MIN_VOLUME_DB, createModel, type Model, type SourceInfo, type SourceKind, type TrackKind } from "./model.ts";
 import { describeLength } from "./time.ts";
 
 /** One media file of a take, as `take.json` lists it. */
@@ -17,6 +17,16 @@ export interface TakeFile {
   readonly file: string;
   /** `screen`, `webcam`, `microphone`, `system-audio`, `interactions` and anything newer. */
   readonly kind: string;
+}
+
+/**
+ * How much louder (plus) or quieter (minus) the author asked each sound to be in the mix inside `screen.mp4` when recording, in whole decibels.
+ * That mix is what a player plays of the raw recording. The video made from an edit is built from `mic.wav` and `system.wav`, which hold the sound
+ * as it was heard, so these are carried into the edit as the volume of those clips, or the choice made when recording would be lost on export.
+ */
+export interface TakeMix {
+  readonly microphoneGainDb: number;
+  readonly systemGainDb: number;
 }
 
 /** The parts of a take that an edit needs. */
@@ -27,6 +37,8 @@ export interface TakeInfo {
   readonly state: string;
   readonly durationMs: number | null;
   readonly media: readonly TakeFile[];
+  /** The loudness chosen when recording, if the take says. */
+  readonly mix?: TakeMix;
 }
 
 export interface EditFromTakes {
@@ -108,8 +120,22 @@ export function editFromTakes(takes: readonly TakeInfo[]): EditFromTakes {
         startMs: at,
         name: `${lane.sourceName} of take ${take.take}`,
       });
-      if (result.ok) model = result.model;
-      else notes.push(`${lane.sourceName} of take ${take.take} could not be added: ${result.message}`);
+      if (!result.ok) {
+        notes.push(`${lane.sourceName} of take ${take.take} could not be added: ${result.message}`);
+        continue;
+      }
+      model = result.model;
+      // The loudness chosen when recording goes on the clip of that sound, so the video made from this edit has it.
+      const db = take.mix === undefined ? 0 : lane.source === "microphone" ? take.mix.microphoneGainDb : lane.source === "system-audio" ? take.mix.systemGainDb : 0;
+      const clipId = result.focus?.[0];
+      if (db !== 0 && Number.isInteger(db) && db >= MIN_VOLUME_DB && db <= MAX_VOLUME_DB && clipId !== undefined) {
+        const set = setVolume(model, clipId, db);
+        if (set.ok) {
+          model = set.model;
+          const how = `${Math.abs(db)} decibels ${db < 0 ? "quieter" : "louder"}`;
+          notes.push(`${lane.sourceName} of take ${take.take} is ${how} than it was heard, as you set when recording. You can change it under Sound balance.`);
+        }
+      }
     }
     at += take.durationMs;
   }
