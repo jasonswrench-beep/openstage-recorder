@@ -177,6 +177,8 @@ export interface Marker {
 export interface Note {
   ok: boolean;
   text: string;
+  /** What the note is about, so two findings about the same thing are not both listed (the balance of the sounds is found twice). */
+  topic?: string;
 }
 
 export interface Session {
@@ -204,6 +206,34 @@ export function initialSession(folder = ""): Session {
 /** The checks the author is always told about when they come, because they say what is being kept. */
 const ALWAYS_SAID = new Set(["interactions", "interactions-on", "interactions-log", "region", "camera", "window", "sound-devices", "cues"]);
 const MAX_NOTES = 60;
+
+/**
+ * Findings about how loud the sounds are, or about the computer's sound not being heard. They are advice, not a recording that went wrong: the
+ * recording is whole and nothing is lost, and the author can still change it afterwards. So they are said as notes, with a next step an author can
+ * follow, and not as problems. The recorder's own words are for people who use it from a command line, so the parts that name its options are
+ * put in the words of this app. A finding that is not recognised comes back unchanged. Returns null for anything that is not sound advice.
+ *
+ * A silent microphone is not advice: a recording with no voice is a real problem, and stays one.
+ */
+export function soundAdvice(kind: "check" | "warning", name: string, message: string): { text: string; topic: string } | null {
+  if ((kind === "check" && name === "balance") || (kind === "warning" && /^Balance:/.test(message))) {
+    const text = message
+      .replace(/^Balance: /, "")
+      .replace(/\(record with --system-gain-db (-?\d+)\)/g, "(put $1 in the computer's sound box on the Record screen before recording)")
+      .replace(/, or balance mic\.wav and system\.wav in the editor: the separate files are not changed by the mix\./, ", or change it afterwards under Sound balance when you edit the recording. The separate sound files are never changed.")
+      .replace(/raise it in the editor, or record with a higher --system-gain-db\./, "raise it under Sound balance when you edit the recording, or put a higher number in the computer's sound box on the Record screen before recording.");
+    return { text: text.charAt(0).toUpperCase() + text.slice(1), topic: "balance" };
+  }
+  if (kind === "warning" && name === "track-silent" && /^The computer's sound track is silent/.test(message)) {
+    const device = /nothing was heard from (.+?) during this recording\./.exec(message)?.[1];
+    return {
+      text: `Nothing was heard from the computer's sound${device === undefined ? "" : ` (${device})`} during this recording. That is normal if nothing was playing. If something was playing, it may have gone to a different sound output: choose the right one under "The computer's own sound" on the Record screen.`,
+      topic: "computer-silent",
+    };
+  }
+  if (kind === "warning" && name === "sound-went-quiet") return { text: message, topic: "sound-went-quiet" };
+  return null;
+}
 
 function parseJson(line: string): Record<string, unknown> | null {
   try {
@@ -305,7 +335,13 @@ export function applyLine(s: Session, line: string): Update {
     }
     case "warning": {
       const message = str(d["message"]);
-      if (message !== "") {
+      const advice = message === "" ? null : soundAdvice("warning", str(d["code"], 60), message);
+      if (advice !== null) {
+        if (!next.notes.some((n) => n.topic === advice.topic)) {
+          next = { ...next, notes: [...next.notes, { ok: true, text: advice.text, topic: advice.topic }].slice(-MAX_NOTES) };
+          say.push(`Note. ${advice.text}`);
+        }
+      } else if (message !== "") {
         const fresh = !next.notes.some((n) => n.text === message);
         if (fresh) {
           next = { ...next, notes: [...next.notes, { ok: false, text: message }].slice(-MAX_NOTES) };
@@ -326,6 +362,14 @@ export function applyLine(s: Session, line: string): Update {
       const message = str(d["message"]);
       if (name !== "" && message !== "" && typeof d["ok"] === "boolean") {
         const ok = d["ok"];
+        const advice = ok ? null : soundAdvice("check", name, message);
+        if (advice !== null) {
+          if (!next.notes.some((n) => n.topic === advice.topic)) {
+            next = { ...next, notes: [...next.notes, { ok: true, text: advice.text, topic: advice.topic }].slice(-MAX_NOTES) };
+            say.push(`Note. ${advice.text}`);
+          }
+          break;
+        }
         next = { ...next, notes: [...next.notes, { ok, text: message }].slice(-MAX_NOTES) };
         if (!ok || ALWAYS_SAID.has(name)) say.push(ok ? message : `Problem. ${message}`);
       }

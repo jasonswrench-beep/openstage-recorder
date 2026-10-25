@@ -22,6 +22,8 @@ export interface StandInControls {
   revealed: string[];
   /** Every set of options the recorder was started with. */
   started: string[][];
+  /** Make the next recording end with the findings the real recorder makes about sound: the computer's sound drowns the voice (said twice, as the real one does), and the computer's sound was not heard. */
+  soundFindings: boolean;
   /** Make the next video never finish by itself, so Cancel can be tried (a real video of a long recording takes minutes). */
   holdRender: boolean;
 }
@@ -83,6 +85,8 @@ class PretendRecorder {
   private gains = { microphoneGainDb: 0, systemGainDb: 0 };
   /** A video that never finishes by itself: it runs until it is stopped. */
   holdRender = false;
+  /** The recording ends with the recorder's findings about the sounds (see `StandInControls.soundFindings`). */
+  soundFindings = false;
 
   private readonly speed: number;
   private readonly files: Map<string, string>;
@@ -283,6 +287,12 @@ class PretendRecorder {
     this.later(() => {
       this.finishTake("complete");
       this.writeRecording();
+      if (this.soundFindings) {
+        const advice = "To put your voice about 6 decibels above it, make the computer's sound 19 decibels quieter in the mix (record with --system-gain-db -19), or balance mic.wav and system.wav in the editor: the separate files are not changed by the mix.";
+        this.emit({ event: "check", check: "balance", ok: false, message: `The computer's sound is about 13 decibels louder than your voice while each is making sound, so in the mixed video your voice may be hard to hear. ${advice}` });
+        this.emit({ event: "warning", code: "sound-balance", message: `Balance: the computer's sound is about 13 decibels louder than your voice. ${advice}` });
+        this.emit({ event: "warning", code: "track-silent", message: "The computer's sound track is silent: nothing was heard from Speakers (Pretend) during this recording. If sound was playing, it was probably going to a different sound output than sound output 1, Speakers (Pretend). FIND SOUND OUTPUT.bat shows which one carries the sound." });
+      }
       this.emit({ event: "result", ok: true, project: this.folder, take: this.take, state: "complete", durationMs: this.lastTakeMs, segments: Math.max(1, Math.ceil(this.lastTakeMs / 2000)) });
       this.end(0);
     }, 60);
@@ -302,6 +312,7 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     files,
     revealed: [],
     started: [],
+    soundFindings: false,
     holdRender: false,
   };
   if (typeof window !== "undefined") window.__openstageStandIn = controls;
@@ -359,6 +370,8 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
       controls.started.push(args);
       recorder.holdRender = controls.holdRender;
       controls.holdRender = false;
+      recorder.soundFindings = controls.soundFindings;
+      controls.soundFindings = false;
       recorder.start(args);
     },
     async streamSend(text) {
