@@ -30,3 +30,6 @@ app/web/main.js
 app/web/style.css
 app/web/icon.svg
 app/src-tauri/gen/
+
+# The installer made by app/BUILD INSTALLER.bat
+app/installer/
