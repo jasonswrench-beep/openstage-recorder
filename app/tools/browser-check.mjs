@@ -259,6 +259,31 @@ await check("the loudness of the computer's sound can be set in decibels and goe
   assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-disabled"), "true", "and Start waits");
 });
 
+await check("advice about the sounds is said as a note, once, in this app's words, and is listed as a note, never as a problem", async (page, t) => {
+  await page.evaluate(() => { window.__openstageStandIn.soundFindings = true; });
+  await page.getByLabel("Name of the recording").fill("Sound advice");
+  await page.getByLabel(/^Countdown/).fill("0");
+  await page.getByLabel(/^Practice/).uncheck();
+  await page.getByRole("button", { name: "Start recording" }).focus();
+  await t.key("Enter");
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  await page.waitForTimeout(150);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  const said = await t.said();
+  assertEqual((said.match(/The computer's sound is about 13 decibels louder/g) ?? []).length, 1, "the balance is said once, though the recorder says it twice");
+  assertMatch(said, /Note\. The computer's sound is about 13 decibels louder than your voice/, "it is said as a note");
+  assertMatch(said, /Note\. Nothing was heard from the computer's sound \(Speakers \(Pretend\)\) during this recording\. That is normal if nothing was playing\./, "a computer sound that was not heard is said as a note, with the reassurance");
+  assert(!/Problem/.test(said), "nothing is called a problem");
+  assert(!/--system-gain-db|mic\.wav|system\.wav|FIND SOUND OUTPUT/.test(said), "none of the recorder's command line words are said");
+  assertMatch(said, /put -19 in the computer's sound box on the Record screen before recording\)/, "the next step is in this app's words");
+  const items = await page.getByRole("list", { name: "What the recorder said" }).locator("li").allTextContents();
+  const advice = items.filter((x) => /decibels louder|Nothing was heard/.test(x));
+  assertEqual(advice.length, 2, "listed once each");
+  assert(advice.every((x) => x.startsWith("Note. ")), "listed as notes");
+  assertEqual(items.filter((x) => x.startsWith("Problem.")).length, 0, "no problem is listed");
+});
+
 // ---- choices that cannot work are said, not hidden ----
 
 await check("Start says why it cannot start, and pressing it says so instead of doing nothing", async (page, t) => {
@@ -457,14 +482,30 @@ await check("Edit opens the editing screen for a recording, says what it opened,
   assertEqual(await page.title(), "OpenStage Recorder", "the title is back");
 });
 
-await check("only Blur is offered among the callouts, with Zoom, and no text, shape, arrow or blackout tool", async (page, t) => {
+await check("only Blur and Cover are offered among the callouts, with Zoom, and no text, shape or arrow tool", async (page, t) => {
   await makeRecording(page, t);
   await openEdit(page, t);
-  assertEqual(await page.locator(".os-ed-callouts button").allTextContents(), ["Blur", "Zoom on a part", "Draw a zoom"], "the callout bar");
+  assertEqual(await page.locator(".os-ed-callouts button").allTextContents(), ["Blur", "Cover", "Zoom on a part", "Draw a zoom"], "the callout bar");
   const everything = (await page.locator(".os-ed button").allTextContents()).join(" | ");
-  for (const word of ["Text", "Title", "Lower third", "Highlight", "Circle", "Arrow", "Cover", "Picture", "Video", "Sound"]) {
+  for (const word of ["Text", "Title", "Lower third", "Highlight", "Circle", "Arrow", "Picture", "Video", "Sound"]) {
     assert(!new RegExp(`(^|\\| )${word}( |\\||$)`).test(everything), `${word} is offered`);
   }
+});
+
+await check("a Cover is added from the bar with the keyboard, says it cannot be undone once the video is made, has a colour and a place to set, and one undo takes it away", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  await page.getByRole("button", { name: "Cover", exact: true }).focus();
+  await t.key("Enter");
+  await page.waitForFunction(() => /nobody can undo this redaction/.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
+  assertMatch(await editSaid(page), /Once the video is exported, nobody can undo this redaction\./, "the warning is said");
+  assertEqual(await stateText(page), "There are changes that are not saved.", "adding it is a change to save");
+  for (const label of ["Cover colour", "Left (%)", "Top (%)", "Width (%)", "Height (%)"]) {
+    assertEqual(await page.getByLabel(label, { exact: true }).count(), 1, `${label} can be set`);
+  }
+  assertEqual(await page.evaluate(() => document.activeElement?.closest(".os-ed-list, .os-ed") !== null), true, "the focus is in the editing screen, on the new cover's form");
+  await page.locator(".os-ed button", { hasText: /^Undo/ }).first().click();
+  assertEqual(await stateText(page), "There are no unsaved changes.", "one undo takes it away");
 });
 
 await check("a webcam clip has Where and How big boxes, they are named, change the edit in one undo step, and are saved and read back", async (page, t) => {

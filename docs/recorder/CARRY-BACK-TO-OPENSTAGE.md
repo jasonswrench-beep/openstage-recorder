@@ -59,11 +59,19 @@ They fail in OpenStage Author's own copy of `capture-timeline/tools/browser-chec
 
 Neither is a fault in the screens. The checks need updating.
 
+### 7. The recorder's advice about sound is said as a problem, in a command line's words
+
+The recorder program's findings about the balance of the voice and the computer's sound, and about the computer's sound not being heard, are `ok: false` checks or warnings, and the dialog says "Problem." for them. But they are advice: the recording is whole. They also name `--system-gain-db`, `mic.wav`, `system.wav` and `FIND SOUND OUTPUT.bat`, which mean nothing to an author using the window. The recorder says the balance twice (a check and a warning). The Recorder's `soundAdvice` in `app/src/capturesession.ts` says them once, as notes, in the app's own words, and keeps a silent microphone a problem. Not heard with a screen reader.
+
+### 8. The Cover tool is announced as a "redaction"
+
+The button says "Cover", but adding one announces `Added the redaction "Redaction" ... nobody can undo this redaction`, and the clip list names it "Redaction" (`capture-edit/src/items.ts`, `addRedact`). An author who has only seen "Cover" may not connect the two.
+
 ## Changes in the Recorder's copy of the shared folders that OpenStage Author may want
 
 These are listed, with the reason for each, in `docs/recorder/EXTRACTED-FROM-OPENSTAGE.md` under "Changes made inside the copied folders". All are additions, and with nothing asked for the screens behave as they did.
 
-- `callouts` on the editor: which callout kinds the bar under the picture offers. OpenStage Author does not need it; the Recorder offers Blur only.
+- `callouts` on the editor: which callout kinds the bar under the picture offers. OpenStage Author does not need it; the Recorder offers Blur and Cover only.
 - Webcam place: `setWebcamPlace` and two boxes in a webcam clip's form, "Webcam picture: where" and "how big". The edit model, the preview and the exporter could already place a webcam, but no screen set it.
 - The loudness carried into a new edit, and the sound balance (item 3).
 

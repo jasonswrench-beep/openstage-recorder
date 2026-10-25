@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  applyLine, commandLine, defaultSettings, describeSession, formatTime, initialSession, keyAction, parseProbe, parseWindow, recordArgs, recordingFolderName, recordingPath,
+  applyLine, commandLine, soundAdvice, defaultSettings, describeSession, formatTime, initialSession, keyAction, parseProbe, parseWindow, recordArgs, recordingFolderName, recordingPath,
   safeName, settingsProblem, STOP_LINE, type RecordSettings, type Session,
 } from "./capturesession.ts";
 
@@ -337,4 +337,66 @@ test("the loudness must be a whole number of decibels the recorder accepts, and 
     assert.match(problem ?? "", /the computer's sound is in the video is a whole number of decibels from -40 to 20/, String(db));
   }
   assert.match(settingsProblem({ ...ok, micGainDb: 99 }) ?? "", /^How loud your voice is in the video/);
+});
+
+// ---- advice about the sounds is said as notes, not as problems ----
+
+const LOUD_CHECK = "The computer's sound is about 13 decibels louder than your voice while each is making sound, so in the mixed video your voice may be hard to hear. To put your voice about 6 decibels above it, make the computer's sound 19 decibels quieter in the mix (record with --system-gain-db -19), or balance mic.wav and system.wav in the editor: the separate files are not changed by the mix.";
+const LOUD_WARNING = "Balance: the computer's sound is about 13 decibels louder than your voice. To put your voice about 6 decibels above it, make the computer's sound 19 decibels quieter in the mix (record with --system-gain-db -19), or balance mic.wav and system.wav in the editor: the separate files are not changed by the mix.";
+const SILENT = "The computer's sound track is silent: nothing was heard from Speakers (Realtek) during this recording. If sound was playing, it was probably going to a different sound output than sound output 1, Speakers (Realtek). FIND SOUND OUTPUT.bat shows which one carries the sound.";
+
+test("a computer sound that drowns the voice is a note with a next step in this app's words, said once even though the recorder says it twice", () => {
+  const { session, said } = play([
+    line({ event: "check", check: "balance", ok: false, message: LOUD_CHECK }),
+    line({ event: "warning", code: "sound-balance", message: LOUD_WARNING }),
+  ]);
+  assert.equal(said.length, 1, "the same finding is not said twice");
+  assert.match(said[0] ?? "", /^Note\. The computer's sound is about 13 decibels louder than your voice/);
+  assert.ok(!(said[0] ?? "").includes("Problem"), "not a problem");
+  assert.ok(!(said[0] ?? "").includes("--system-gain-db"), "no command line option");
+  assert.ok(!(said[0] ?? "").includes("mic.wav"), "no file names");
+  assert.match(said[0] ?? "", /\(put -19 in the computer's sound box on the Record screen before recording\), or change it afterwards under Sound balance when you edit the recording\. The separate sound files are never changed\.$/);
+  assert.deepEqual(session.notes.map((n) => n.ok), [true], "listed once, as a note");
+});
+
+test("the warning alone, arriving first, is said the same way and the check after it adds nothing", () => {
+  const { said } = play([
+    line({ event: "warning", code: "sound-balance", message: LOUD_WARNING }),
+    line({ event: "check", check: "balance", ok: false, message: LOUD_CHECK }),
+  ]);
+  assert.equal(said.length, 1);
+  assert.match(said[0] ?? "", /^Note\. The computer's sound is about 13 decibels louder than your voice\. To put your voice/);
+});
+
+test("a computer sound that was not heard says that is normal if nothing was playing, and where to choose another output", () => {
+  const { session, said } = play([line({ event: "warning", code: "track-silent", message: SILENT })]);
+  assert.deepEqual(said, [
+    "Note. Nothing was heard from the computer's sound (Speakers (Realtek)) during this recording. That is normal if nothing was playing. If something was playing, it may have gone to a different sound output: choose the right one under \"The computer's own sound\" on the Record screen.",
+  ]);
+  assert.deepEqual(session.notes.map((n) => n.ok), [true]);
+});
+
+test("a microphone that was not heard stays a warning, because a recording with no voice is a real problem", () => {
+  const message = "The microphone track is silent: nothing was heard from Webcam microphone during this recording. Check that the microphone is not muted.";
+  const { said, session } = play([line({ event: "warning", code: "track-silent", message })]);
+  assert.deepEqual(said, [message]);
+  assert.deepEqual(session.notes.map((n) => n.ok), [false]);
+  assert.equal(soundAdvice("warning", "track-silent", message), null);
+});
+
+test("a computer sound that goes quiet part way is a note; a balance that is good, and a sound level check, are left as they were", () => {
+  const quiet = "The computer's sound was heard until 0:12 and was silent for the last 5 seconds of the recording. If something was meant to play, it may have gone to a different sound output: this recording kept to the output you chose.";
+  assert.deepEqual(play([line({ event: "warning", code: "sound-went-quiet", message: quiet })]).said, [`Note. ${quiet}`]);
+  const good = play([line({ event: "check", check: "balance", ok: true, message: "Your voice is about 6 decibels louder than the computer's sound while each is making sound. That is a good balance for narration." })]);
+  assert.deepEqual(good.said, [], "a balance that is fine is listed but not said");
+  assert.deepEqual(play([line({ event: "check", check: "run-cpu", ok: false, message: "Processor use was 90 percent." })]).said, ["Problem. Processor use was 90 percent."]);
+});
+
+test("a very quiet computer sound note uses this app's words for what to do, and anything unrecognised comes back as it was", () => {
+  const veryQuiet = "The computer's sound is about 20 decibels quieter than your voice, which may be too quiet to hear in the mixed video. If it should be heard, raise it in the editor, or record with a higher --system-gain-db.";
+  const advice = soundAdvice("check", "balance", veryQuiet);
+  assert.ok(advice !== null);
+  assert.match(advice.text, /raise it under Sound balance when you edit the recording, or put a higher number in the computer's sound box on the Record screen before recording\.$/);
+  const odd = soundAdvice("check", "balance", "Something the recorder says in some new way.");
+  assert.deepEqual(odd, { text: "Something the recorder says in some new way.", topic: "balance" });
 });
