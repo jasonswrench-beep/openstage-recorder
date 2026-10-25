@@ -82,3 +82,20 @@ test("with nothing to edit the edit is empty and says so", () => {
   assert.equal(model.tracks.length, 0);
   assert.deepEqual(notes, ["There is nothing recorded yet that can be edited."]);
 });
+
+test("the loudness chosen when recording becomes the volume of the voice and the computer's sound, and is said; anything else is left as heard", () => {
+  const loud: TakeInfo = { ...take1, mix: { microphoneGainDb: 6, systemGainDb: -19 } };
+  const { model, notes } = editFromTakes([loud]);
+  const volume = (track: string) => model.tracks.find((t) => t.name === track)?.clips.map((c) => c.volumeDb);
+  assert.deepEqual([volume("Microphone"), volume("Computer sound"), volume("Screen"), volume("Webcam")], [[6], [-19], [0], [0]]);
+  assert.deepEqual(notes, [
+    "Microphone of take 1 is 6 decibels louder than it was heard, as you set when recording. You can change it under Sound balance.",
+    "Computer sound of take 1 is 19 decibels quieter than it was heard, as you set when recording. You can change it under Sound balance.",
+  ]);
+  assert.deepEqual(validate(model), []);
+  for (const mix of [{ microphoneGainDb: 0, systemGainDb: 0 }, { microphoneGainDb: 41, systemGainDb: -41 }, { microphoneGainDb: 2.5, systemGainDb: Number.NaN }]) {
+    const other = editFromTakes([{ ...take1, mix }]);
+    assert.deepEqual(other.notes, [], JSON.stringify(mix));
+    assert.deepEqual(other.model.tracks.flatMap((t) => t.clips.map((c) => c.volumeDb)), [0, 0, 0, 0]);
+  }
+});

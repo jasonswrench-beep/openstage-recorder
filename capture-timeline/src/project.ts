@@ -21,6 +21,7 @@ import {
   type SourceRef,
   type TakeFile,
   type TakeInfo,
+  type TakeMix,
 } from "../../capture-edit/src/index.ts";
 
 /** A recording folder, however it was reached. Paths are relative to the folder and use `/`. */
@@ -89,11 +90,23 @@ function readTake(text: string, folderName: string): TakeInfo | string {
       if (isObject(entry) && typeof entry["file"] === "string" && typeof entry["kind"] === "string") media.push({ file: entry["file"], kind: entry["kind"] });
     }
   }
+  // The loudness chosen when recording is written on the file of the mixed video, as `mix`.
+  let mix: TakeMix | undefined;
+  if (Array.isArray(data["media"])) {
+    for (const entry of data["media"]) {
+      const m = isObject(entry) ? entry["mix"] : undefined;
+      if (isObject(m) && typeof m["microphoneGainDb"] === "number" && typeof m["systemGainDb"] === "number") {
+        mix = { microphoneGainDb: m["microphoneGainDb"], systemGainDb: m["systemGainDb"] };
+        break;
+      }
+    }
+  }
   return {
     take: data["id"],
     state: typeof data["state"] === "string" ? data["state"] : "unknown",
     durationMs: typeof data["durationMs"] === "number" ? data["durationMs"] : null,
     media,
+    ...(mix === undefined ? {} : { mix }),
   };
 }
 

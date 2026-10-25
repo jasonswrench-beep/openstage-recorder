@@ -243,7 +243,7 @@ await check("starting again sets a take aside, keeps it, and says so", async (pa
 await check("the loudness of the computer's sound can be set in decibels and goes to the recorder, and a wrong number is said in words", async (page, t) => {
   const box = page.getByLabel(/^The computer's sound in the video/);
   assertEqual(await box.inputValue(), "0", "it starts as heard");
-  assertMatch(await page.getByText(/^0 leaves a sound as it is heard/).textContent(), /never changed by this\.$/, "what the boxes mean is written beside them");
+  assertMatch(await page.getByText(/^0 leaves a sound as it is heard/).textContent(), /never changed by this\. When you edit the recording, these numbers are where each sound starts, and you can change them again there, under Sound balance\.$/, "what the boxes mean is written beside them, and where to change them again");
   await box.fill("-19");
   await page.getByLabel(/^Countdown/).fill("0");
   await page.getByRole("button", { name: "Start recording" }).focus();
@@ -386,14 +386,18 @@ for (const scheme of ["light", "dark"]) {
 // ---- editing a recording ----
 
 /** Make a pretend recording with the keyboard-free shortcuts and come back to the Record screen with it in the list. */
-async function makeRecording(page, t, { name = "Edit demo", webcam = false } = {}) {
+async function makeRecording(page, t, { name = "Edit demo", webcam = false, real = false, micGain, systemGain } = {}) {
   await page.getByLabel("Name of the recording").fill(name);
   await page.getByLabel(/^Countdown/).fill("0");
-  if (webcam) {
+  if (webcam || real) {
     await page.getByLabel(/^Practice/).uncheck();
+    if (micGain !== undefined) await page.getByLabel(/^Your voice in the video/).fill(String(micGain));
+    if (systemGain !== undefined) await page.getByLabel(/^The computer's sound in the video/).fill(String(systemGain));
+  }
+  if (webcam) {
     const value = await page.getByLabel("A webcam", { exact: true }).evaluate((el) => [...el.options].find((o) => /Pretend webcam/.test(o.textContent))?.value);
     await page.getByLabel("A webcam", { exact: true }).selectOption(value);
-  } else {
+  } else if (!real) {
     await page.getByLabel(/^Practice/).check();
   }
   await page.getByRole("button", { name: "Start recording" }).focus();
@@ -556,6 +560,57 @@ await check("a recording with a newer take asks which edit to open, and keeping 
   assertMatch(await editSaid(page), /^Saved the edit in Which demo\.capture\./, "the new edit is saved");
   assertEqual(await saved(page, "Which demo.capture/edit-before-take-2.json"), before, "the older edit is kept as it was");
   assert((await saved(page, "Which demo.capture/edit.json")) !== before, "edit.json is now the new edit");
+});
+
+await check("the loudness chosen when recording is where Sound balance starts, and the opening words say so", async (page, t) => {
+  await makeRecording(page, t, { name: "Loud demo", real: true, micGain: 6, systemGain: -19 });
+  await openEdit(page, t);
+  assertEqual(await page.getByRole("group", { name: "Sound balance" }).isVisible(), true, "the balance is offered");
+  assertEqual(await page.getByLabel("Your voice, in decibels", { exact: true }).inputValue(), "6", "your voice starts where it was set");
+  assertEqual(await page.getByLabel("The computer's sound, in decibels", { exact: true }).inputValue(), "-19", "the computer's sound starts where it was set");
+  assertMatch(await editSaid(page), /Microphone of take 1 is 6 decibels louder than it was heard, as you set when recording\. You can change it under Sound balance\. Computer sound of take 1 is 19 decibels quieter than it was heard/, "the opening words say what was carried over");
+});
+
+await check("Sound balance sets every clip of a sound from the keyboard, says so, saves, takes one undo, and a wrong number is said and kept to mend", async (page, t) => {
+  await makeRecording(page, t, { name: "Balance demo", real: true });
+  await openEdit(page, t);
+  const system = page.getByLabel("The computer's sound, in decibels", { exact: true });
+  const voice = page.getByLabel("Your voice, in decibels", { exact: true });
+  assertEqual([await voice.inputValue(), await system.inputValue()], ["0", "0"], "both start as heard");
+  assertMatch((await system.getAttribute("aria-describedby")) ?? "", /-balance-hint$/, "the boxes point at their hint");
+  await system.focus();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("-12");
+  await t.key("Enter");
+  assertMatch(await editSaid(page), /^The computer's sound is now 12 decibels quieter than it was heard, in its one clip\./, "the change is said");
+  assertEqual(await stateText(page), "There are changes that are not saved.", "it is a change to save");
+  assertEqual(await voice.inputValue(), "0", "your voice is not touched");
+  await t.key("Escape"); // nothing left to put back, so back to the timeline
+  assertEqual(await page.evaluate(() => document.activeElement?.closest(".os-ed-timeline") !== null), true, "Escape returns to the timeline");
+  await t.key("Control+s");
+  await editSaid(page);
+  const text = ((await saved(page, "Balance demo.capture/edit.json")) ?? "").replace(/\s+/g, "");
+  assert(/"volumeDb":-12/.test(text), "the volume is in the saved edit");
+  await t.key("Control+z");
+  assertEqual(await system.inputValue(), "0", "one undo takes the balance back");
+  // a wrong number is said, marked, and kept to mend; Escape puts the number back
+  await voice.focus();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("99");
+  await t.key("Enter");
+  assertMatch(await editSaid(page), /whole number of decibels from -40 to 20/, "the wrong number is said in words");
+  assertEqual(await voice.getAttribute("aria-invalid"), "true", "the box is marked as not accepted");
+  assertEqual(await voice.inputValue(), "99", "what was typed is kept");
+  await t.key("Escape");
+  assertEqual([await voice.inputValue(), await voice.getAttribute("aria-invalid")], ["0", null], "Escape puts the number back and clears the mark");
+});
+
+await check("Sound balance offers only the sounds the recording has", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  assertEqual(await page.getByRole("group", { name: "Sound balance" }).isVisible(), true, "a practice recording has a voice to balance");
+  assertEqual(await page.getByLabel("Your voice, in decibels", { exact: true }).isVisible(), true, "the voice box is there");
+  assertEqual(await page.getByLabel("The computer's sound, in decibels", { exact: true }).isVisible(), false, "the computer's sound box is put away when none was recorded");
 });
 
 await check("Make a video saves the edit first, shows progress, says it has no captions, and the focus moves to Show the video", async (page, t) => {

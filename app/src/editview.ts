@@ -16,7 +16,7 @@ import { describeLength, listCaption, modelLengthMs, serialize } from "../../cap
 import { h, nextId } from "../../capture-timeline/src/dom.ts";
 import { mountEditor, type Editor } from "../../capture-timeline/src/editor.ts";
 import { backupName, libraryOf, readProject } from "../../capture-timeline/src/project.ts";
-import { EditSession } from "../../capture-timeline/src/session.ts";
+import { EditSession, SOUND_NAMES, type BalanceSound } from "../../capture-timeline/src/session.ts";
 import { errorText, type RecorderBackend } from "./backend.ts";
 import { runOneShot } from "./capturecontroller.ts";
 import { applyExportLine, exportPlan, finishedWords, initialExport, type ExportPlan, type ExportState } from "./captureexport.ts";
@@ -103,8 +103,21 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const reveal = h("button", { type: "button", class: "os-cl-button", hidden: true }, "Show the video in its folder");
   const videoBox = h("section", { class: "rv-section", "aria-labelledby": id("video-title"), hidden: true }, h("h3", { id: id("video-title") }, "The video"), progress, say, notes, h("div", { class: "rv-actions" }, reveal));
 
+  // ---- the balance between your voice and the computer's sound, which a recording keeps on separate tracks
+  const balanceHint = h(
+    "p",
+    { id: id("balance-hint"), class: "rv-note" },
+    "Your voice and the computer's sound are on separate tracks, so each can be made louder or quieter in the video, for every clip of it at once. A whole number of decibels from -40 to 20. 0 is as it was heard, a minus number is quieter (-6 is about half as loud) and a plus number is louder. A box that is empty means the clips of that sound are not all the same; typing a number sets them all. To change just one clip, use Volume in that clip's form.",
+  );
+  const balanceBoxes = (["microphone", "system-audio"] as const).map((sound) => {
+    const input = h("input", { id: id(`balance-${sound}`), type: "text", class: "os-cl-input os-cl-time", autocomplete: "off", spellcheck: "false", "aria-describedby": id("balance-hint") });
+    const field = h("div", { class: "os-cl-field" }, h("label", { for: input.id }, `${SOUND_NAMES[sound]}, in decibels`), input);
+    return { sound, input, field };
+  });
+  const balance = h("fieldset", { class: "rv-fieldset", hidden: true }, h("legend", {}, "Sound balance"), ...balanceBoxes.map((b) => b.field), balanceHint);
+
   const editorHost = h("div", { class: "ev-host" });
-  const root = h("section", { class: "rv-section ev", "aria-labelledby": id("title") }, heading, intro, actions, reduce, state, videoBox, editorHost);
+  const root = h("section", { class: "rv-section ev", "aria-labelledby": id("title") }, heading, intro, actions, reduce, state, balance, videoBox, editorHost);
   host.append(root);
 
   const folder = recordingFolder(b, opts.library, opts.name);
@@ -278,10 +291,57 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
     const live = new EditSession(project.model);
     session = live;
     editor = mountEditor(editorHost, live, { library: libraryOf(project.folder), callouts: CALLOUTS_OFFERED });
+    // The balance boxes show how loud each sound is now, and put away the box of a sound that this recording does not have.
+    const showBalance = (): void => {
+      let any = false;
+      for (const { sound, input, field } of balanceBoxes) {
+        const now = live.soundBalance(sound);
+        field.hidden = now.clips === 0;
+        any ||= now.clips > 0;
+        // A box the author is typing in is left alone until they leave it or press Enter.
+        if (document.activeElement !== input) {
+          input.value = now.db === undefined ? "" : String(now.db);
+          input.removeAttribute("aria-invalid");
+        }
+      }
+      balance.hidden = !any;
+    };
+    for (const { sound, input } of balanceBoxes) {
+      const commit = (): void => {
+        const asked = input.value;
+        const was = live.soundBalance(sound).db;
+        if (asked.trim() === "" && was === undefined) return; // left as it was: different clips, nothing typed
+        const outcome = live.setSoundBalance(sound, asked);
+        editor?.announce(outcome.message);
+        if (outcome.ok) {
+          input.removeAttribute("aria-invalid");
+          const db = live.soundBalance(sound).db;
+          input.value = db === undefined ? "" : String(db);
+        } else {
+          // What was typed is kept, to be mended, and marked as not accepted.
+          input.setAttribute("aria-invalid", "true");
+        }
+      };
+      input.addEventListener("change", commit);
+      input.addEventListener("input", () => input.removeAttribute("aria-invalid"));
+      input.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        e.preventDefault();
+        const db = live.soundBalance(sound).db;
+        const text = db === undefined ? "" : String(db);
+        // The first Escape puts the number back as it was; with nothing to put back, it returns to the timeline.
+        if (input.value !== text) {
+          input.value = text;
+          input.removeAttribute("aria-invalid");
+        } else editor?.focus();
+      });
+    }
     live.subscribe((kind) => {
       if (kind === "model" || kind === "saved") showState();
+      if (kind === "model") showBalance();
     });
     showState();
+    showBalance();
     editor.announce(openingWords(project.title, modelLengthMs(project.model), listCaption(project.model), project.notes, project.problems));
     editor.focus();
   })();

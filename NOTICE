@@ -30,12 +30,16 @@ Rust libraries of the app window (app/src-tauri, the Tauri framework and what it
   259 libraries for Windows, checked by app/tools/check_app_licences.py. All but five are on the allowed
   licence list. The five are under the Mozilla Public License 2.0, which applies to the files of those
   libraries and not to this program: cssparser, cssparser-macros, dtoa-short, option-ext and selectors.
-  They come in through Tauri, are used unmodified, and their source is published on crates.io. The full
-  list with versions and licences is made by the check before a release is built.
+  The project owner accepted them on 2026-10-24. They come in through Tauri, are used unmodified, and their
+  source is published on crates.io. The condition of the acceptance: if any of those files is ever changed
+  here, the changed files must be published under the MPL-2.0, and this notice updated. The full list with
+  versions and licences is made by the check before a release is built.
 
 The application icon
-  app/branding/OpenRecorder.svg is the picture of a film camera that the project owner supplied for this
-  app. The icon files in app/src-tauri/icons and app/web/icon.svg are made from it.
+  app/branding/OpenStageRecorder.svg is the picture of a film camera that the project owner supplied for this
+  app (supplied under the file name OpenRecorder.svg; only the file name and the title inside the file were
+  changed, not the picture). It is released under Apache-2.0 with the rest of the project. The icon files in
+  app/src-tauri/icons and app/web/icon.svg are made from it.
 
 Windows' own capture and encoding services
   Screen and window capture, sound capture and MP4 encoding use services that Windows already
