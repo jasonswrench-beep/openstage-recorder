@@ -1,0 +1,53 @@
+# Builds the OpenStage Recorder installer on a Windows machine from what is in this repository.
+#
+# Run it by hand from the Actions tab ("Run workflow"), or it runs when a version tag such as v0.1.0 is pushed.
+# The installer is kept with the run as a download called OpenStage-Recorder-installer.
+#
+# The installer is NOT signed. Nothing here uses a secret. Signing, when it is decided on, is added as a step after
+# "Make the installer"; docs/recorder/INSTALLER-AND-SIGNING.md says what it would involve.
+
+name: Build the Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Get the files
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build the recording program
+        working-directory: capture
+        run: cargo build --release -p openstage-capture-cli
+
+      - name: Build the app window
+        working-directory: app
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Make the installer
+        working-directory: app
+        run: npx tauri build --config src-tauri/tauri.installer.conf.json
+
+      - name: Keep the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenStage-Recorder-installer
+          path: app/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
