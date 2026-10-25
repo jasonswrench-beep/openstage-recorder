@@ -70,6 +70,17 @@ body {
   min-width: 0;
 }
 
+/* A number of decibels needs a short box, not the width of the page. */
+.ev .rv-fieldset input.os-cl-input[type="text"] {
+  width: 8rem;
+  max-width: 100%;
+}
+
+/* The editing screens' boxes set their own display, which would keep a box with the hidden attribute on the page. */
+.ev .os-cl-field[hidden] {
+  display: none;
+}
+
 .rv-status {
   position: sticky;
   top: 0;

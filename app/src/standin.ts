@@ -78,6 +78,9 @@ class PretendRecorder {
   private takes: { take: number; ms: number; state: string }[] = [];
   /** The `--camera` the recording was started with: `none`, or the number of a camera. */
   private camera = "none";
+  /** The computer's own sound is recorded (`--output` was given and is not `none`), and the loudness asked for, as the real program writes it into the mixed video's `mix`. */
+  private system = false;
+  private gains = { microphoneGainDb: 0, systemGainDb: 0 };
   /** A video that never finishes by itself: it runs until it is stopped. */
   holdRender = false;
 
@@ -122,6 +125,8 @@ class PretendRecorder {
     this.paused = false;
     this.mode = "other";
     this.camera = opt("--camera") ?? "none";
+    this.system = (opt("--output") ?? "none") !== "none";
+    this.gains = { microphoneGainDb: Number(opt("--mic-gain-db") ?? 0), systemGainDb: Number(opt("--system-gain-db") ?? 0) };
     this.later(() => this.emit({ event: "hello", protocol: "0.1", program: "openstage-capture", programVersion: "0.1.0", platform: "pretend" }), 5);
     switch (args[0]) {
       case "probe":
@@ -210,7 +215,7 @@ class PretendRecorder {
     this.files.set(`${name}/capture.json`, JSON.stringify({ format: "openstage-capture-project", title: this.title }));
     for (const t of this.takes) {
       const dir = `${name}/takes/take-${String(t.take).padStart(3, "0")}`;
-      this.files.set(`${dir}/take.json`, JSON.stringify({ id: t.take, state: t.state, durationMs: t.ms, media: [{ file: "screen.mp4", kind: "screen" }, { file: "mic.wav", kind: "microphone" }, ...(this.camera === "none" ? [] : [{ file: "webcam.mp4", kind: "webcam" }])] }));
+      this.files.set(`${dir}/take.json`, JSON.stringify({ id: t.take, state: t.state, durationMs: t.ms, media: [{ file: "screen.mp4", kind: "screen", mix: this.gains }, { file: "mic.wav", kind: "microphone" }, ...(this.system ? [{ file: "system.wav", kind: "system-audio" }] : []), ...(this.camera === "none" ? [] : [{ file: "webcam.mp4", kind: "webcam" }])] }));
     }
   }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Makes the icon files the app needs from the one source picture, branding/OpenRecorder.svg:
+// Makes the icon files the app needs from the one source picture, branding/OpenStageRecorder.svg:
 //
 //   src-tauri/icons/32x32.png, 128x128.png, 128x128@2x.png, icon.png   the pictures Tauri uses for the window
 //   src-tauri/icons/icon.ico                                           the Windows program icon (16, 24, 32, 48, 64 and 256 pixels)
@@ -18,7 +18,7 @@ const app = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_DIR ?? "/opt/node-tools/node_modules/playwright");
 
-const svg = readFileSync(resolve(app, "branding", "OpenRecorder.svg"), "utf-8");
+const svg = readFileSync(resolve(app, "branding", "OpenStageRecorder.svg"), "utf-8");
 const address = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 
 const browser = await chromium.launch({ args: ["--no-sandbox"] });

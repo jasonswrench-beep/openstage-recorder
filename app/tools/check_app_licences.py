@@ -25,14 +25,15 @@ ALLOWED = {
 
 # Libraries under a licence that is not on the list, which have been looked at. MPL-2.0 is a licence that applies to the files of the
 # library itself, so using one unmodified does not change the licence of this program, but the notice and the way to get its source
-# have to travel with the program. They come in through Tauri (the window), and OpenStage Author carries the same ones. The owner has to
-# decide whether this is acceptable before a release; until then they are listed here, by name, so nothing else slips in beside them.
+# have to travel with the program. They come in through Tauri (the window), and OpenStage Author carries the same ones. The owner accepted
+# these five on 2026-10-24, on the condition that they are used unmodified (if one is ever changed here, the changed files have to be
+# published under the MPL-2.0). They are listed by name, so nothing else slips in beside them.
 KNOWN_EXCEPTIONS = {
-    "cssparser": "MPL-2.0, through Tauri",
-    "cssparser-macros": "MPL-2.0, through Tauri",
-    "dtoa-short": "MPL-2.0, through Tauri",
-    "option-ext": "MPL-2.0, through Tauri",
-    "selectors": "MPL-2.0, through Tauri",
+    "cssparser": "MPL-2.0, through Tauri, accepted by the owner 2026-10-24",
+    "cssparser-macros": "MPL-2.0, through Tauri, accepted by the owner 2026-10-24",
+    "dtoa-short": "MPL-2.0, through Tauri, accepted by the owner 2026-10-24",
+    "option-ext": "MPL-2.0, through Tauri, accepted by the owner 2026-10-24",
+    "selectors": "MPL-2.0, through Tauri, accepted by the owner 2026-10-24",
 }
 
 # What is bundled into web/main.js, from package.json's dependencies (not the tools used to build it).
@@ -95,7 +96,7 @@ def main():
     known = [f"{n} {v} ({lic})" for n, v, lic in rust if n in KNOWN_EXCEPTIONS]
     print(f"{len(rust)} Rust libraries for Windows, {len(js)} JavaScript packages bundled into the page.")
     if known:
-        print("Looked at and listed, awaiting the owner's decision: " + "; ".join(known))
+        print("Accepted by the owner on 2026-10-24, used unmodified: " + "; ".join(known))
     if failures:
         for f in failures:
             print("FAIL  " + f)
