@@ -1,6 +1,6 @@
 # The installer, and whether to sign it
 
-Written 2026-10-25. Nothing in the installer has been built or run on Windows yet. Only its settings were checked, on Linux, by Tauri's own reader.
+Written 2026-10-25. **The installer has been built once, on a Windows machine at GitHub, and the build passed** (the workflow "Build the Windows installer", its first run, 2026-10-25: the recording program took about two and a half minutes, the installer about five and a half, and the result is a 3.2 MB download called `OpenStage-Recorder-installer`, kept by GitHub for about three months). **It has not been installed or run on any computer, and its contents have not been looked inside**: the computer this was written on cannot reach the place the download is kept. `BUILD INSTALLER.bat` has not been run. Before that run, its settings were also checked on Linux by Tauri's own reader.
 
 ## What is set up
 
