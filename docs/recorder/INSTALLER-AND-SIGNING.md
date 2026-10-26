@@ -8,6 +8,20 @@ Written 2026-10-25. **The installer has been built once, on a Windows machine at
 - `app/BUILD INSTALLER.bat`: double-click. It asks before downloading, builds the recording program and the app, makes the installer, copies it to `app\installer\`, and shows it in a folder window. It says plainly that the installer is not signed and what Windows will show.
 - `.github/workflows/build-installer.yml`: makes the same installer on a Windows machine at GitHub, from what is in the repository (run it by hand from the Actions tab, or push a version tag such as `v0.1.0`). It uses no secret and does not sign.
 
+- **A portable folder**, made by the same workflow run: `OpenStage Recorder.exe`, `openstage-capture.exe` (the recording program), the licence texts and a short `READ ME FIRST.txt`. Unzip it anywhere and double-click `OpenStage Recorder.exe`: nothing is installed, and deleting the folder removes it. It is the same program as the installed one, and equally unsigned.
+
+## How to get the files from GitHub
+
+The workflow keeps its two results with each run, for about three months. No special tools are needed, only a web browser, and you may need to be signed in to GitHub.
+
+1. Open https://github.com/jasonswrench-beep/openstage-recorder/actions
+2. Click the newest run called "Build the Windows installer" (it has a green tick when it worked).
+3. Scroll to the bottom of that page, to the heading **Artifacts**.
+4. Click **OpenStage-Recorder-portable** to download the folder as a zip file, or **OpenStage-Recorder-installer** to download the setup file as a zip file.
+5. Unzip it (right-click, Extract All). Open the folder `OpenStage Recorder` and double-click `OpenStage Recorder.exe`, or double-click the setup file.
+
+A later run is made with "Run workflow" on the same Actions page (choose "Build the Windows installer" on the left, then the grey "Run workflow" button). It takes about nine minutes.
+
 The installed app finds the recording program beside itself. `app/core/src/program.rs` already looked there first; only a unit test has shown it.
 
 ## What to check on a real computer

@@ -31,7 +31,7 @@ On Windows, double-click one of these, in the `app` folder. Both ask before they
 
 - `OPEN RECORDER PREVIEW.bat` shows the Record screen in your web browser with a pretend recorder. Nothing real is recorded. Use it to try the screen with a keyboard or a screen reader.
 - `OPEN RECORDER.bat` builds the app and the recording program the first time, then opens the real thing. It was run once, on 2026-10-23, and built and opened the app.
-- `BUILD INSTALLER.bat` builds one installer file, named like `OpenStage Recorder_0.1.0_x64-setup.exe`, in `app\installer`, which installs the app for your own user with no administrator password. **Never run yet.** It is not signed, so Windows will show a blue "Windows protected your PC" box the first time. `docs/recorder/INSTALLER-AND-SIGNING.md` has what to check and what signing would change.
+- `BUILD INSTALLER.bat` builds one installer file, named like `OpenStage Recorder_0.1.0_x64-setup.exe`, in `app\installer`, which installs the app for your own user with no administrator password. **Never run yet.** It is not signed, so Windows will show a blue "Windows protected your PC" box the first time. A build at GitHub also makes a portable folder you can unzip and double-click with nothing to install, and both can be downloaded from the Actions page (steps in `docs/recorder/INSTALLER-AND-SIGNING.md`). `docs/recorder/INSTALLER-AND-SIGNING.md` has what to check and what signing would change.
 
 ## Checking it
 
