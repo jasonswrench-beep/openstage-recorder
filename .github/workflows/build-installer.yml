@@ -1,7 +1,10 @@
 # Builds the OpenStage Recorder installer on a Windows machine from what is in this repository.
 #
 # Run it by hand from the Actions tab ("Run workflow"), or it runs when a version tag such as v0.1.0 is pushed.
-# The installer is kept with the run as a download called OpenStage-Recorder-installer.
+# Two downloads are kept with the run:
+#   OpenStage-Recorder-installer  the installer (a setup file that installs the app for the current user)
+#   OpenStage-Recorder-portable   a folder with "OpenStage Recorder.exe" and the recording program, to unzip and
+#                                 double-click, with nothing to install
 #
 # The installer is NOT signed. Nothing here uses a secret. Signing, when it is decided on, is added as a step after
 # "Make the installer"; docs/recorder/INSTALLER-AND-SIGNING.md says what it would involve.
@@ -50,4 +53,25 @@ jobs:
         with:
           name: OpenStage-Recorder-installer
           path: app/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+      - name: Make the portable folder
+        working-directory: app
+        shell: pwsh
+        run: |
+          $out = "portable/OpenStage Recorder"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item "src-tauri/target/release/openstage-recorder.exe" "$out/OpenStage Recorder.exe"
+          Copy-Item "../capture/target/release/openstage-capture.exe" "$out/openstage-capture.exe"
+          Copy-Item "../LICENSE" "$out/LICENSE.txt"
+          Copy-Item "../NOTICE" "$out/NOTICE.txt"
+          Copy-Item "../capture/THIRD-PARTY.md" "$out/THIRD-PARTY.md"
+          Copy-Item "portable-readme.txt" "$out/READ ME FIRST.txt"
+          Get-ChildItem $out | Format-Table Name, Length
+
+      - name: Keep the portable folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenStage-Recorder-portable
+          path: app/portable
           if-no-files-found: error
