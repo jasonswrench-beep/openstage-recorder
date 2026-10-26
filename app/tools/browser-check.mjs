@@ -23,7 +23,7 @@ const shots = process.argv[2];
 const PORT = 8794;
 const BASE = `http://127.0.0.1:${PORT}/`;
 
-const server = spawn(process.execPath, [resolve(here, "..", "dev-server.mjs"), String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
+const server = spawn(process.execPath, [resolve(here, "..", "dev-server.mjs"), String(PORT), "--media-test"], { stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ready, fail) => {
   server.stdout.on("data", (chunk) => String(chunk).includes("preview") && ready());
   server.on("exit", () => fail(new Error("the preview server stopped")));
@@ -653,6 +653,37 @@ await check("Sound balance offers only the sounds the recording has", async (pag
   assertEqual(await page.getByLabel("Your voice, in decibels", { exact: true }).isVisible(), true, "the voice box is there");
   assertEqual(await page.getByLabel("The computer's sound, in decibels", { exact: true }).isVisible(), false, "the computer's sound box is put away when none was recorded");
 });
+
+await check("pressing Play in the editing screen is heard: the sound of the recording, from another web address than the page as in the installed app, reaches the speakers", async (page, t) => {
+  await makeRecording(page, t, { name: "Heard demo", real: true });
+  // Put an analyser after every sound the preview sends through Web Audio, to read what really reaches the speakers.
+  await page.evaluate(() => {
+    window.__tapped = [];
+    const original = AudioContext.prototype.createMediaElementSource;
+    AudioContext.prototype.createMediaElementSource = function (element) {
+      const node = original.call(this, element);
+      const analyser = this.createAnalyser();
+      node.connect(analyser);
+      window.__tapped.push(analyser);
+      return node;
+    };
+  });
+  await openEdit(page, t);
+  await page.getByRole("button", { name: "Play", exact: false }).first().click();
+  await page.waitForFunction(() => document.querySelectorAll("audio").length > 0, null, { timeout: 5000 });
+  await page.waitForTimeout(900);
+  const heard = await page.evaluate(() => {
+    const peaks = window.__tapped.map((analyser) => {
+      const data = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(data);
+      return Math.max(...data.map(Math.abs));
+    });
+    return { sources: peaks.length, loudest: Math.max(0, ...peaks), crossOrigin: [...document.querySelectorAll("audio")].map((a) => a.crossOrigin) };
+  });
+  assert(heard.sources >= 1, "the preview sent no sound through Web Audio");
+  assert(heard.loudest > 0.05, `the sound reaching the speakers was silent (loudest sample ${heard.loudest.toFixed(4)})`);
+  assertEqual(heard.crossOrigin.every((c) => c === "anonymous"), true, "every sound is asked for with CORS");
+}, { search: "&media=1" });
 
 await check("Make a video saves the edit first, shows progress, says it has no captions, and the focus moves to Show the video", async (page, t) => {
   await makeRecording(page, t);

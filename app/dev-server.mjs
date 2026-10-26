@@ -6,6 +6,9 @@
 // With --open it also opens the address in the browser.
 //
 // For development and the automatic checks only. It listens on 127.0.0.1, so no other computer can reach it, and it serves nothing but web/.
+//
+// With --media-test it also listens on the next port and serves one made-up tone, /tone.wav, from that other address, as the installed app
+// serves a recording's sound from another address than the page, so the automatic checks can see whether that sound is heard.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -41,6 +44,31 @@ function openInBrowser(address) {
   const child = spawn(command, args, { stdio: "ignore", detached: true });
   child.on("error", () => console.log("The browser could not be opened by itself. Please open the address above."));
   child.unref();
+}
+
+if (argv.includes("--media-test")) {
+  // Four seconds of 440 Hz, 16 bit, mono, 48000 samples a second.
+  const rate = 48000;
+  const count = rate * 4;
+  const tone = Buffer.alloc(44 + count * 2);
+  tone.write("RIFF", 0);
+  tone.writeUInt32LE(36 + count * 2, 4);
+  tone.write("WAVEfmt ", 8);
+  tone.writeUInt32LE(16, 16);
+  tone.writeUInt16LE(1, 20);
+  tone.writeUInt16LE(1, 22);
+  tone.writeUInt32LE(rate, 24);
+  tone.writeUInt32LE(rate * 2, 28);
+  tone.writeUInt16LE(2, 32);
+  tone.writeUInt16LE(16, 34);
+  tone.write("data", 36);
+  tone.writeUInt32LE(count * 2, 40);
+  for (let i = 0; i < count; i++) tone.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / rate) * 12000), 44 + i * 2);
+  // Like the app's own protocol, it says the page's own address may use the file, and no other.
+  createServer((req, res) => {
+    res.writeHead(200, { "content-type": "audio/wav", "access-control-allow-origin": `http://127.0.0.1:${port}`, "cache-control": "no-store" });
+    res.end(tone);
+  }).listen(port + 1, "127.0.0.1");
 }
 
 server.listen(port, "127.0.0.1", () => {

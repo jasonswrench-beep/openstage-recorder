@@ -154,6 +154,9 @@ export function mountPreview(container: HTMLElement, session: EditSession, initi
       } else {
         const el = kind === "video" ? h("video", { class: "os-pv-media", playsinline: true, preload: "auto" }) : h("audio", { preload: "auto" });
         if (el instanceof HTMLVideoElement) el.muted = true; // the exporter does not use a screen recording's own sound
+        // Sound goes through Web Audio (see connectAudio), which plays nothing at all from a file that comes from another web address, as the
+        // recordings do in the installed app, unless the file is asked for with CORS. Asking is harmless for a file from the same address.
+        if (el instanceof HTMLAudioElement) el.crossOrigin = "anonymous";
         el.src = url;
         if (el instanceof HTMLAudioElement) soundHost.append(el);
         made.el = el;

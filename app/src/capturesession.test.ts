@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  applyLine, commandLine, soundAdvice, defaultSettings, describeSession, formatTime, initialSession, keyAction, parseProbe, parseWindow, recordArgs, recordingFolderName, recordingPath,
+  applyLine, commandLine, plainWords, soundAdvice, defaultSettings, describeSession, formatTime, initialSession, keyAction, parseProbe, parseWindow, recordArgs, recordingFolderName, recordingPath,
   safeName, settingsProblem, STOP_LINE, type RecordSettings, type Session,
 } from "./capturesession.ts";
 
@@ -400,3 +400,23 @@ test("a very quiet computer sound note uses this app's words for what to do, and
   const odd = soundAdvice("check", "balance", "Something the recorder says in some new way.");
   assert.deepEqual(odd, { text: "Something the recorder says in some new way.", topic: "balance" });
 });
+
+// ---- notes that name the recorder's command line options are said in the window's own words ----
+
+test("the notes about the short sounds and the webcam do not name command line options", () => {
+  const cues = "The recorder will make a short sound for the countdown, the start, a pause, a resume, the stop and an error, at volume 70 of 100. None of them is recorded. Turn them off with --cues off, or change the volume with --cue-volume.";
+  const camera = "Recording the webcam 1. NexiGo Iris 4K Webcam into webcam.mp4, beside the screen video. If the camera stops, the recording carries on without it and you are told. Leave out --camera to record no webcam.";
+  const volume = "The sounds are played at volume 70 of 100. To change it use --cue-volume with a number from 1 to 100; --cues off turns them off.";
+  const { session } = play([
+    line({ event: "check", check: "cues", ok: true, message: cues }),
+    line({ event: "check", check: "camera", ok: true, message: camera }),
+    line({ event: "check", check: "cue-volume", ok: true, message: volume }),
+  ]);
+  const text = session.notes.map((n) => n.text);
+  assert.ok(text.every((x) => !x.includes("--")), `a command line option is still named: ${text.join(" | ")}`);
+  assert.match(text[0] ?? "", /None of them is recorded\. Turn them off with the box about a short sound for each step, under Starting\.$/);
+  assert.match(text[1] ?? "", /you are told\. To record without it, choose no webcam in the list called A webcam\.$/);
+  assert.match(text[2] ?? "", /at volume 70 of 100\. To turn them off, clear the box about a short sound for each step, under Starting\.$/);
+  assert.equal(plainWords("Something else the recorder says."), "Something else the recorder says.");
+});
+

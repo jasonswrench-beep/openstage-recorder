@@ -29,7 +29,7 @@ The installed app finds the recording program beside itself. `app/core/src/progr
 1. Run `BUILD INSTALLER.bat`. Does it make a file in `app\installer`? If not, send me what the window shows.
 2. Double-click the installer. Windows will probably show a blue "Windows protected your PC" box, because the installer is not signed. Click "More info", then "Run anyway". It should not ask for an administrator password.
 3. Is OpenStage Recorder in the Start menu? Does it open? Does "Check this computer" find the recording program?
-4. Record ten seconds, edit it, make a video.
+4. Record ten seconds, edit it, press Play in the editing screen (you should hear your voice; the first installed build played no sound there, fixed 2026-10-26), make a video, and play the video.
 5. Remove it from Settings, Apps, Installed apps. The app and the program should go. **Your recordings must stay** (they are in your own recordings folder, not in the app's folder).
 6. Install it again. Does that work cleanly?
 7. Do it all with the keyboard only, and with a screen reader if you can: the installer's own pages are made by NSIS, not by this project, and have not been tested for access by anyone here.
