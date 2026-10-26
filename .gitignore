@@ -33,3 +33,4 @@ app/src-tauri/gen/
 
 # The installer made by app/BUILD INSTALLER.bat
 app/installer/
+app/portable/
