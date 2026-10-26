@@ -235,6 +235,17 @@ export function soundAdvice(kind: "check" | "warning", name: string, message: st
   return null;
 }
 
+/**
+ * The recorder's findings were written for people who start it from a command line, and some end by naming one of its options. An author using the
+ * window has no such options, so those sentences are put in the words of the window's own boxes. Anything else comes back as it was.
+ */
+export function plainWords(message: string): string {
+  return message
+    .replace(/Turn them off with --cues off, or change the volume with --cue-volume\./, "Turn them off with the box about a short sound for each step, under Starting.")
+    .replace(/To change it use --cue-volume with a number from 1 to 100; --cues off turns them off\./, "To turn them off, clear the box about a short sound for each step, under Starting.")
+    .replace(/Leave out --camera to record no webcam\./, "To record without it, choose no webcam in the list called A webcam.");
+}
+
 function parseJson(line: string): Record<string, unknown> | null {
   try {
     const d: unknown = JSON.parse(line);
@@ -359,7 +370,7 @@ export function applyLine(s: Session, line: string): Update {
     }
     case "check": {
       const name = str(d["check"], 60);
-      const message = str(d["message"]);
+      const message = plainWords(str(d["message"]));
       if (name !== "" && message !== "" && typeof d["ok"] === "boolean") {
         const ok = d["ok"];
         const advice = ok ? null : soundAdvice("check", name, message);

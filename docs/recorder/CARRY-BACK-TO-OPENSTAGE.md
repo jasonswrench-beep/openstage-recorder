@@ -40,6 +40,16 @@ How sure each item is: items 1 and 2 were read in the code and then shown by a b
 
 **Also added, which OpenStage Author may want:** the owner asked for a way to balance voice and computer sound when editing. `EditSession.soundBalance(sound)` and `setSoundBalance(sound, text)` (in `capture-timeline/src/session.ts`, with `capture-timeline/test/balance.test.ts`) set every clip of the microphone, or of the computer's sound, as one undo step. The two boxes ("Your voice, in decibels", "The computer's sound, in decibels") are on the Recorder's editing page, `app/src/editview.ts`, not in the shared screens. OpenStage Author would put them wherever its editing dialog suits.
 
+### 9. The editing preview plays no sound when the recording comes from another web address than the page
+
+**What an author sees.** In the installed app, pressing Play in the editing screen shows the picture moving and plays no sound. Found on 2026-10-26, from the Recorder owner's first use of the installed Recorder. The recording itself had sound.
+
+**Why.** `capture-timeline/src/preview-panel.ts` sends each sound clip through Web Audio (`createMediaElementSource`, so a clip can be louder than recorded). Chromium, which is the engine in Windows' web view, outputs silence from a media file at another web address (another origin) than the page unless the file was asked for with CORS. In the installed app the recordings are served by Tauri's file protocol at `asset.localhost` and the page is at `tauri.localhost`. A plain browser serving both from one address does not show the fault, and the pretend recordings in the browser checks had no sound, so no check saw it. Pictures are not sent through Web Audio, which is why they play.
+
+**The fix used in the Recorder.** One line: `crossOrigin = "anonymous"` on each audio element before its address is set. Tauri's file protocol answers with `Access-Control-Allow-Origin` for the page's address (read in Tauri 2.12.5, `protocol/asset.rs`), so the request is allowed. See the Recorder's `capture-timeline/src/preview-panel.ts` and the browser check "pressing Play in the editing screen is heard", which serves a tone from a second address, presses Play, reads what reaches the speakers with an analyser, and fails on the old code (the loudest sample is exactly 0).
+
+**OpenStage Author.** Its editing dialog uses the same preview, and serves recordings (and assets) with `b.mediaUrl`, which is the same file protocol, so it very probably has the same fault. Not tried.
+
 ## Smaller things
 
 ### 4. The recorder dialog's status line can lose a message
@@ -67,6 +77,10 @@ The recorder program's findings about the balance of the voice and the computer'
 
 The button says "Cover", but adding one announces `Added the redaction "Redaction" ... nobody can undo this redaction`, and the clip list names it "Redaction" (`capture-edit/src/items.ts`, `addRedact`). An author who has only seen "Cover" may not connect the two.
 
+### 10. Other notes still name the recorder program's command line options
+
+The note about the short sounds says "Turn them off with --cues off, or change the volume with --cue-volume", the volume note says "use --cue-volume", and the webcam note ends "Leave out --camera to record no webcam". The Recorder's `plainWords` in `app/src/capturesession.ts` puts these in the window's words. There may be others; any finding that ends by naming an option has the same problem.
+
 ## Changes in the Recorder's copy of the shared folders that OpenStage Author may want
 
 These are listed, with the reason for each, in `docs/recorder/EXTRACTED-FROM-OPENSTAGE.md` under "Changes made inside the copied folders". All are additions, and with nothing asked for the screens behave as they did.
@@ -77,7 +91,7 @@ These are listed, with the reason for each, in `docs/recorder/EXTRACTED-FROM-OPE
 
 ## Suggested order
 
-1. Fault 1 and fault 2, with the checks that show them, since an author can meet them now.
+1. Fault 9 (no sound in the preview), then fault 1 and fault 2, with the checks that show them, since an author can meet them now.
 2. Fault 3, which also needs a decision about whether the recorder dialog should get loudness boxes.
 3. Items 4 and 5, which are small.
 4. Item 6, which restores two checks.
