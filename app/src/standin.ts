@@ -349,7 +349,10 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
       if (files.has(fileKey(name, file))) throw new Error(`A copy of an older edit named ${file} is already in the recording, so another was not made and nothing was saved.`);
       files.set(fileKey(name, file), text);
     },
-    async recordingMediaUrl() {
+    async recordingMediaUrl(_dir, _name, rel) {
+      // With ?media=1 (the automatic checks, served by dev-server.mjs --media-test) the sound files are a tone from another address than the
+      // page, as in the installed app. Pictures are never offered: the pretend recorder makes none.
+      if (params.get("media") === "1" && rel.endsWith(".wav")) return `${location.protocol}//${location.hostname}:${Number(location.port) + 1}/tone.wav`;
       throw new Error("The pretend recorder makes no pictures or sounds to play.");
     },
     async revealRecording(_dir, name, rel) {
