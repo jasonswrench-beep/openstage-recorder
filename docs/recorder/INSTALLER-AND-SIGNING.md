@@ -40,6 +40,8 @@ An unsigned installer shows Windows' blue "Windows protected your PC" box and "U
 
 **Signing is a step added at the end of the same build.** Nothing built now has to be redone for it, so there is no reason to wait for a certificate before building the installer.
 
+*Added 2026-10-28:* the SignPath Foundation route was chosen, and the signing step now exists in the workflow, switched off until the repository variable `SIGNPATH_SIGNING` is `true`. It signs the installer file only. `SIGNPATH-APPLICATION.md` has the conditions as SignPath's own pages state them, the draft application answers, and the steps to switch it on.
+
 ## The options
 
 | Route | Cost | What it needs | What people see | Cautions |
