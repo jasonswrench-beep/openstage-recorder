@@ -2,6 +2,17 @@
 
 The base (the recording engine and the editing parts, copied from OpenStage Author; `IMPORT-MANIFEST.md` lists every file), the window, the Record screen and the editing screen are built. The cursor highlight and the installer are not. Only the Record screen has been run on Windows; the editing screen has been run in a browser with a pretend recorder, not on Windows.
 
+## Where we stopped (2026-10-29)
+
+For whoever picks this up next, in plain words:
+
+- **Signing is decided: the SignPath Foundation's free route for open source** (the owner's choice, 2026-10-29). The options and why are in `INSTALLER-AND-SIGNING.md`.
+- **The repository is private, and SignPath needs a public one.** The owner has not yet answered: A, make this repository public as it is (one early commit shows his Gmail address as author, and 12 commit messages carry links to a Claude session); B, a new public repository with a clean copy of the files and this one kept private; C, not now. A scan on 2026-10-29 found no passwords, keys or tokens, no personal paths, and no large files in the history. Our rules do not allow rewriting history.
+- **SignPath's own pages could not be read** in the session that wrote this, because the session's network list did not include them. The owner added `signpath.org`, `about.signpath.io` and `docs.signpath.io` to the environment's Allowed domains and saved, but a session already running does not pick the change up. **A session started after 2026-10-29 should be able to read them.** Read SignPath's terms and its GitHub Actions page first; what is written about SignPath here came from search results and is unchecked.
+- **What to do once the owner answers A, B or C:** write the "Code signing policy" page SignPath requires and link it from the README and the release pages; draft the owner's application answers for him to paste (the application, the SignPath account and any payment-free approval are his, not ours); add a signing step to `.github/workflows/build-installer.yml` that stays switched off until SignPath approves, using SignPath's own current instructions and not guesses. Each of the six products would be its own project.
+- **The owner's own tasks:** make a video from the editing screen and send the `.mp4` (none has been seen yet); a keyboard-only and a screen reader pass; decide the cursor highlight (recommended: drawn when the video is made, from recorded cursor positions); hand `CARRY-BACK-TO-OPENSTAGE.md` to OpenStage Author's own session when ready.
+- **Done and tried by the owner on Windows:** the installed app records (screen, microphone, computer sound, webcam), and its editing preview; the sound fault he found is fixed in builds 4 and later and he has installed that build.
+
 ## Where the work stands
 
 Written 2026-10-23, and updated 2026-10-24. Checked on Linux, and run once on Windows (see the table).
