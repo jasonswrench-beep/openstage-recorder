@@ -6,8 +6,9 @@
 #   OpenStage-Recorder-portable   a folder with "OpenStage Recorder.exe" and the recording program, to unzip and
 #                                 double-click, with nothing to install
 #
-# The installer is NOT signed. Nothing here uses a secret. Signing, when it is decided on, is added as a step after
-# "Make the installer"; docs/recorder/INSTALLER-AND-SIGNING.md says what it would involve.
+# The installer is NOT signed. Signing is switched off: the three steps at the end that talk to SignPath run only when the
+# repository variable SIGNPATH_SIGNING is set to "true", which is done only after the SignPath Foundation has approved the
+# project. Until then nothing here uses a secret. docs/recorder/SIGNPATH-APPLICATION.md says how it is switched on.
 
 name: Build the Windows installer
 
@@ -17,6 +18,7 @@ on:
     tags: ["v*"]
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -49,6 +51,7 @@ jobs:
         run: npx tauri build --config src-tauri/tauri.installer.conf.json
 
       - name: Keep the installer
+        id: unsigned-installer
         uses: actions/upload-artifact@v4
         with:
           name: OpenStage-Recorder-installer
@@ -74,4 +77,39 @@ jobs:
         with:
           name: OpenStage-Recorder-portable
           path: app/portable
+          if-no-files-found: error
+
+      # Signing with SignPath Foundation. SWITCHED OFF: these three steps are skipped unless the repository variable
+      # SIGNPATH_SIGNING is "true". They sign the installer file only; the programs inside it stay unsigned.
+      # The four values SignPath needs are read from repository secrets and variables, none is written here.
+      # See docs/recorder/SIGNPATH-APPLICATION.md before switching this on.
+      - name: Read the version for SignPath
+        id: version
+        if: ${{ vars.SIGNPATH_SIGNING == 'true' }}
+        working-directory: app
+        shell: pwsh
+        run: |
+          $version = (Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json).version
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Sign the installer with SignPath
+        if: ${{ vars.SIGNPATH_SIGNING == 'true' }}
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-installer
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.value) }}
+
+      - name: Keep the signed installer
+        if: ${{ vars.SIGNPATH_SIGNING == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenStage-Recorder-installer-signed
+          path: signed-installer/*.exe
           if-no-files-found: error

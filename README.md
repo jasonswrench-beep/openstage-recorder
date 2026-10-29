@@ -44,6 +44,10 @@ The same checks as in OpenStage, run from this folder:
 
 `capture/README.md` lists the double-click scripts for Windows.
 
+## Code signing policy
+
+Not yet in force. No release of OpenStage Recorder is signed, and the project has not yet been approved for free code signing by the SignPath Foundation. The policy it will follow is in [docs/recorder/CODE-SIGNING-POLICY.md](docs/recorder/CODE-SIGNING-POLICY.md).
+
 ## Licence
 
 Apache License 2.0. See `LICENSE` and `NOTICE`.
