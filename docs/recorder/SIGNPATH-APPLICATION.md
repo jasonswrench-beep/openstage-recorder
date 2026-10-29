@@ -2,6 +2,10 @@
 
 Written 2026-10-28 from SignPath's own pages, read that day: `signpath.org/terms`, `signpath.org/apply` (the form was looked at by scrolling; nothing was typed), and `docs.signpath.io` (the GitHub trusted build system, the artifact configuration syntax and reference). **Nothing has been applied for, no SignPath account exists, nothing has been signed, and the signing step in the workflow is switched off.** The application, the account and every approval are the owner's.
 
+## Decision, 2026-10-28
+
+The owner chose this free route over Microsoft Artifact Signing (about $9.99 a month for 5,000 signatures, a paid Azure account, and a registered business that Microsoft can validate), to spend nothing. The cost of that choice: a signed file shows **SignPath Foundation** as its publisher, not Open Torch Press. Open Torch Press is a brand in text only; it is a domain, not a registered business. If SignPath says no, the project stays unsigned until the owner decides otherwise.
+
 ## What SignPath asks, and where the project is
 
 | What SignPath asks (`signpath.org/terms`) | Where the project is |
