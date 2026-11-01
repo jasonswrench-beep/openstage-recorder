@@ -6,12 +6,14 @@
 //! reads the finished video back through Windows, the way a player would, and checks that its length, its size and
 //! its sound are what they should be. The pieces that need Windows are passed in, so all of it is tested here.
 
-use crate::export::{export, export_audio, ExportError, ExportJob, ExportReport, ExportTools, Progress, SoundReader};
+use crate::export::{
+    export, export_audio, export_frame, ExportError, ExportJob, ExportReport, ExportTools, Progress, SoundReader,
+};
 use crate::make_edit::{edit_from_take, EditOptions};
 use crate::video::{compare_audio_readback, compare_readback, compare_size_readback, SizeOf};
 use crate::{check, Check};
 use openstage_capture_project::{parse_edit, Edit, EditSeverity};
-use openstage_capture_render::RenderSettings;
+use openstage_capture_render::{read_back_png, PictureSource, RenderSettings, TextRenderer};
 use std::path::PathBuf;
 
 /// What to make.
@@ -38,6 +40,8 @@ pub struct RenderOptions {
     pub allow_unfinished: bool,
     /// Make only the sound, as a WAV file, instead of a video.
     pub audio_only: bool,
+    /// Make only the picture the video has at this moment (milliseconds from its start), as a PNG file, instead of a video.
+    pub frame_ms: Option<u64>,
 }
 
 fn say(report: &mut dyn FnMut(Check), name: &str, ok: bool, message: impl Into<String>) -> bool {
@@ -173,6 +177,81 @@ fn read_wav_samples(path: &std::path::Path) -> Result<u64, String> {
     Ok(data / 4)
 }
 
+/// One picture of the edit as a PNG file, then a check that the file reads back as the size it should be.
+fn run_frame_only(
+    opts: &RenderOptions,
+    edit: &Edit,
+    at_ms: u64,
+    pictures: &mut dyn PictureSource,
+    text: &dyn TextRenderer,
+    report: &mut dyn FnMut(Check),
+) -> bool {
+    let is_png = opts.out.extension().is_some_and(|e| e.eq_ignore_ascii_case("png"));
+    if !is_png {
+        return say(
+            report,
+            "export",
+            false,
+            format!("A single picture is a PNG file, so its name has to end in .png: {}", opts.out.display()),
+        );
+    }
+    let job = ExportJob {
+        settings: RenderSettings {
+            fps: opts.fps,
+            reduce_motion: opts.reduce_motion,
+            require_complete: !opts.allow_unfinished,
+            ..RenderSettings::default()
+        },
+        size: opts.size,
+        bitrate_kbps: None,
+        out: opts.out.clone(),
+    };
+    let done = match export_frame(edit, &job, at_ms, pictures, text) {
+        Ok(done) => done,
+        Err(ExportError::Cancelled) => return say(report, "export", false, "The export was cancelled."),
+        Err(ExportError::Failed(why)) => return say(report, "export", false, why),
+    };
+    say(
+        report,
+        "export",
+        true,
+        format!(
+            "Exported the picture at {} as a PNG ({} by {} pixels): {}",
+            seconds_text(done.at_ms as f64 / 1000.0),
+            done.width,
+            done.height,
+            done.out.display()
+        ),
+    );
+    for note in &done.notes {
+        report(check("export-note", false, note.clone()));
+    }
+    let read = std::fs::read(&done.out)
+        .map_err(|e| format!("The picture file could not be read back: {e}"))
+        .and_then(|bytes| read_back_png(&bytes));
+    match read {
+        Ok(picture) if (picture.width, picture.height) == (done.width, done.height) => say(
+            report,
+            "frame-readback",
+            true,
+            format!(
+                "The picture file reads back as {} by {} pixels, the size it should be.",
+                picture.width, picture.height
+            ),
+        ),
+        Ok(picture) => say(
+            report,
+            "frame-readback",
+            false,
+            format!(
+                "The picture file is {} by {} pixels but it should be {} by {}.",
+                picture.width, picture.height, done.width, done.height
+            ),
+        ),
+        Err(why) => say(report, "frame-readback", false, why),
+    }
+}
+
 /// Run the command with everything it needs supplied. Reports checks as it goes; `progress` is told how far the
 /// export has got (about every tenth of the way, plus the end). Returns whether the export worked and the finished
 /// video read back as it should. Notes about the result (text that did not fit) are reported as `export-note`
@@ -184,6 +263,9 @@ pub fn run_render_with(
     report: &mut dyn FnMut(Check),
     progress: &mut dyn FnMut(Progress),
 ) -> bool {
+    if opts.audio_only && opts.frame_ms.is_some() {
+        return say(report, "export", false, "Choose either --audio-only or --frame, not both.");
+    }
     let (edit, what) = match choose_edit(opts) {
         Ok(chosen) => chosen,
         Err(message) => return say(report, "edit", false, message),
@@ -192,6 +274,10 @@ pub fn run_render_with(
     if opts.audio_only {
         let ExportTools { sound, .. } = tools;
         return run_audio_only(opts, &edit, sound, cancelled, report, progress);
+    }
+    if let Some(at_ms) = opts.frame_ms {
+        let ExportTools { pictures, text, .. } = tools;
+        return run_frame_only(opts, &edit, at_ms, pictures, text, report);
     }
 
     let job = ExportJob {
@@ -383,6 +469,7 @@ mod tests {
             reduce_motion: false,
             allow_unfinished: false,
             audio_only: false,
+            frame_ms: None,
         }
     }
 
@@ -610,5 +697,62 @@ mod tests {
         assert!(!o.ok);
         assert_eq!(find(&o, "export").message, "The export was cancelled. No sound file was made.");
         assert!(!out.exists());
+    }
+
+    #[test]
+    fn one_picture_is_exported_as_a_png_and_read_back_in_words() {
+        let (dir, project) = project(10);
+        let out = dir.path().join("moment.png");
+        let mut opts = options(&project, &out);
+        opts.frame_ms = Some(4_000);
+        let o = render(&opts, |_| {}, None);
+        assert!(o.ok, "{:?}", o.checks);
+        let names: Vec<&str> = o.checks.iter().map(|c| c.check.as_str()).collect();
+        assert_eq!(names, ["edit", "export", "frame-readback"]);
+        assert_eq!(
+            find(&o, "export").message,
+            format!("Exported the picture at 4.0 seconds as a PNG (64 by 36 pixels): {}", out.display())
+        );
+        assert_eq!(
+            find(&o, "frame-readback").message,
+            "The picture file reads back as 64 by 36 pixels, the size it should be."
+        );
+        assert!(fs::metadata(&out).unwrap().len() > 64 * 36 * 3);
+        assert_eq!(o.state.borrow().frames, 0, "no video was written");
+        assert!(o.progress.is_empty(), "a single picture has no progress to report");
+    }
+
+    #[test]
+    fn a_single_picture_needs_a_png_name_and_a_moment_inside_the_edit_and_says_so() {
+        let (dir, project) = project(10);
+        let wrong = dir.path().join("moment.jpg");
+        let mut opts = options(&project, &wrong);
+        opts.frame_ms = Some(1_000);
+        let o = render(&opts, |_| {}, None);
+        assert!(!o.ok);
+        assert!(find(&o, "export").message.contains("has to end in .png"), "{}", find(&o, "export").message);
+        assert!(!wrong.exists());
+        let out = dir.path().join("late.png");
+        opts.out = out.clone();
+        opts.frame_ms = Some(12_000);
+        let o = render(&opts, |_| {}, None);
+        assert!(!o.ok);
+        assert_eq!(
+            find(&o, "export").message,
+            "The edit is 10.0 seconds long, so there is no picture at 12.0 seconds."
+        );
+        assert!(!out.exists());
+    }
+
+    #[test]
+    fn a_picture_and_a_sound_file_cannot_be_asked_for_together() {
+        let (dir, project) = project(10);
+        let mut opts = options(&project, &dir.path().join("x.png"));
+        opts.frame_ms = Some(1_000);
+        opts.audio_only = true;
+        let o = render(&opts, |_| {}, None);
+        assert!(!o.ok);
+        assert_eq!(o.checks.len(), 1, "it says so before anything else: {:?}", o.checks);
+        assert_eq!(find(&o, "export").message, "Choose either --audio-only or --frame, not both.");
     }
 }
