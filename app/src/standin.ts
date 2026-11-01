@@ -153,7 +153,7 @@ class PretendRecorder {
         this.later(() => this.end(0), 20);
         break;
       case "render":
-        this.render(opt("--out") ?? "video.mp4", opt("--project") ?? "", args.includes("--audio-only"));
+        this.render(opt("--out") ?? "video.mp4", opt("--project") ?? "", args.includes("--audio-only"), opt("--frame"));
         break;
       case "record":
         this.record(opt("--project") ?? "", opt("--title") ?? "Recording", Number(opt("--countdown-ms") ?? "0"));
@@ -163,7 +163,7 @@ class PretendRecorder {
     }
   }
 
-  private render(out: string, project: string, audioOnly = false): void {
+  private render(out: string, project: string, audioOnly = false, frame?: string): void {
     this.mode = "render";
     const name = lastPart(out);
     // Like the real video maker, it reads the saved edit.json, and has nothing to make a video from without one.
@@ -181,6 +181,24 @@ class PretendRecorder {
         this.emit({ event: "check", check: "export", ok: false, message: `A sound-only export is a WAV file, so its name has to end in .wav: ${out}` });
         this.end(1);
       }, 40);
+      return;
+    }
+    if (frame !== undefined) {
+      // One picture: no progress, and like the real recorder it needs a PNG name.
+      const seconds = (Number(frame) / 1000).toFixed(1);
+      if (!name.toLowerCase().endsWith(".png")) {
+        this.later(() => {
+          this.emit({ event: "check", check: "export", ok: false, message: `A single picture is a PNG file, so its name has to end in .png: ${out}` });
+          this.end(1);
+        }, 40);
+        return;
+      }
+      if (this.holdRender) return;
+      this.later(() => {
+        this.emit({ event: "check", check: "export", ok: true, message: `Exported the picture at ${seconds} seconds as a PNG (1920 by 1080 pixels): ${out}` });
+        this.emit({ event: "check", check: "frame-readback", ok: true, message: "The picture file reads back as 1920 by 1080 pixels, the size it should be." });
+        this.end(0);
+      }, 120);
       return;
     }
     [0, 40, 80].forEach((percent, i) =>

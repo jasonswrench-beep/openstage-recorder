@@ -17,6 +17,8 @@ export interface ExportPlan {
   args: string[];
   /** Only the sound is made, as a WAV file, not a video. */
   audioOnly: boolean;
+  /** Only the picture at this moment (milliseconds from the start) is made, as a PNG file, not a video; null for a video. */
+  frameMs: number | null;
 }
 
 export interface ExportOptions {
@@ -24,10 +26,12 @@ export interface ExportOptions {
   reduceMotion?: boolean;
   /** Make only the sound, as a WAV file (`exports/<recording>.wav`), instead of a video. */
   audioOnly?: boolean;
+  /** Make only the picture the video has at this moment, in milliseconds from its start, as a PNG file (`exports/<recording> at <seconds> seconds.png`). */
+  frameMs?: number;
 }
 
-/** What is being made: a video, or only the sound. */
-export type ExportKind = "video" | "sound";
+/** What is being made: a video, only the sound, or one picture. */
+export type ExportKind = "video" | "sound" | "picture";
 
 /** The options for exporting a recording in the recordings folder. The separator follows the one the folder already uses. */
 export function exportPlan(library: string, name: string, options: ExportOptions = {}): ExportPlan {
@@ -36,14 +40,21 @@ export function exportPlan(library: string, name: string, options: ExportOptions
   const folder = `${base}${sep}${name}`;
   const stem = name.replace(/\.capture$/i, "") || "recording";
   const audioOnly = options.audioOnly === true;
-  const extension = audioOnly ? "wav" : "mp4";
-  const rel = `exports/${stem}.${extension}`;
-  const out = `${folder}${sep}exports${sep}${stem}.${extension}`;
+  const frameMs = !audioOnly && options.frameMs !== undefined ? Math.max(0, Math.round(options.frameMs)) : null;
+  const extension = audioOnly ? "wav" : frameMs !== null ? "png" : "mp4";
+  // A picture is named for its moment, so pictures from different moments sit side by side instead of replacing one another.
+  const fileName = frameMs !== null ? `${stem} at ${(frameMs / 1000).toFixed(1)} seconds` : stem;
+  const rel = `exports/${fileName}.${extension}`;
+  const out = `${folder}${sep}exports${sep}${fileName}.${extension}`;
   const args = ["render", "--project", folder, "--out", out];
   // Zooms are pictures, so "cuts instead of animated zooms" has nothing to say about a sound file.
   if (audioOnly) args.push("--audio-only");
-  else if (options.reduceMotion === true) args.push("--reduce-motion");
-  return { out, rel, args, audioOnly };
+  else {
+    if (frameMs !== null) args.push("--frame", String(frameMs));
+    // A picture in the middle of a zoom is drawn as the video draws it, so it follows the same choice about motion.
+    if (options.reduceMotion === true) args.push("--reduce-motion");
+  }
+  return { out, rel, args, audioOnly, frameMs };
 }
 
 export interface ExportNote {
@@ -124,7 +135,7 @@ export interface ExportSummary {
 
 /** How it went, in one sentence. A video the recorder made but could not read back is never called good. */
 export function summariseExport(s: ExportState, exit: StreamExit | null, kind: ExportKind = "video"): ExportSummary {
-  const thing = kind === "video" ? "video" : "sound file";
+  const thing = kind === "video" ? "video" : kind === "sound" ? "sound file" : "picture";
   if (exit === null) return { ok: false, sentence: `The ${thing} could not be made.${s.problem === "" ? "" : ` ${s.problem}`}` };
   if (exit.code === 2 && s.notes.length === 0) return { ok: false, sentence: `Making a ${thing} works on Windows only.` };
   if (exit.killed || exit.code === null) return { ok: false, sentence: `Making the ${thing} did not finish, so there is no ${thing}.` };
