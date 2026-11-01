@@ -12,7 +12,7 @@
 // The screens have their own F6, which moves between the preview, the timeline and the clip list and says where it arrived, and their own line
 // of announcements, a polite live region. The app's own status line is not used as well, so nothing is read twice.
 
-import { describeLength, listCaption, modelLengthMs, serialize } from "../../capture-edit/src/index.ts";
+import { describeLength, describeSuggestion, describeTime, listCaption, modelLengthMs, serialize, suggestZooms, type ZoomSuggestion } from "../../capture-edit/src/index.ts";
 import { h, nextId } from "../../capture-timeline/src/dom.ts";
 import { mountEditor, type Editor } from "../../capture-timeline/src/editor.ts";
 import { backupName, libraryOf, readProject } from "../../capture-timeline/src/project.ts";
@@ -21,6 +21,7 @@ import { errorText, type RecorderBackend } from "./backend.ts";
 import { runOneShot } from "./capturecontroller.ts";
 import { applyExportLine, exportPlan, finishedWords, initialExport, type ExportKind, type ExportPlan, type ExportState } from "./captureexport.ts";
 import { recordingFolder } from "./recordingfolder.ts";
+import { gatherClicks, nothingToSuggestFrom, videoSizeOf } from "./zoomsuggest.ts";
 
 export interface EditViewOptions {
   backend: RecorderBackend;
@@ -84,11 +85,12 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const state = h("p", { id: id("state"), class: "rv-note" }, "Opening the recording.");
   const back = h("button", { type: "button", class: "os-cl-button" }, "Back to recordings");
   const save = h("button", { type: "button", class: "os-cl-button", "aria-describedby": id("state") }, "Save the edit");
+  const suggestBtn = h("button", { type: "button", class: "os-cl-button", hidden: true }, "Suggest zooms from my clicks");
   const make = h("button", { type: "button", class: "os-cl-button rv-primary" }, "Make a video from this edit");
   const makeSound = h("button", { type: "button", class: "os-cl-button" }, "Make a sound file (WAV) from this edit");
   const makePicture = h("button", { type: "button", class: "os-cl-button" }, "Save the picture shown in the preview (PNG)");
   const cancelVideo = h("button", { type: "button", class: "os-cl-button", hidden: true }, "Cancel the video");
-  const actions = h("div", { class: "rv-actions" }, back, save, make, makeSound, makePicture, cancelVideo);
+  const actions = h("div", { class: "rv-actions" }, back, save, suggestBtn, make, makeSound, makePicture, cancelVideo);
   const reduceBox = h("input", { type: "checkbox", id: id("reduce") });
   reduceBox.checked = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const highlightBox = h("input", { type: "checkbox", id: id("highlight") });
@@ -113,6 +115,14 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const videoTitle = h("h3", { id: id("video-title") }, "The video");
   const videoBox = h("section", { class: "rv-section", "aria-labelledby": id("video-title"), hidden: true }, videoTitle, progress, say, notes, h("div", { class: "rv-actions" }, reveal));
 
+  // ---- zooms suggested from where the mouse was clicked
+  const suggestTitle = h("h3", { id: id("suggest-title"), tabindex: "-1" }, "Suggested zooms");
+  const suggestSay = h("p", { id: id("suggest-message") });
+  const suggestList = h("ul", { class: "rv-list", "aria-label": "Suggested zooms" });
+  const addAll = h("button", { type: "button", class: "os-cl-button", hidden: true }, "Add all");
+  const closeSuggest = h("button", { type: "button", class: "os-cl-button" }, "Close the suggestions");
+  const suggestBox = h("section", { class: "rv-section", "aria-labelledby": id("suggest-title"), hidden: true }, suggestTitle, suggestSay, suggestList, h("div", { class: "rv-actions" }, addAll, closeSuggest));
+
   // ---- the balance between your voice and the computer's sound, which a recording keeps on separate tracks
   const balanceHint = h(
     "p",
@@ -127,7 +137,7 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const balance = h("fieldset", { class: "rv-fieldset", hidden: true }, h("legend", {}, "Sound balance"), ...balanceBoxes.map((b) => b.field), balanceHint);
 
   const editorHost = h("div", { class: "ev-host" });
-  const root = h("section", { class: "rv-section ev", "aria-labelledby": id("title") }, heading, intro, actions, reduce, highlight, state, balance, videoBox, editorHost);
+  const root = h("section", { class: "rv-section ev", "aria-labelledby": id("title") }, heading, intro, actions, reduce, highlight, state, balance, suggestBox, videoBox, editorHost);
   host.append(root);
 
   const folder = recordingFolder(b, opts.library, opts.name);
@@ -251,6 +261,97 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
     if (done.made) reveal.focus();
   }
 
+  // ---- suggested zooms: made from the clicks that were noted while recording, added only when the author says so
+  let suggestions: ZoomSuggestion[] = [];
+
+  const tell = (message: string): void => {
+    suggestSay.textContent = message;
+    editor?.announce(message);
+  };
+
+  function drawSuggestions(): void {
+    suggestList.replaceChildren(
+      ...suggestions.map((z) => {
+        const when = describeTime(z.startMs);
+        const add = h("button", { type: "button", class: "os-cl-button", "aria-label": `Add the zoom at ${when}` }, "Add this zoom");
+        const skip = h("button", { type: "button", class: "os-cl-button", "aria-label": `Leave out the zoom at ${when}` }, "Leave it out");
+        add.addEventListener("click", () => addSuggestion(z));
+        skip.addEventListener("click", () => {
+          suggestions = suggestions.filter((x) => x !== z);
+          drawSuggestions();
+          tell(`Left out the zoom at ${when}. ${suggestions.length === 0 ? "No suggestions are left." : `${suggestions.length} left.`}`);
+          focusSuggestions();
+        });
+        return h("li", {}, h("span", {}, describeSuggestion(z)), " ", add, " ", skip);
+      }),
+    );
+    addAll.hidden = suggestions.length < 2;
+    addAll.textContent = `Add all ${suggestions.length}`;
+  }
+
+  /** The focus goes to the next thing to do: the first suggestion's Add button, or Close when none is left. */
+  function focusSuggestions(): void {
+    const first = suggestList.querySelector<HTMLButtonElement>("button");
+    (first ?? closeSuggest).focus();
+  }
+
+  function addSuggestion(z: ZoomSuggestion): void {
+    if (session === undefined) return;
+    const outcome = session.addSuggestedZoom(z);
+    if (!outcome.ok) {
+      tell(outcome.message);
+      return;
+    }
+    suggestions = suggestions.filter((x) => x !== z);
+    drawSuggestions();
+    tell(`${outcome.message} ${suggestions.length === 0 ? "No suggestions are left." : `${suggestions.length} left.`}`);
+    focusSuggestions();
+  }
+
+  async function suggestNow(): Promise<void> {
+    if (session === undefined) return;
+    suggestBox.hidden = false;
+    suggestions = [];
+    drawSuggestions();
+    tell("Looking at where you clicked.");
+    const gathered = await gatherClicks(folder, session.model, videoSizeOf);
+    if (gathered.takes.size === 0) {
+      tell(nothingToSuggestFrom(gathered));
+      suggestTitle.focus();
+      return;
+    }
+    suggestions = suggestZooms(session.model, gathered.takes);
+    drawSuggestions();
+    const extra = gathered.notes.length > 0 ? ` ${gathered.notes.join(" ")}` : "";
+    tell(
+      suggestions.length === 0
+        ? `No zoom is suggested: the clicks are too few, too far apart, or already covered by a zoom.${extra}`
+        : `${suggestions.length === 1 ? "One zoom is" : `${suggestions.length} zooms are`} suggested from where you clicked. Add the ones you want. Each is an ordinary zoom afterwards, and still needs a description of what it shows.${extra}`,
+    );
+    if (suggestions.length > 0) focusSuggestions();
+    else suggestTitle.focus();
+  }
+
+  suggestBtn.addEventListener("click", () => void suggestNow());
+  addAll.addEventListener("click", () => {
+    const all = [...suggestions];
+    let added = 0;
+    for (const z of all) {
+      if (session?.addSuggestedZoom(z).ok === true) {
+        added += 1;
+        suggestions = suggestions.filter((x) => x !== z);
+      }
+    }
+    drawSuggestions();
+    tell(`Added ${added} of ${all.length} zooms. ${suggestions.length === 0 ? "No suggestions are left." : `${suggestions.length} could not be added and are still listed.`}`);
+    focusSuggestions();
+  });
+  closeSuggest.addEventListener("click", () => {
+    suggestBox.hidden = true;
+    suggestions = [];
+    suggestBtn.focus();
+  });
+
   /** Leave for the Record screen, after asking if anything would be lost. */
   async function leaveNow(): Promise<void> {
     const ask = closeQuestion(dirty(), making, "leave", thingOf(makingWhat));
@@ -326,6 +427,7 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
     if (project.replacedEdit !== undefined && project.newestTake !== undefined) toKeep = { text: project.replacedEdit, name: backupName(project.newestTake) };
     const live = new EditSession(project.model);
     session = live;
+    suggestBtn.hidden = false;
     editor = mountEditor(editorHost, live, { library: libraryOf(project.folder), callouts: CALLOUTS_OFFERED });
     // The balance boxes show how loud each sound is now, and put away the box of a sound that this recording does not have.
     const showBalance = (): void => {

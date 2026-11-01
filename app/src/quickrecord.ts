@@ -38,7 +38,6 @@ export function quickSettings(base: RecordSettings, name: string): RecordSetting
     target: base.target === "window" ? "screen" : base.target,
     window: "",
     region: { ...base.region },
-    interactions: "off",
   };
 }
 
@@ -59,7 +58,7 @@ export function describeQuick(base: RecordSettings): string {
       : `the whole of screen ${s.display}${base.target === "window" ? " (a window is not remembered from one time to the next, so a quick recording takes the whole screen)" : ""}`;
   const start = s.countdownSeconds === 0 ? "at once" : `after a countdown of ${s.countdownSeconds} ${s.countdownSeconds === 1 ? "second" : "seconds"}`;
   const stop = KEYS.get("stop") ?? "the stop key";
-  return `Quick record starts ${start} and records ${what}, with ${voiceWords(s.microphone)}, ${soundWords(s.output)} and ${cameraWords(s.camera)}. Stop it with ${stop} from any program, the Stop button, or Stop recording in the menu of the icon in the notification area. Then the video is made and its path is copied, ready to paste.`;
+  return `Quick record starts ${start} and records ${what}, with ${voiceWords(s.microphone)}, ${soundWords(s.output)} and ${cameraWords(s.camera)}. Stop it with ${stop} from any program, the Stop button, or Stop recording in the menu of the icon in the notification area. ${s.interactions === "off" ? "" : "The mouse is noted too: where it goes and where you click. "}Then the video is made and its path is copied, ready to paste.`;
 }
 
 /** The icon's tooltip: what the recorder is doing, short enough to read at a glance. */

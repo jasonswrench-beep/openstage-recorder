@@ -104,6 +104,8 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   const countdown = h("input", { type: "number", id: id("countdown"), class: "os-cl-input", min: "0", max: String(MAX_COUNTDOWN), step: "1", value: String(s.countdownSeconds) });
   const sounds = h("input", { type: "checkbox", id: id("sounds") });
   sounds.checked = s.sounds;
+  const noteMouse = h("input", { type: "checkbox", id: id("notemouse") });
+  noteMouse.checked = s.interactions !== "off";
 
   const field = (fieldId: string, label: string, control: HTMLElement, extra: Node[] = []) =>
     h("div", { class: "os-cl-field" }, h("label", { for: fieldId }, label), h("div", { class: "rv-control" }, control, ...extra));
@@ -132,8 +134,8 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
       microphone: microphone.value, output: output.value, camera: camera.value,
       micGainDb: micGain.value.trim() === "" ? Number.NaN : Number(micGain.value),
       systemGainDb: systemGain.value.trim() === "" ? Number.NaN : Number(systemGain.value),
-      // Noting the mouse is for highlighting the cursor, which is not built yet, so it is never switched on from here.
-      interactions: "off",
+      // The keys that are pressed are never noted from here: the mouse is, or nothing is.
+      interactions: noteMouse.checked ? "no-keys" : "off",
       countdownSeconds: countdown.value.trim() === "" ? Number.NaN : Number(countdown.value), sounds: sounds.checked,
     };
   }
@@ -144,6 +146,9 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     h("div", { class: "os-cl-fields" }, left.field, top.field, width.field, height.field));
   const realGroup = h("div", {},
     h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "What to record"), field(id("target"), "Record", target), screenGroup, windowGroup, regionGroup),
+    h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "The mouse"),
+      h("div", { class: "rv-check" }, noteMouse, " ", h("label", { for: id("notemouse") }, "Note where the mouse goes and where I click. This lets a video show a ring round the pointer, and lets the editor suggest zooms from your clicks.")),
+      h("p", { class: "rv-note" }, "The notes stay inside the recording, on this computer, and are never published. They also say which window was in front and the name of what you clicked, which can give away private things such as the title of a page. The keys you press are never noted. Leave this off when you do not need it.")),
     h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "Sound, and a picture of you"),
       field(id("microphone"), "Your voice", microphone), field(id("output"), "The computer's own sound", output), field(id("camera"), "A webcam", camera),
       h("p", { class: "rv-note" }, "A webcam, and your voice, are recorded only if you choose them. The computer's own sound includes a screen reader's speech."),
@@ -421,7 +426,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     say([`Recordings are now kept in ${chosen}.`]);
     changeFolder.focus();
   });
-  for (const el of [name, practice, target, display, windowSel, microphone, output, camera, micGain, systemGain, countdown, sounds, left.input, top.input, width.input, height.input]) {
+  for (const el of [name, practice, target, display, windowSel, microphone, output, camera, micGain, systemGain, countdown, sounds, noteMouse, left.input, top.input, width.input, height.input]) {
     el.addEventListener("input", showSetup);
     el.addEventListener("change", showSetup);
   }

@@ -991,6 +991,133 @@ await check("Quick record cannot start without the recording program, and says s
   assertMatch(await t.said(), /nothing can be recorded/, "pressing it says so");
 }, { search: "&norecorder=1" });
 
+// ---- Noting the mouse, and zooms suggested from the clicks ----
+
+/** Wait until the running recording has gone on for at least this many seconds (the pretend recorder runs a hundred times faster than the clock). */
+const recordedFor = (page, seconds) =>
+  page.waitForFunction((wanted) => {
+    const m = /^Recording take 1, (?:(\d+) minutes? )?(\d+) seconds?/.exec(document.querySelector('[id$="-now"]')?.textContent ?? "");
+    return m !== null && Number(m[1] ?? 0) * 60 + Number(m[2]) >= wanted;
+  }, seconds);
+
+/** Record a part of a screen with the mouse noted for about 20 seconds, stop, and open the editing screen on it. */
+async function recordClicksAndEdit(page, { whole = false, note = true } = {}) {
+  await page.getByLabel("Name of the recording").fill("Clicks demo");
+  await page.getByLabel(/^Countdown/).fill("0");
+  if (!whole) {
+    await page.locator('select[id$="-target"]').selectOption("region");
+    await page.getByLabel("Pixels from the left of the screen").fill("100");
+    await page.getByLabel("Pixels from the top of the screen").fill("200");
+    await page.getByLabel("Width in pixels").fill("1280");
+    await page.getByLabel("Height in pixels").fill("720");
+  }
+  if (note) await page.getByLabel(/^Note where the mouse goes and where I click/).check();
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  await recordedFor(page, 18);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  await page.getByRole("button", { name: "Edit the recording I just made" }).click();
+  await page.getByRole("heading", { level: 2, name: "Edit the recording: Clicks demo" }).waitFor();
+  await page.waitForFunction(() => /^Opened the recording/.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
+}
+
+const suggestSaid = async (page) => (await page.locator('[id$="-suggest-message"]').textContent()) ?? "";
+
+await check("the mouse box is off until it is ticked, then the recorder is asked to note the mouse but never the keys, the choice is kept for next time, and Quick record says so", async (page, t) => {
+  const box = page.getByLabel(/^Note where the mouse goes and where I click/);
+  assertEqual(await box.isChecked(), false, "off to start with");
+  assertEqual((await page.locator('[id$="-quick-note"]').textContent()).includes("mouse is noted"), false, "Quick record does not mention it while it is off");
+  await page.getByLabel(/^Countdown/).fill("0");
+  await box.check();
+  assertMatch(await page.locator('[id$="-quick-note"]').textContent(), /The mouse is noted too: where it goes and where you click\. Then the video is made/, "Quick record says the mouse is noted");
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  const args = await page.evaluate(() => window.__openstageStandIn.started.find((a) => a[0] === "record"));
+  assertEqual(args[args.indexOf("--interactions") + 1], "no-keys", "the mouse, and not the keys");
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  await page.reload();
+  await page.getByRole("heading", { level: 1, name: "OpenStage Recorder" }).waitFor();
+  assertEqual(await page.getByLabel(/^Note where the mouse goes and where I click/).isChecked(), true, "and it is still ticked next time");
+});
+
+await check("without the box ticked the recorder is told to note nothing", async (page) => {
+  await page.getByLabel(/^Countdown/).fill("0");
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  const args = await page.evaluate(() => window.__openstageStandIn.started.find((a) => a[0] === "record"));
+  assertEqual(args[args.indexOf("--interactions") + 1], "off", "nothing noted");
+  await page.getByRole("button", { name: "Stop" }).click();
+});
+
+await check("Suggest zooms from my clicks lists a zoom for each moment of clicking, adds the ones chosen as ordinary zooms, and they are saved", async (page, t) => {
+  await recordClicksAndEdit(page);
+  const suggest = page.getByRole("button", { name: "Suggest zooms from my clicks" });
+  await suggest.focus();
+  await t.key("Enter");
+  await page.getByRole("heading", { name: "Suggested zooms" }).waitFor();
+  await page.waitForFunction(() => /zooms are suggested from where you clicked/.test(document.querySelector('[id$="-suggest-message"]')?.textContent ?? ""));
+  assertMatch(await suggestSaid(page), /^3 zooms are suggested from where you clicked\. Add the ones you want\. Each is an ordinary zoom afterwards, and still needs a description of what it shows\.$/, "what was found");
+  const items = page.locator('ul[aria-label="Suggested zooms"] li');
+  assertEqual(await items.count(), 3, "three moments of clicking");
+  assertMatch(await items.nth(0).locator("span").textContent(), /^At 0\.5 seconds, for 3\.3 seconds: 3 times on the .* of the picture, around "Open" \(2 clicks\)\.$/, "the first says when, how long, how close, where and what was clicked");
+  assertMatch(await items.nth(1).locator("span").textContent(), /around "Save" \(1 click\)\.$/, "the second");
+  assertMatch(await items.nth(2).locator("span").textContent(), /around where you clicked \(1 click\)\.$/, "the third had no name for what was clicked, so none is guessed");
+  assertEqual(await t.focusLabel(), "Add the zoom at 0.5 seconds", "the focus is on the first Add button, named for its time");
+  assertEqual(await page.getByRole("button", { name: "Add all 3" }).isVisible(), true, "Add all says how many");
+  await t.key("Enter");
+  assertMatch(await editSaid(page), /Added the zoom "Zoom" to the Zoom track at 0\.5 seconds/, "the editing screen says it added it");
+  assertMatch(await suggestSaid(page), /Still needed: .* has no description\. .*2 left\.$/, "it still asks for a description, and says how many are left");
+  assertEqual(await items.count(), 2, "the added one is off the list");
+  assertEqual(await t.focusLabel(), "Add the zoom at 8 seconds", "the focus moved to the next suggestion");
+  await page.getByRole("button", { name: "Leave out the zoom at 8 seconds" }).click();
+  assertEqual(await items.count(), 1, "the one left out is off the list");
+  assertMatch(await suggestSaid(page), /^Left out the zoom at 8 seconds\. 1 left\.$/, "and says so");
+  await page.getByRole("button", { name: "Add the zoom at 15 seconds" }).click();
+  assertMatch(await suggestSaid(page), /No suggestions are left\.$/, "none left");
+  assertEqual(await t.focusLabel(), "Close the suggestions", "the focus is on Close");
+  await t.key("Control+s");
+  await page.waitForTimeout(150);
+  const edit = JSON.parse(await saved(page, "Clicks demo.capture/edit.json"));
+  const zooms = edit.tracks.flatMap((track) => track.items ?? []).filter((item) => item.kind === "zoom");
+  assertEqual(zooms.length, 2, "two zooms were saved, not three");
+  assert(zooms.every((z) => z.rect.width === z.rect.height), "each has the picture's shape");
+  await page.getByRole("button", { name: "Close the suggestions" }).click();
+  assertEqual(await t.focusLabel(), "Suggest zooms from my clicks", "Close gives the focus back to the button");
+  assertEqual(await page.getByRole("heading", { name: "Suggested zooms" }).isHidden(), true, "and puts the list away");
+});
+
+await check("Add all puts every suggestion in and saves them, and asking again finds nothing new", async (page, t) => {
+  await recordClicksAndEdit(page);
+  await page.getByRole("button", { name: "Suggest zooms from my clicks" }).click();
+  await page.getByRole("button", { name: "Add all 3" }).click();
+  assertMatch(await suggestSaid(page), /^Added 3 of 3 zooms\. No suggestions are left\.$/, "all three");
+  await t.key("Control+s");
+  await page.waitForTimeout(150);
+  const edit = JSON.parse(await saved(page, "Clicks demo.capture/edit.json"));
+  assertEqual(edit.tracks.flatMap((track) => track.items ?? []).filter((item) => item.kind === "zoom").length, 3, "three zooms in the saved edit");
+  await page.getByRole("button", { name: "Suggest zooms from my clicks" }).click();
+  await page.waitForFunction(() => /No zoom is suggested/.test(document.querySelector('[id$="-suggest-message"]')?.textContent ?? ""));
+  assertMatch(await suggestSaid(page), /^No zoom is suggested: the clicks are too few, too far apart, or already covered by a zoom\./, "asking again finds nothing new, since the zooms are in");
+});
+
+await check("a recording that did not note the mouse says how to, in the suggestions box, and the focus goes there", async (page, t) => {
+  await recordClicksAndEdit(page, { note: false });
+  await page.getByRole("button", { name: "Suggest zooms from my clicks" }).click();
+  await page.waitForFunction(() => /did not note where the mouse went/.test(document.querySelector('[id$="-suggest-message"]')?.textContent ?? ""));
+  assertMatch(await suggestSaid(page), /Tick "Note where the mouse goes and where I click" on the Record screen before the next recording\.$/, "how to");
+  assertEqual(await t.focusLabel(), "Suggested zooms", "the focus is on the heading, where the words are");
+  assertEqual(await page.locator('ul[aria-label="Suggested zooms"] li').count(), 0, "nothing listed");
+});
+
+await check("a whole screen whose picture size cannot be read says so instead of guessing where the clicks were", async (page, t) => {
+  await recordClicksAndEdit(page, { whole: true });
+  await page.getByRole("button", { name: "Suggest zooms from my clicks" }).click();
+  await page.waitForFunction(() => /could not be read/.test(document.querySelector('[id$="-suggest-message"]')?.textContent ?? ""));
+  assertMatch(await suggestSaid(page), /^The size of the picture of take 1 could not be read, so no zooms are suggested from its clicks\.$/, "said in words");
+});
+
 await check("every box, choice and button on the editing screen has a name, and the screen fits 320 pixels without sideways scrolling", async (page, t) => {
   await makeRecording(page, t, { webcam: true });
   await openEdit(page, t);
