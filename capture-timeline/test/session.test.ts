@@ -588,6 +588,23 @@ test("a lower third with a logo is added at the playhead in one step, the logo i
   assert.equal(s.rows.length, before, "a refused one changes nothing");
 });
 
+test("a suggested zoom is added at its own time in one undo step, chosen, and still asks for its description", () => {
+  const s = open();
+  s.setPlayheadText("40");
+  const before = s.rows.length;
+  const added = s.addSuggestedZoom({ startMs: 4000, durationMs: 3500, rect: { x: 3000, y: 3000, width: 3300, height: 3300 } });
+  assert.equal(added.ok, true);
+  assert.match(added.message, /at 4 seconds, 3.5 seconds long/);
+  assert.equal(s.rows.length, before + 1);
+  assert.equal(s.playheadMs, 40_000, "the playhead stays where the author left it");
+  assert.match(added.message, /Still needed: .* has no description\./);
+  assert.equal(s.undo().ok, true);
+  assert.equal(s.rows.length, before, "one undo takes it away");
+  const outside = s.addSuggestedZoom({ startMs: 999_000, durationMs: 3500, rect: { x: 3000, y: 3000, width: 3300, height: 3300 } });
+  assert.equal(outside.ok, false, "a zoom after the end of the recording is refused in words");
+  assert.equal(s.rows.length, before);
+});
+
 test("a sound clip, an overlay and several chosen rows get a sentence instead of a transition", () => {
   const sound = open("Voice, part 1");
   assert.match(sound.addTransitionHere().message, /sound only/);

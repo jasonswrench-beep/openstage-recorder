@@ -17,3 +17,4 @@ export * from "./paste.ts";
 export * from "./callouts.ts";
 export * from "./transitions.ts";
 export * from "./media.ts";
+export * from "./suggest.ts";

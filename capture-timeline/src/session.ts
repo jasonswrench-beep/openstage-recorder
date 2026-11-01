@@ -1003,6 +1003,11 @@ export class EditSession {
     return this.#addRow((m) => addZoomRegion(m, rect, at));
   }
 
+  /** Put a suggested zoom in at its own time (not the playhead), and choose it. The author decided to add it, so this is an ordinary zoom. */
+  addSuggestedZoom(zoom: { readonly startMs: number; readonly durationMs: number; readonly rect: Rect }): Outcome {
+    return this.#addRow((m) => addZoomRegion(m, zoom.rect, zoom.startMs, zoom.durationMs));
+  }
+
   /** The chosen overlay or zoom, or a sentence saying that it is not one. */
   #oneItem(): Item | Outcome {
     const row = this.#one();

@@ -77,6 +77,19 @@ Found by reading the code before checking the screens, and then caught by a brow
 
 Both faults are in OpenStage Author's `editor/src/editrecording.ts` and `recordingfolder.ts` as copied (main, commit `01fc056`). I have not changed that repository and will not without the owner's yes.
 
+## Noting the mouse, and zooms suggested from the clicks (2026-11-01)
+
+**A gap, found while building the next thing.** The Record screen could never turn on noting the mouse: its code said the choice was "never switched on from here", written before the pointer ring existed. So nothing recorded in this app could show the pointer ring or give zooms from clicks. It is now a box on the Record screen, **Note where the mouse goes and where I click**, off to start with, kept for next time, which asks the recorder for `--interactions no-keys`. The keys that are pressed are never noted from here, and the words beside the box say that the notes also say which window was in front and the name of what was clicked, which can give away private things. Quick record uses the same choice and says so in its sentence.
+
+**Suggested zooms** (the requirement "Capture can suggest zooms from where I clicked. I accept, edit, or reject each one"). A button on the editing screen, **Suggest zooms from my clicks**, lists zooms made from the noted clicks. Each can be added, left out, or all added at once; nothing is added by itself. The rules are in `capture-edit/src/suggest.ts` and are plain enough to say in words:
+- Clicks no more than 4 seconds apart, and not spread over more than about half the picture, are one moment.
+- A zoom starts 1 second before the first click of a moment and ends 1.5 seconds after the last, between 2.5 and 12 seconds long, showing between a third and two thirds of the picture's width (1.5 to 3 times closer), centred on the clicks and kept inside the picture.
+- No suggestion overlaps another or a zoom already in the edit; at most 10, the busiest moments first. Only the part of a take that the edit uses counts.
+- **The description of a suggested zoom is left empty on purpose.** A suggestion knows where you clicked, not what the picture shows, and a guess would let a zoom with no real description pass as finished. The edit asks for one, as it does for any zoom. What was clicked (the name Windows gave the item) is shown in the list only when every click of the moment was on the same named thing.
+- For a part of a screen the take says where the part starts and how big it is. For a whole screen the picture is the display, whose size the take does not say, so the app reads it from the video; when it cannot, it says so in words and suggests nothing.
+- **Not built:** the same button in OpenStage Author's own recording editor (the rules are shared, so it is a small step), suggested steps or step text, settings for the numbers above (they are constants at the top of `suggest.ts`).
+- **Checked:** 12 tests of the rules, 5 of reading a recording for them, one of the session adding a zoom at its own time, and 6 browser checks. **Never tried on a real recording** (the clicks come from the pretend recorder), and nobody has looked at whether the suggested zooms land where a person would want them.
+
 ## Quick record (2026-11-01)
 
 Built from the list item "tray start, countdown, save, copy the path": the part of a quick-capture tool that needs no server. The choices below are mine and each can be reversed.

@@ -93,6 +93,10 @@ class PretendRecorder {
   /** The computer's own sound is recorded (`--output` was given and is not `none`), and the loudness asked for, as the real program writes it into the mixed video's `mix`. */
   private system = false;
   private gains = { microphoneGainDb: 0, systemGainDb: 0 };
+  /** What the author asked to have noted (`--interactions`): `off`, `no-keys` or `on`. A practice recording never notes anything. */
+  private interactions = "off";
+  /** The part of the display recorded (`--region`): left, top, width and height; absent for the whole display. */
+  private region: { x: number; y: number; width: number; height: number } | undefined;
   /** A video that never finishes by itself: it runs until it is stopped. */
   holdRender = false;
   /** The recording ends with the recorder's findings about the sounds (see `StandInControls.soundFindings`). */
@@ -141,6 +145,9 @@ class PretendRecorder {
     this.camera = opt("--camera") ?? "none";
     this.system = (opt("--output") ?? "none") !== "none";
     this.gains = { microphoneGainDb: Number(opt("--mic-gain-db") ?? 0), systemGainDb: Number(opt("--system-gain-db") ?? 0) };
+    this.interactions = (opt("--source") ?? "") === "synthetic" ? "off" : (opt("--interactions") ?? "off");
+    const box = (opt("--region") ?? "").split(/[,\s]+/).map(Number);
+    this.region = box.length === 4 && box.every((n) => Number.isFinite(n)) ? { x: box[0] ?? 0, y: box[1] ?? 0, width: box[2] ?? 0, height: box[3] ?? 0 } : undefined;
     this.later(() => this.emit({ event: "hello", protocol: "0.1", program: "openstage-capture", programVersion: "0.1.0", platform: "pretend" }), 5);
     switch (args[0]) {
       case "probe":
@@ -262,8 +269,42 @@ class PretendRecorder {
     this.files.set(`${name}/capture.json`, JSON.stringify({ format: "openstage-capture-project", title: this.title }));
     for (const t of this.takes) {
       const dir = `${name}/takes/take-${String(t.take).padStart(3, "0")}`;
-      this.files.set(`${dir}/take.json`, JSON.stringify({ id: t.take, state: t.state, durationMs: t.ms, media: [{ file: "screen.mp4", kind: "screen", mix: this.gains }, { file: "mic.wav", kind: "microphone" }, ...(this.system ? [{ file: "system.wav", kind: "system-audio" }] : []), ...(this.camera === "none" ? [] : [{ file: "webcam.mp4", kind: "webcam" }])] }));
+      const noted = this.interactions !== "off";
+      this.files.set(`${dir}/take.json`, JSON.stringify({ id: t.take, state: t.state, durationMs: t.ms, media: [
+        { file: "screen.mp4", kind: "screen", mix: this.gains, ...(this.region === undefined ? {} : { region: { display: 1, ...this.region } }) },
+        { file: "mic.wav", kind: "microphone" },
+        ...(this.system ? [{ file: "system.wav", kind: "system-audio" }] : []),
+        ...(this.camera === "none" ? [] : [{ file: "webcam.mp4", kind: "webcam" }]),
+        ...(noted ? [{ file: "events.jsonl", kind: "interactions", container: "jsonl", interactions: { display: 1, keys: this.interactions === "on" } }] : []),
+      ] }));
+      if (noted) this.files.set(`${dir}/events.jsonl`, this.clicksFor(t.ms));
     }
+  }
+
+  /**
+   * The pretend recorder's log of what the author did: a few clicks that cluster into three moments, at places that are the same shares of the picture
+   * whatever its size, in the display's own pixels (so a region's corner is added). Only those that fall inside the take are written.
+   */
+  private clicksFor(ms: number): string {
+    const width = this.region?.width ?? 1920;
+    const height = this.region?.height ?? 1080;
+    const left = this.region?.x ?? 0;
+    const top = this.region?.y ?? 0;
+    const at = (fx: number, fy: number) => ({ x: left + Math.round(fx * width), y: top + Math.round(fy * height) });
+    const clicks: { t: number; fx: number; fy: number; name: string }[] = [
+      { t: 1500, fx: 0.3, fy: 0.4, name: "Open" },
+      { t: 2300, fx: 0.31, fy: 0.41, name: "Open" },
+      { t: 9000, fx: 0.8, fy: 0.75, name: "Save" },
+      { t: 16_000, fx: 0.5, fy: 0.2, name: "" },
+    ];
+    const lines: string[] = [];
+    for (const c of clicks) {
+      if (c.t >= ms) continue;
+      const p = at(c.fx, c.fy);
+      lines.push(line({ t: c.t, type: "click", x: p.x, y: p.y, button: "left" }));
+      if (c.name !== "") lines.push(line({ t: c.t, type: "element", name: c.name, role: "button" }));
+    }
+    return lines.length === 0 ? "" : `${lines.join("\n")}\n`;
   }
 
   command(text: string): void {

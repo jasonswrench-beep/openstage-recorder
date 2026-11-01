@@ -23,7 +23,7 @@ The layout and the paths of the first four are the same as in OpenStage Author o
 
 ## What is not built yet
 
-The cursor highlight. The installer is set up but has never been built or run (`docs/recorder/INSTALLER-AND-SIGNING.md`), and is not signed. `docs/recorder/plan.md` says what each is and the order.
+The installer is set up but has never been built or run (`docs/recorder/INSTALLER-AND-SIGNING.md`), and is not signed. `docs/recorder/plan.md` says what each is and the order.
 
 ## Quick record
 

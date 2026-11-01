@@ -53,6 +53,8 @@ test("quick settings are the Record screen's own, with a made name, for real, an
   const region = quickSettings({ ...base, target: "region", region: { left: "10", top: "20", width: "640", height: "480" } }, "x");
   assert.equal(region.target, "region", "a part of a screen is kept");
   assert.notEqual(region.region, base.region, "the copy does not share the object");
+  assert.equal(q.interactions, "off", "the mouse is noted only when the Record screen says so");
+  assert.equal(quickSettings({ ...base, interactions: "no-keys" }, "x").interactions, "no-keys", "and then it is");
   assert.equal(base.practice, true, "the Record screen's own choices are not changed");
   assert.equal(base.target, "window");
 });
@@ -65,6 +67,8 @@ test("the sentence says what a quick recording will do, from the same choices, a
   const quiet = describeQuick({ ...defaultSettings(), countdownSeconds: 0, microphone: "none", output: "none", camera: "default", display: 2 });
   assert.match(quiet, /^Quick record starts at once and records the whole of screen 2, with no voice, none of the computer's sound and the first webcam\./);
   assert.match(describeQuick({ ...defaultSettings(), countdownSeconds: 1 }), /after a countdown of 1 second and/);
+  assert.doesNotMatch(describeQuick(defaultSettings()), /mouse is noted/, "nothing about the mouse while it is not noted");
+  assert.match(describeQuick({ ...defaultSettings(), interactions: "no-keys" }), /ready to paste\.$|The mouse is noted too: where it goes and where you click\. Then the video is made and its path is copied, ready to paste\.$/, "and a sentence about it when it is");
   assert.match(describeQuick({ ...defaultSettings(), microphone: "2", output: "3", camera: "2" }), /your voice \(microphone 2\), the computer's own sound \(output 3\) and webcam 2/);
   assert.match(describeQuick({ ...defaultSettings(), target: "region", region: { left: "0", top: "0", width: "640", height: "360" } }), /the part of screen 1 that is chosen above \(640 by 360 pixels\)/);
   assert.match(describeQuick({ ...defaultSettings(), target: "window", window: "Notes" }), /the whole of screen 1 \(a window is not remembered from one time to the next, so a quick recording takes the whole screen\)/);
