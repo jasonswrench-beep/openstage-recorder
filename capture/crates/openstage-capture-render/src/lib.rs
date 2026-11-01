@@ -13,6 +13,7 @@ mod audio;
 mod canvas;
 mod compose;
 mod plan;
+mod png;
 mod text;
 mod zoom;
 
@@ -22,5 +23,6 @@ pub use compose::{compose_frame, PictureSource, DEFAULT_WEBCAM_PLACE};
 pub use plan::{
     plan, FrameRecipe, Layer, LayerTransition, RenderPlan, RenderSettings, SpanTransition, TransitionPhase, VideoSpan,
 };
+pub use png::{encode_png, read_back_png, PngPicture};
 pub use text::{line_start, padding, wrap_lines, BlockText, TextFit, TextRenderer, TextRequest, LINE_SPACING};
 pub use zoom::{zoom_view, ZoomSpan, ZoomView};

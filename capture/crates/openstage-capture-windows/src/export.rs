@@ -19,7 +19,9 @@
 use crate::video::{AudioSpec, SinkSpec, VideoPlatform};
 use crate::Frame;
 use openstage_capture_project::{Edit, EditSourceRef, WavFile};
-use openstage_capture_render::{compose_frame, mix_block, plan, Canvas, PictureSource, RenderSettings, TextRenderer};
+use openstage_capture_render::{
+    compose_frame, encode_png, mix_block, plan, Canvas, PictureSource, RenderSettings, TextRenderer,
+};
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
@@ -445,6 +447,94 @@ pub fn export_audio(
             Err(e)
         }
     }
+}
+
+/// What a single-picture export made.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FrameReport {
+    pub out: PathBuf,
+    pub width: u32,
+    pub height: u32,
+    /// Where in the edit the picture is from, in milliseconds: the start of the video frame that covers the moment asked for.
+    pub at_ms: u64,
+    /// Things the author should know about the result (text that did not fit), each once.
+    pub notes: Vec<String>,
+}
+
+/// Where a picture file is written until it is whole: `name.part.png` beside `name.png`.
+fn part_path_png(out: &Path) -> PathBuf {
+    let name = out.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let stem = if name.to_ascii_lowercase().ends_with(".png") { &name[..name.len() - 4] } else { name.as_str() };
+    out.with_file_name(format!("{stem}.part.png"))
+}
+
+/// Make one picture of an edit, as a PNG file: the frame the finished video has at `at_ms` milliseconds from its start, drawn
+/// exactly as the video draws it (the same size, the same zoom, transitions and overlays at that moment), with no video made
+/// and no sound. The size is `job.size`, or that of the first picture on the screen track, as for a video. The file is written
+/// as `name.part.png` and renamed to `name.png` only when it is whole; a failed export leaves any earlier file as it was.
+/// A moment after the end of the edit is refused in words.
+pub fn export_frame(
+    edit: &Edit,
+    job: &ExportJob,
+    at_ms: u64,
+    pictures: &mut dyn PictureSource,
+    text: &dyn TextRenderer,
+) -> Result<FrameReport, ExportError> {
+    let mut settings = job.settings.clone();
+    let probe = plan(edit, &settings).map_err(failed)?;
+    let (width, height) = match job.size {
+        Some(size) => size,
+        None => {
+            let first = probe
+                .video
+                .iter()
+                .find(|s| s.track_kind != openstage_capture_project::EditTrackKind::Webcam)
+                .or_else(|| probe.video.first());
+            match first {
+                Some(span) => {
+                    let layer = probe.layer_for(span);
+                    let picture = pictures.picture(&layer).map_err(failed)?;
+                    (picture.width & !1, picture.height & !1)
+                }
+                None => (settings.width, settings.height),
+            }
+        }
+    };
+    settings.width = width;
+    settings.height = height;
+    let plan = plan_with(edit, &settings)?;
+    if plan.frame_count == 0 {
+        return Err(failed("The edit is empty: there is nothing to take a picture of yet."));
+    }
+    let fps = settings.fps as u64;
+    let index = at_ms * fps / 1000;
+    if index >= plan.frame_count {
+        return Err(failed(format!(
+            "The edit is {:.1} seconds long, so there is no picture at {:.1} seconds.",
+            plan.frame_count as f64 / fps as f64,
+            at_ms as f64 / 1000.0
+        )));
+    }
+    let recipe = plan.frame(index);
+    let mut canvas = Canvas::new(width, height);
+    let mut notes: Vec<String> = Vec::new();
+    compose_frame(&recipe, pictures, text, &mut canvas, &mut notes).map_err(failed)?;
+    notes.dedup();
+    let bytes = encode_png(width, height, &canvas.bgra);
+    let part = part_path_png(&job.out);
+    let _ = fs::remove_file(&part);
+    if let Some(folder) = job.out.parent().filter(|p| !p.as_os_str().is_empty()) {
+        fs::create_dir_all(folder).map_err(|e| failed(format!("The folder for the picture could not be made: {e}")))?;
+    }
+    if let Err(e) = fs::write(&part, &bytes) {
+        let _ = fs::remove_file(&part);
+        return Err(failed(format!("The picture file could not be written: {e}")));
+    }
+    if let Err(e) = fs::rename(&part, &job.out) {
+        let _ = fs::remove_file(&part);
+        return Err(failed(format!("The finished picture could not be put in place: {e}")));
+    }
+    Ok(FrameReport { out: job.out.clone(), width, height, at_ms: index * 1000 / fps, notes })
 }
 
 fn plan_with(edit: &Edit, settings: &RenderSettings) -> Result<openstage_capture_render::RenderPlan, ExportError> {
@@ -1050,5 +1140,101 @@ mod tests {
         assert_eq!(u32::from_le_bytes([h[4], h[5], h[6], h[7]]), 436, "the file is 36 bytes more than the sound");
         assert_eq!(u32::from_le_bytes([h[28], h[29], h[30], h[31]]), 176_400);
         assert_eq!(u32::from_le_bytes([h[40], h[41], h[42], h[43]]), 400);
+    }
+
+    // ---- one picture ----
+
+    fn frame_run(
+        edit: &Edit,
+        out: &Path,
+        at_ms: u64,
+        pictures_fail_after: Option<usize>,
+    ) -> Result<FrameReport, ExportError> {
+        let mut pictures = Pictures { asked: Vec::new(), fail_after: pictures_fail_after, log: None };
+        let job = ExportJob {
+            settings: RenderSettings { fps: 30, reduce_motion: false, ..RenderSettings::default() },
+            size: None,
+            bitrate_kbps: None,
+            out: out.to_path_buf(),
+        };
+        export_frame(edit, &job, at_ms, &mut pictures, &BlockText)
+    }
+
+    #[test]
+    fn one_moment_of_an_edit_is_a_png_of_the_size_of_its_picture_and_in_place_only_when_whole() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("moment.png");
+        let report = frame_run(&edit("valid-basic.json"), &out, 5_000, None).unwrap();
+        assert_eq!((report.width, report.height, report.at_ms), (96, 54, 5_000));
+        assert!(!part_path_png(&out).exists(), "no half-made file is left");
+        let picture = openstage_capture_render::read_back_png(&fs::read(&out).unwrap()).unwrap();
+        assert_eq!((picture.width, picture.height), (96, 54), "the size of the screen picture, as for a video");
+        // The fake recording is coloured by the moment it shows: blue is 99 and red is 0 on every part of the screen.
+        let corner = (2 * 96 + 2) * 3;
+        assert_eq!((picture.rgb[corner], picture.rgb[corner + 2]), (0, 99), "the screen is drawn, red 0 and blue 99");
+        assert_eq!(
+            frame_run(&edit("valid-basic.json"), &dir.path().join("again.png"), 5_000, None).unwrap().at_ms,
+            5_000
+        );
+        assert_eq!(
+            fs::read(&out).unwrap(),
+            fs::read(dir.path().join("again.png")).unwrap(),
+            "the same moment is the same bytes"
+        );
+    }
+
+    #[test]
+    fn a_moment_is_the_start_of_the_video_frame_that_covers_it_and_the_ends_of_the_edit_work() {
+        let dir = tempfile::tempdir().unwrap();
+        let at = |ms: u64| {
+            frame_run(&edit("valid-basic.json"), &dir.path().join(format!("{ms}.png")), ms, None).unwrap().at_ms
+        };
+        assert_eq!(at(0), 0);
+        assert_eq!(at(1_010), 1_000, "at 30 pictures a second the frame at 1,010 ms starts at 1,000 ms");
+        assert_eq!(at(59_999), 59_966, "the last frame of a 60 second edit");
+    }
+
+    #[test]
+    fn a_moment_after_the_end_is_refused_in_words_and_makes_no_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("late.png");
+        match frame_run(&edit("valid-basic.json"), &out, 75_000, None) {
+            Err(ExportError::Failed(why)) => {
+                assert_eq!(why, "The edit is 60.0 seconds long, so there is no picture at 75.0 seconds.")
+            }
+            other => panic!("expected a refusal in words, got {other:?}"),
+        }
+        assert!(
+            frame_run(&edit("valid-basic.json"), &out, 60_000, None).is_err(),
+            "60 seconds is the end, not a moment inside it"
+        );
+        assert!(!out.exists() && !part_path_png(&out).exists());
+    }
+
+    #[test]
+    fn a_recording_that_cannot_be_read_ends_the_picture_in_words_and_keeps_an_earlier_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("moment.png");
+        fs::write(&out, b"an earlier picture").unwrap();
+        match frame_run(&edit("valid-basic.json"), &out, 5_000, Some(0)) {
+            Err(ExportError::Failed(why)) => assert!(why.contains("screen.mp4 could not be read"), "{why}"),
+            other => panic!("expected a problem in words, got {other:?}"),
+        }
+        assert_eq!(fs::read(&out).unwrap(), b"an earlier picture", "the earlier file is exactly as it was");
+        assert!(!part_path_png(&out).exists());
+        frame_run(&edit("valid-basic.json"), &out, 5_000, None).unwrap();
+        assert!(
+            fs::read(&out).unwrap().starts_with(&[0x89, b'P', b'N', b'G']),
+            "a whole picture replaces the earlier file"
+        );
+    }
+
+    #[test]
+    fn the_unfinished_picture_file_is_named_so_that_it_is_plainly_unfinished() {
+        let name = |p: &str| part_path_png(Path::new(p)).to_string_lossy().replace('\\', "/");
+        assert_eq!(name("out/moment.png"), "out/moment.part.png");
+        assert_eq!(name("out/Moment.PNG"), "out/Moment.part.png");
+        assert_eq!(name("moment"), "moment.part.png");
+        assert_eq!(name("out/moment.jpg"), "out/moment.jpg.part.png");
     }
 }

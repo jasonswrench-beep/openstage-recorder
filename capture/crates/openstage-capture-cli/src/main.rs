@@ -446,6 +446,10 @@ enum Cmd {
         /// Make only the sound, as a WAV file, instead of a video. `--out` must then end in `.wav`.
         #[arg(long)]
         audio_only: bool,
+        /// Make only the picture the video has at this moment, in milliseconds from its start, as a PNG file, instead of a
+        /// video. `--out` must then end in `.png`.
+        #[arg(long)]
+        frame: Option<u64>,
         /// How the recorded videos are read back: `rgb32` (Windows converts the colours; the default) or `nv12`
         /// (this program converts them). For working around a fault in Windows' own reader; `TEST EXPORT.bat` uses
         /// `nv12` by itself if `rgb32` makes the program stop.
@@ -1295,6 +1299,7 @@ fn main() -> ExitCode {
             reduce_motion,
             allow_unfinished,
             audio_only,
+            frame,
             picture_reader,
             plain,
         } => {
@@ -1329,6 +1334,7 @@ fn main() -> ExitCode {
                     reduce_motion,
                     allow_unfinished,
                     audio_only,
+                    frame_ms: frame,
                 };
                 install_cancel_handler();
                 let video = system_video_platform();
@@ -1370,9 +1376,19 @@ fn main() -> ExitCode {
                 finish_checks_with(
                     plain,
                     ok,
-                    if audio_only { "The sound file was exported." } else { "The video was exported." },
                     if audio_only {
+                        "The sound file was exported."
+                    } else if frame.is_some() {
+                        "The picture was exported."
+                    } else {
+                        "The video was exported."
+                    },
+                    if audio_only && frame.is_some() {
+                        "The export did not start."
+                    } else if audio_only {
                         "The export did not finish, or the finished sound file did not read back as it should."
+                    } else if frame.is_some() {
+                        "The export did not finish, or the finished picture did not read back as it should."
                     } else {
                         "The export did not finish, or the finished video did not read back as it should."
                     },
@@ -1392,6 +1408,7 @@ fn main() -> ExitCode {
                     reduce_motion,
                     allow_unfinished,
                     audio_only,
+                    frame,
                     reader,
                 );
                 emit_check(
