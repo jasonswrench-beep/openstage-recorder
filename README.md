@@ -23,7 +23,7 @@ The layout and the paths of the first four are the same as in OpenStage Author o
 
 ## What is not built yet
 
-The installer is set up but has never been built or run (`docs/recorder/INSTALLER-AND-SIGNING.md`), and is not signed. `docs/recorder/plan.md` says what each is and the order.
+The installer is not signed (`docs/recorder/INSTALLER-AND-SIGNING.md`). It has been built the way the workflow builds it (3.4 MB) and the app inside it was started once from a folder, but it has not been installed or used by anyone but its maker. What the first release holds, and what it does not: `docs/recorder/RELEASE-NOTES.md`. `docs/recorder/plan.md` says what each is and the order.
 
 ## Quick record
 
