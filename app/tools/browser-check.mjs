@@ -1118,6 +1118,82 @@ await check("a whole screen whose picture size cannot be read says so instead of
   assertMatch(await suggestSaid(page), /^The size of the picture of take 1 could not be read, so no zooms are suggested from its clicks\.$/, "said in words");
 });
 
+// ---- Windows to hide ----
+
+await check("the windows to hide are typed with semicolons between them, each reaches the recorder on its own, the check the recorder makes is said, and the words are kept for next time", async (page, t) => {
+  const box = page.getByLabel(/^Hide windows with these words/);
+  assertEqual(await box.inputValue(), "", "nothing is hidden to start with");
+  await page.getByLabel(/^Countdown/).fill("0");
+  await box.fill("KeePass ; Outlook;");
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  const args = await page.evaluate(() => window.__openstageStandIn.started.find((a) => a[0] === "record"));
+  assertEqual(args.flatMap((a, i) => (a === "--hide" ? [args[i + 1]] : [])), ["KeePass", "Outlook"], "one --hide for each word, tidied");
+  await t.waitSaid(/Hiding windows whose title or program name holds: KeePass, Outlook\./);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  await page.reload();
+  await page.getByRole("heading", { level: 1, name: "OpenStage Recorder" }).waitFor();
+  assertEqual(await page.getByLabel(/^Hide windows with these words/).inputValue(), "KeePass ; Outlook;", "kept for next time");
+  assertMatch(await page.locator('[id$="-quick-note"]').textContent(), /Windows with KeePass, Outlook in their title or program name are covered in the video\./, "Quick record says so too");
+});
+
+await check("nothing is hidden when the box is empty, and a recording of one window cannot hide windows and says why", async (page, t) => {
+  await page.getByLabel(/^Countdown/).fill("0");
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  const args = await page.evaluate(() => window.__openstageStandIn.started.find((a) => a[0] === "record"));
+  assertEqual(args.includes("--hide"), false, "no --hide at all");
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  await page.getByRole("button", { name: "Done" }).click();
+  await page.getByLabel(/^Hide windows with these words/).fill("KeePass");
+  await page.locator('select[id$="-target"]').selectOption("window");
+  await page.getByRole("button", { name: "Look for windows" }).click();
+  await page.waitForFunction(() => /Found \d+ windows/.test(document.querySelector('[role="status"]')?.innerText ?? ""));
+  await page.locator('select[id$="-window"]').selectOption({ index: 1 });
+  assertMatch(await page.locator('[id$="-problem"]').textContent(), /Hiding windows works when recording a screen or part of one, not one window/, "the reason is written beside Start");
+  assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-disabled"), "true", "Start is not available");
+});
+
+// ---- Picking a window by clicking it ----
+
+await check("Pick a window by clicking it steps the window aside, takes the window that was clicked, selects it, and makes Start available", async (page, t) => {
+  await page.locator('select[id$="-target"]').selectOption("window");
+  await page.getByLabel(/^Countdown/).fill("0");
+  assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-disabled"), "true", "Start needs a window first");
+  const pick = page.getByRole("button", { name: "Pick a window by clicking it" });
+  await pick.focus();
+  await t.key("Enter");
+  await t.waitSaid(/Chosen: 2\. WINWORD\.EXE: Lesson plan - Word \(1920 by 1032\)\./);
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.windowCalls), ["minimize", "restore"], "the window stepped aside and came back");
+  assertEqual(await page.locator('select[id$="-window"]').inputValue(), "Lesson plan - Word", "the window clicked is the one chosen");
+  assertEqual(await t.focusLabel(), "Which window", "the focus is on the choice, where it now says which window");
+  assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-disabled"), null, "Start is available");
+  assertEqual(await pick.getAttribute("aria-disabled"), null, "the button is ready to be used again");
+  const args = await page.evaluate(() => window.__openstageStandIn.started.find((a) => a[0] === "pick-window"));
+  assertEqual(args.includes("--timeout-ms"), true, "the recorder is told how long to wait");
+});
+
+await check("when no window is clicked, or Escape is pressed, it says so, brings the window back, and chooses nothing", async (page, t) => {
+  await page.locator('select[id$="-target"]').selectOption("window");
+  for (const [how, words] of [["none", /No window was clicked within 30 seconds, so none was chosen\./], ["cancel", /Escape was pressed, so no window was chosen\./]]) {
+    await page.evaluate((v) => { window.__openstageStandIn.pick = v; }, how);
+    await page.getByRole("button", { name: "Pick a window by clicking it" }).click();
+    await t.waitSaid(words);
+    assertEqual(await page.locator('select[id$="-window"]').inputValue(), "", `nothing chosen after ${how}`);
+    assertEqual(await t.focusLabel(), "Pick a window by clicking it", "the focus stays on the button to try again");
+  }
+  assertEqual((await page.evaluate(() => window.__openstageStandIn.windowCalls)).filter((c) => c === "restore").length, 2, "the window came back both times");
+});
+
+await check("Pick a window by clicking it says why it cannot work without the recording program, and does not put the window away for nothing", async (page, t) => {
+  await page.locator('select[id$="-target"]').selectOption("window");
+  await page.getByRole("button", { name: "Pick a window by clicking it" }).click();
+  assertMatch(await t.said(), /The recording program was not found/, "said");
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.windowCalls), [], "the window was not put away for nothing");
+}, { search: "&norecorder=1" });
+
 await check("every box, choice and button on the editing screen has a name, and the screen fits 320 pixels without sideways scrolling", async (page, t) => {
   await makeRecording(page, t, { webcam: true });
   await openEdit(page, t);

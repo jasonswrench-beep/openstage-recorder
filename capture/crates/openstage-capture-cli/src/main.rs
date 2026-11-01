@@ -77,6 +77,12 @@ enum Cmd {
         /// height, for example `100,200,1280,720`. An odd width or height is made one pixel smaller.
         #[arg(long)]
         region: Option<String>,
+        /// With `--source screen` and a display or `--region`: hide windows. Every open window whose title or
+        /// program name contains this word (capital letters do not matter) is covered with a plain dark box in every
+        /// picture, wherever it is on the screen, and nothing of it is kept. Give it more than once to hide
+        /// several, up to 8. Nothing is covered in a recording of one window (`--window`), which shows only that window.
+        #[arg(long = "hide")]
+        hide: Vec<String>,
         /// With `--source screen`: record just one window instead of a display: its number from the
         /// `windows` command, or part of its title or program name. Nothing else on the screen is in the
         /// video, whatever is in front of the window. Cannot be used with `--region`.
@@ -271,6 +277,16 @@ enum Cmd {
     /// List the open windows that can be recorded, numbered, so one can be chosen with `record --window`.
     /// Windows that are minimized or hidden, and windows without a title, are not listed. Windows only.
     Windows {
+        /// Print sentences for a person to read instead of one-line JSON events.
+        #[arg(long)]
+        plain: bool,
+    },
+    /// Choose the window to record by clicking it. The click only chooses the window: it is not passed on to it, so
+    /// nothing in it is pressed. Escape cancels. Prints the window as the `windows` command lists it. Windows only.
+    PickWindow {
+        /// How many milliseconds to wait for a click.
+        #[arg(long, default_value_t = 60_000)]
+        timeout_ms: u64,
         /// Print sentences for a person to read instead of one-line JSON events.
         #[arg(long)]
         plain: bool,
@@ -656,6 +672,7 @@ fn main() -> ExitCode {
             source,
             display,
             region,
+            hide,
             window,
             fps,
             bitrate_kbps,
@@ -702,6 +719,30 @@ fn main() -> ExitCode {
                 sink.emit(Event::Error {
                     code: "bad-option".into(),
                     message: "--interactions only works with --source screen. The built-in test source has no mouse or keyboard to note, so nothing would be recorded.".into(),
+                    fatal: true,
+                });
+                return ExitCode::from(2);
+            }
+            // Words to hide windows by are checked now, so a mistake is explained before the countdown. The test source has no windows to hide.
+            let hidden_words = match openstage_capture_windows::parse_words(&hide) {
+                Ok(words) => words,
+                Err(message) => {
+                    sink.emit(Event::Error { code: "bad-option".into(), message, fatal: true });
+                    return ExitCode::from(2);
+                }
+            };
+            if source == "synthetic" && !hidden_words.is_empty() {
+                sink.emit(Event::Error {
+                    code: "bad-option".into(),
+                    message: "--hide only works with --source screen. The built-in test source has no windows, so nothing would be hidden.".into(),
+                    fatal: true,
+                });
+                return ExitCode::from(2);
+            }
+            if window.is_some() && !hidden_words.is_empty() {
+                sink.emit(Event::Error {
+                    code: "bad-option".into(),
+                    message: "--hide cannot be used with --window. A recording of one window shows only that window, so there is nothing else to hide.".into(),
                     fatal: true,
                 });
                 return ExitCode::from(2);
@@ -844,6 +885,17 @@ fn main() -> ExitCode {
                     }
                     if let Some(found) = chosen_window {
                         media = media.with_window(found);
+                    }
+                    if !hidden_words.is_empty() {
+                        sink.emit(Event::Check {
+                            check: "hide".into(),
+                            ok: true,
+                            message: format!(
+                                "Hiding windows whose title or program name holds: {}. Wherever such a window is on the screen it is covered with a plain dark box in every picture, and nothing of it is kept. The whole box is covered, even where another window is in front of it. A window that opens or moves is followed within a tenth of a second, so a pop-up can show for a moment. The notes of what you do (--interactions) still name the window in front, and the webcam and the sound are not changed.",
+                                hidden_words.join(", ")
+                            ),
+                        });
+                        media = media.with_hidden_windows(hidden_words.clone());
                     }
                     // Said in words now, before the countdown, and again in words and with a sound as each countdown begins.
                     if interaction_level.is_on() {
@@ -1143,6 +1195,17 @@ fn main() -> ExitCode {
                 }
             }
             finish_checks(plain, all_fine)
+        }
+        Cmd::PickWindow { timeout_ms, plain } => {
+            if !plain {
+                hello();
+            }
+            let wait = std::time::Duration::from_millis(timeout_ms.clamp(1000, 600_000));
+            let chosen = openstage_capture_windows::run_pick_window(
+                &openstage_capture_windows::PickWindowOptions { wait },
+                &mut |c| emit_check(plain, c),
+            );
+            finish_checks(plain, chosen)
         }
         Cmd::Cameras { plain } => {
             if !plain {

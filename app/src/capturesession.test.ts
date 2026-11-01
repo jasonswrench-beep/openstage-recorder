@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   applyLine, commandLine, plainWords, soundAdvice, defaultSettings, describeSession, formatTime, initialSession, keyAction, parseProbe, parseWindow, recordArgs, recordingFolderName, recordingPath,
-  safeName, settingsProblem, STOP_LINE, type RecordSettings, type Session,
+  hideWords, safeName, settingsProblem, STOP_LINE, type RecordSettings, type Session,
 } from "./capturesession.ts";
 
 const settings = (over: Partial<RecordSettings> = {}): RecordSettings => ({ ...defaultSettings(), ...over });
@@ -86,6 +86,20 @@ test("every choice reaches the recorder, and the sounds and countdown follow the
   const a = recordArgs(settings({ microphone: "3", output: "none", camera: "1", interactions: "no-keys", countdownSeconds: 0, sounds: false }), "f");
   const pick = (flag: string) => a[a.indexOf(flag) + 1];
   assert.deepEqual([pick("--microphone"), pick("--output"), pick("--camera"), pick("--interactions"), pick("--countdown-ms"), pick("--cues")], ["3", "none", "1", "no-keys", "0", "off"]);
+});
+
+test("the windows to hide are the words between semicolons, each given to the recorder on its own, and a practice recording is given none", () => {
+  assert.deepEqual(hideWords(" KeePass ;; Outlook; "), ["KeePass", "Outlook"]);
+  assert.deepEqual(hideWords(""), []);
+  const a = recordArgs(settings({ hide: "KeePass; Outlook" }), "f");
+  assert.deepEqual(a.flatMap((x, i) => (x === "--hide" ? [a[i + 1]] : [])), ["KeePass", "Outlook"]);
+  assert.ok(!recordArgs(settings({ hide: "" }), "f").includes("--hide"), "nothing is asked for when there is nothing to hide");
+  assert.ok(!recordArgs(settings({ practice: true, hide: "KeePass" }), "f").includes("--hide"), "the made-up picture has no windows");
+  assert.equal(settingsProblem(settings({ hide: "KeePass; Outlook" })), null);
+  assert.match(settingsProblem(settings({ hide: "a;b;c;d;e;f;g;h;i" }))!, /Hide at most 8 windows/);
+  assert.match(settingsProblem(settings({ hide: "x".repeat(81) }))!, /at most 80 characters/);
+  assert.match(settingsProblem(settings({ hide: "KeePass", target: "window", window: "Notes" }))!, /not one window/);
+  assert.equal(settingsProblem(settings({ hide: "KeePass", target: "region" })), null);
 });
 
 test("a practice recording uses the made-up source and asks for nothing real", () => {

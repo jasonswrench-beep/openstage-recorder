@@ -26,6 +26,8 @@ export interface StandInControls {
   soundFindings: boolean;
   /** Make the next video never finish by itself, so Cancel can be tried (a real video of a long recording takes minutes). */
   holdRender: boolean;
+  /** What clicking a window does when the app asks for one to be picked: it chooses a window, nothing was clicked in time, or Escape was pressed. */
+  pick: "window" | "none" | "cancel";
   /** Choose from the menu of the icon in the notification area, as if from the taskbar (`quick` or `stop`). */
   pressTray(id: string): void;
   /** Everything put on the clipboard, in order. */
@@ -93,6 +95,10 @@ class PretendRecorder {
   /** The computer's own sound is recorded (`--output` was given and is not `none`), and the loudness asked for, as the real program writes it into the mixed video's `mix`. */
   private system = false;
   private gains = { microphoneGainDb: 0, systemGainDb: 0 };
+  /** The words windows are hidden by (`--hide`, given once for each). */
+  private hidden: string[] = [];
+  /** What picking a window does here; set by the test through the controls. */
+  pick: "window" | "none" | "cancel" = "window";
   /** What the author asked to have noted (`--interactions`): `off`, `no-keys` or `on`. A practice recording never notes anything. */
   private interactions = "off";
   /** The part of the display recorded (`--region`): left, top, width and height; absent for the whole display. */
@@ -146,6 +152,7 @@ class PretendRecorder {
     this.system = (opt("--output") ?? "none") !== "none";
     this.gains = { microphoneGainDb: Number(opt("--mic-gain-db") ?? 0), systemGainDb: Number(opt("--system-gain-db") ?? 0) };
     this.interactions = (opt("--source") ?? "") === "synthetic" ? "off" : (opt("--interactions") ?? "off");
+    this.hidden = args.flatMap((a, i) => (a === "--hide" ? [args[i + 1] ?? ""] : []));
     const box = (opt("--region") ?? "").split(/[,\s]+/).map(Number);
     this.region = box.length === 4 && box.every((n) => Number.isFinite(n)) ? { x: box[0] ?? 0, y: box[1] ?? 0, width: box[2] ?? 0, height: box[3] ?? 0 } : undefined;
     this.later(() => this.emit({ event: "hello", protocol: "0.1", program: "openstage-capture", programVersion: "0.1.0", platform: "pretend" }), 5);
@@ -159,6 +166,20 @@ class PretendRecorder {
           this.emit({ event: "check", check: "windows", ok: true, message: `${WINDOWS.length} windows can be recorded.` });
           this.end(0);
         }, 30);
+        break;
+      case "pick-window":
+        this.later(() => {
+          this.emit({ event: "check", check: "pick-window", ok: true, message: "Click the window you want to record. The click only chooses it: the window does not get the click, so nothing in it is pressed. Press Escape to cancel. This waits up to 30 seconds." });
+          if (this.pick === "window") {
+            this.emit({ event: "check", check: "window", ok: true, message: WINDOWS[1] ?? "" });
+            this.emit({ event: "check", check: "window-chosen", ok: true, message: `Chosen: ${WINDOWS[1] ?? ""}. To record it, use --window "Lesson plan - Word".` });
+            this.end(0);
+          } else {
+            const why = this.pick === "cancel" ? "Escape was pressed, so no window was chosen." : "No window was clicked within 30 seconds, so none was chosen.";
+            this.emit({ event: "check", check: "window-chosen", ok: false, message: why });
+            this.end(1);
+          }
+        }, 60);
         break;
       case "setup-check":
         this.later(() => {
@@ -240,6 +261,9 @@ class PretendRecorder {
     this.take = 1;
     this.elapsed = 0;
     this.takes = [];
+    if (this.hidden.length > 0) {
+      this.later(() => this.emit({ event: "check", check: "hide", ok: true, message: `Hiding windows whose title or program name holds: ${this.hidden.join(", ")}. Wherever such a window is on the screen it is covered with a plain dark box in every picture, and nothing of it is kept.` }), 10);
+    }
     const begin = (): void => {
       this.emit({ event: "state", state: "recording", elapsedMs: 0, take: this.take });
       this.ticker = setInterval(() => {
@@ -399,6 +423,7 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     started: [],
     soundFindings: false,
     holdRender: false,
+    pick: "window",
     pressTray: (id) => { for (const l of [...trayListeners]) l(id); },
     copied: [],
     failNextCopy: false,
@@ -461,6 +486,7 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
         throw new Error(message);
       }
       controls.started.push(args);
+      recorder.pick = controls.pick;
       recorder.holdRender = controls.holdRender;
       controls.holdRender = false;
       recorder.soundFindings = controls.soundFindings;

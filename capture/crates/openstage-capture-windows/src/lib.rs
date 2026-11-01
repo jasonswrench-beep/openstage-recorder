@@ -19,9 +19,11 @@ mod cue_player;
 mod cursor_track;
 mod echo;
 mod export;
+mod hide;
 mod interactions;
 mod make_edit;
 mod pick;
+mod pick_window;
 mod queue;
 mod record;
 mod region;
@@ -60,6 +62,8 @@ mod win_setup;
 mod win_text;
 #[cfg(windows)]
 mod win_video;
+#[cfg(windows)]
+mod win_pick_window;
 #[cfg(windows)]
 mod win_windows;
 mod window;
@@ -115,6 +119,8 @@ impl InteractionPlatform for NoInteractions {
 pub use make_edit::{edit_from_take, EditOptions};
 pub use openstage_capture_project::fmp4::{repair_file, scan_file, Mp4Scan, Repair, TopBox};
 pub use pick::{region_numbers, run_pick_region, run_pick_region_with, PickRegionOptions};
+pub use pick_window::{run_pick_window, run_pick_window_with, PickWindowOptions, WindowPick, DEFAULT_WAIT as PICK_WINDOW_WAIT};
+pub use hide::{cover, matches_any, parse_words, HideProvider, HideRect, HidingSource, HIDE_COLOUR, MAX_WORDS, MAX_WORD_LEN};
 pub use queue::{FramePool, FrameQueue};
 pub use record::{ScreenMedia, DECLARED_LOSS_MS, SCREEN_FILE};
 pub use region::{crop, crop_into, CroppedSource, Region, MIN_SIDE as REGION_MIN_SIDE};
@@ -331,6 +337,15 @@ pub trait Platform {
     /// (or on a system that cannot).
     fn show_region_outline(&self, _display: &DisplayInfo, _region: &Region) -> Option<Outline> {
         None
+    }
+    /// Where the windows whose title or program name holds any of `words` are, asked again for every picture,
+    /// so they can be covered in a recording of a screen (story A7). Only Windows can say.
+    fn hide_windows(&self, _words: &[String]) -> Result<HideProvider, ScreenError> {
+        Err(ScreenError::NotWindows)
+    }
+    /// Wait for the author to click a window (or press Escape), up to `wait`, and say which window it was (story A1). The click is not passed on.
+    fn pick_window(&self, _wait: std::time::Duration) -> Result<WindowPick, ScreenError> {
+        Err(ScreenError::NotWindows)
     }
 }
 

@@ -36,14 +36,25 @@ export interface RecordSettings {
   countdownSeconds: number;
   /** The recorder's own short sound for each step. */
   sounds: boolean;
+  /** Words from the title or program name of windows to cover in the video, separated by semicolons. Empty hides nothing. */
+  hide: string;
 }
 
 export function defaultSettings(): RecordSettings {
   return {
     name: "Recording", practice: false, target: "screen", display: 1, window: "",
     region: { left: "0", top: "0", width: "1280", height: "720" },
-    microphone: "default", output: "default", camera: "none", interactions: "off", micGainDb: 0, systemGainDb: 0, countdownSeconds: 3, sounds: true,
+    microphone: "default", output: "default", camera: "none", interactions: "off", micGainDb: 0, systemGainDb: 0, countdownSeconds: 3, sounds: true, hide: "",
   };
+}
+
+/** The most words to hide windows by, and the longest one: the same limits as the recorder's. */
+export const MAX_HIDE_WORDS = 8;
+export const MAX_HIDE_WORD_LENGTH = 80;
+
+/** The words to hide windows by, from the box where they are typed with semicolons between them: trimmed, none empty. */
+export function hideWords(text: string): string[] {
+  return text.split(";").map((w) => w.trim()).filter((w) => w !== "");
 }
 
 export const MIN_REGION = 64;
@@ -87,6 +98,10 @@ export function settingsProblem(s: RecordSettings): string | null {
       return `How loud ${what} is in the video is a whole number of decibels from ${MIN_GAIN_DB} to ${MAX_GAIN_DB}. 0 leaves it as heard, and a negative number makes it quieter.`;
     }
   }
+  const hidden = hideWords(s.hide);
+  if (hidden.length > MAX_HIDE_WORDS) return `Hide at most ${MAX_HIDE_WORDS} windows by their words. There are ${hidden.length}: remove some, or keep the semicolons for between words only.`;
+  if (hidden.some((w) => w.length > MAX_HIDE_WORD_LENGTH)) return `A word to hide windows by can be at most ${MAX_HIDE_WORD_LENGTH} characters.`;
+  if (hidden.length > 0 && s.target === "window") return "Hiding windows works when recording a screen or part of one, not one window, which shows nothing but itself. Clear the windows to hide, or choose a screen.";
   if (!Number.isInteger(s.display) || s.display < 1) return "Choose a screen.";
   if (s.target === "window" && s.window.trim() === "") return "Choose the window to record. Press Look for windows to list them.";
   if (s.target === "region") {
@@ -105,6 +120,7 @@ export function recordArgs(s: RecordSettings, folder: string): string[] {
   if (s.target === "window") args.push("--window", s.window.trim());
   if (s.target === "region") args.push("--region", [s.region.left, s.region.top, s.region.width, s.region.height].map((n) => String(Number(n))).join(","));
   args.push("--microphone", s.microphone, "--output", s.output, "--camera", s.camera, "--interactions", s.interactions);
+  for (const word of hideWords(s.hide)) args.push("--hide", word);
   // Only when changed, so a recording made with nothing changed is asked for exactly as before.
   if (s.micGainDb !== 0) args.push("--mic-gain-db", String(s.micGainDb));
   if (s.systemGainDb !== 0) args.push("--system-gain-db", String(s.systemGainDb));
@@ -204,7 +220,7 @@ export function initialSession(folder = ""): Session {
 }
 
 /** The checks the author is always told about when they come, because they say what is being kept. */
-const ALWAYS_SAID = new Set(["interactions", "interactions-on", "interactions-log", "region", "camera", "window", "sound-devices", "cues"]);
+const ALWAYS_SAID = new Set(["interactions", "interactions-on", "interactions-log", "region", "hide", "camera", "window", "sound-devices", "cues"]);
 const MAX_NOTES = 60;
 
 /**

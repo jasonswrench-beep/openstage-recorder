@@ -13,6 +13,7 @@
 
 use crate::audio::{AudioPlatform, CHANNELS, SAMPLE_RATE};
 use crate::interactions::{announcement, InteractionPlatform, InteractionSetup, InteractionTake, Level};
+use crate::hide::HidingSource;
 use crate::region::{CroppedSource, Region};
 use crate::report::{LookStats, PictureWork, RecordingReport, SlowMoment};
 use crate::sound::{Sound, SoundPlan, SoundTake, MIXED_BITRATE_KBPS};
@@ -51,6 +52,8 @@ pub struct ScreenMedia {
     outline: bool,
     /// Record just this window instead of a display, if set.
     window: Option<WindowInfo>,
+    /// Cover the windows whose title or program name holds any of these words, in a recording of a screen (not of a window).
+    hide_words: Vec<String>,
     sound: Option<Sound>,
     /// Record this webcam too, into a file of its own, if set.
     camera: Option<(Box<dyn CameraPlatform>, CameraInfo)>,
@@ -85,6 +88,7 @@ impl ScreenMedia {
             region: None,
             outline: false,
             window: None,
+            hide_words: Vec::new(),
             sound: None,
             camera: None,
             interactions: None,
@@ -113,6 +117,13 @@ impl ScreenMedia {
     /// closed, the recording stops at once and keeps everything recorded until then.
     pub fn with_window(mut self, window: WindowInfo) -> Self {
         self.window = Some(window);
+        self
+    }
+
+    /// Cover the windows whose title or program name holds any of these words with a plain box in every picture of the
+    /// screen (or part of it) that is recorded, so nothing of them is kept. Does nothing when a single window is recorded.
+    pub fn with_hidden_windows(mut self, words: Vec<String>) -> Self {
+        self.hide_words = words;
         self
     }
 
@@ -468,6 +479,11 @@ impl ScreenMedia {
             .screen
             .start_display_capture(display, false)
             .map_err(|e| media_error(format!("Could not start capturing {}: {e}", display.describe())))?;
+        // The windows to hide are covered on the whole display's picture, before any part of it is cut out.
+        if !self.hide_words.is_empty() {
+            let provider = self.screen.hide_windows(&self.hide_words).map_err(media_error)?;
+            source = Box::new(HidingSource::new(source, (display.x, display.y), provider));
+        }
         if let Some(region) = region {
             source = Box::new(CroppedSource::new(source, region));
         }
@@ -935,6 +951,10 @@ mod tests {
         /// The regions a frame was shown around, and how many such frames are on the screen right now.
         outlines: Rc<RefCell<Vec<Region>>>,
         outlines_showing: Rc<std::cell::Cell<i32>>,
+        /// Where the windows that were asked to be hidden are on the desktop, if this screen can say. `None`: it cannot.
+        hidden_at: Option<Vec<crate::HideRect>>,
+        /// The words it was asked to hide windows by.
+        asked_to_hide: Rc<RefCell<Vec<String>>>,
     }
 
     /// A frame on the fake screen; it counts itself off when it goes.
@@ -962,6 +982,16 @@ mod tests {
                 system_name: "D1".into(),
                 handle: 1,
             }])
+        }
+        fn hide_windows(&self, words: &[String]) -> Result<crate::HideProvider, ScreenError> {
+            self.asked_to_hide.borrow_mut().extend(words.iter().cloned());
+            match &self.hidden_at {
+                Some(rects) => {
+                    let rects = rects.clone();
+                    Ok(Rc::new(move || rects.clone()))
+                }
+                None => Err(ScreenError::NotWindows),
+            }
         }
         fn show_region_outline(&self, _: &DisplayInfo, region: &Region) -> Option<crate::Outline> {
             self.outlines.borrow_mut().push(*region);
@@ -1099,6 +1129,8 @@ mod tests {
             captures: Rc::new(std::cell::Cell::new(0)),
             outlines: Rc::new(RefCell::new(Vec::new())),
             outlines_showing: Rc::new(std::cell::Cell::new(0)),
+            hidden_at: None,
+            asked_to_hide: Rc::new(RefCell::new(Vec::new())),
         }
     }
 
@@ -1138,6 +1170,86 @@ mod tests {
 
         let region = read_take(&cfg.project, 1).unwrap().media[0].region.expect("the region is written down");
         assert_eq!(region, RegionInfo { display: 1, x: 30, y: 20, width: 64, height: 64 });
+    }
+
+    // ---- hiding windows ----
+
+    #[test]
+    fn a_hidden_window_is_covered_in_every_picture_of_a_region_by_where_it_is_on_the_desktop() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cfg = config(&dir);
+        cfg.max_duration_ms = Some(1000);
+        let asked = Rc::new(RefCell::new(Vec::new()));
+        // The window is at (30, 20) to (40, 30) on a display that starts at the desktop's corner: the first pixels of the region.
+        let screen = FakeScreen {
+            hidden_at: Some(vec![crate::HideRect { left: 30, top: 20, right: 40, bottom: 30 }]),
+            asked_to_hide: Rc::clone(&asked),
+            ..wide_screen()
+        };
+        let (media, files) = factory(screen);
+        let media = media.with_region(Region { x: 30, y: 20, width: 64, height: 64 }).with_hidden_windows(vec!["Passwords".into()]);
+        run_session(&cfg, &media, &mut ScriptedInput::none(), &mut VecSink::default(), &ManualClock::new()).unwrap();
+        assert_eq!(*asked.borrow(), vec!["Passwords".to_string()], "the platform was asked for windows with these words");
+        let files = files.0.borrow();
+        let f = files[0].borrow();
+        assert!(!f.pictures.is_empty());
+        assert!(
+            f.pictures.iter().all(|p| *p == (64, 64, crate::HIDE_COLOUR)),
+            "the corner of every picture is where the window is, so it is covered, not [30, 20, 7, 255]"
+        );
+    }
+
+    #[test]
+    fn a_window_outside_the_recorded_region_changes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cfg = config(&dir);
+        cfg.max_duration_ms = Some(500);
+        let screen = FakeScreen { hidden_at: Some(vec![crate::HideRect { left: 150, top: 80, right: 190, bottom: 99 }]), ..wide_screen() };
+        let (media, files) = factory(screen);
+        let media = media.with_region(Region { x: 30, y: 20, width: 64, height: 64 }).with_hidden_windows(vec!["x".into()]);
+        run_session(&cfg, &media, &mut ScriptedInput::none(), &mut VecSink::default(), &ManualClock::new()).unwrap();
+        assert!(files.0.borrow()[0].borrow().pictures.iter().all(|p| *p == (64, 64, [30, 20, 7, 255])));
+    }
+
+    #[test]
+    fn the_desktop_place_of_a_display_to_the_right_of_the_main_one_is_taken_into_account() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cfg = config(&dir);
+        cfg.max_duration_ms = Some(500);
+        // The display starts at (1920, -40) on the desktop, so a window at the desktop's (1920, -40) is at the display's own (0, 0).
+        let screen = FakeScreen {
+            origin: (1920, -40),
+            hidden_at: Some(vec![crate::HideRect { left: 1920, top: -40, right: 1922, bottom: -39 }]),
+            positional: true,
+            ..good_screen()
+        };
+        let (media, files) = factory(screen);
+        let media = media.with_hidden_windows(vec!["x".into()]);
+        run_session(&cfg, &media, &mut ScriptedInput::none(), &mut VecSink::default(), &ManualClock::new()).unwrap();
+        // Only the first pixel of each picture is recorded in these tests. It is covered only if the display's corner was taken into account.
+        assert!(files.0.borrow()[0].borrow().pictures.iter().all(|p| *p == (8, 4, crate::HIDE_COLOUR)));
+    }
+
+    #[test]
+    fn a_screen_that_cannot_find_windows_ends_the_session_with_a_plain_message_and_makes_no_video() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = config(&dir);
+        let (media, files) = factory(good_screen());
+        let media = media.with_hidden_windows(vec!["x".into()]);
+        let out = run_session(&cfg, &media, &mut ScriptedInput::none(), &mut VecSink::default(), &ManualClock::new());
+        assert!(out.is_err() || !out.as_ref().is_ok_and(|o| o.ok), "a recording that was asked to hide windows must not go on without doing it");
+        assert!(files.0.borrow().is_empty() || files.0.borrow()[0].borrow().pictures.is_empty(), "no picture with the window showing was kept");
+    }
+
+    #[test]
+    fn with_no_words_nothing_is_asked_of_the_platform() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cfg = config(&dir);
+        cfg.max_duration_ms = Some(300);
+        let asked = Rc::new(RefCell::new(Vec::new()));
+        let (media, _files) = factory(FakeScreen { asked_to_hide: Rc::clone(&asked), ..good_screen() });
+        run_session(&cfg, &media, &mut ScriptedInput::none(), &mut VecSink::default(), &ManualClock::new()).unwrap();
+        assert!(asked.borrow().is_empty());
     }
 
     #[test]

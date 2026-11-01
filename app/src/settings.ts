@@ -74,6 +74,7 @@ export function parseSettings(raw: string | null | undefined, now: Date = new Da
       systemGainDb: gain(r["systemGainDb"], fresh.systemGainDb),
       countdownSeconds: typeof countdown === "number" && Number.isInteger(countdown) && countdown >= 0 && countdown <= 10 ? countdown : fresh.countdownSeconds,
       sounds: typeof r["sounds"] === "boolean" ? r["sounds"] : fresh.sounds,
+      hide: text(r["hide"], fresh.hide, 400),
     },
   };
 }
