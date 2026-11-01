@@ -280,7 +280,7 @@ export function describeAt(model: Model, timeMs: number, context: PreviewContext
       } else if (item.kind === "blur") {
         showing.push(`a blur over ${describePlace(item.rect)} of the picture`);
       } else if (item.kind === "redact") {
-        showing.push(`a redaction over ${describePlace(item.rect)} of the picture`);
+        showing.push(`a cover over ${describePlace(item.rect)} of the picture`);
       } else {
         showing.push(`${itemKindName(item)}${item.decorative === true || item.altText === undefined || item.altText === "" ? "" : `: ${item.altText}`}`);
       }

@@ -497,8 +497,8 @@ await check("a Cover is added from the bar with the keyboard, says it cannot be 
   await openEdit(page, t);
   await page.getByRole("button", { name: "Cover", exact: true }).focus();
   await t.key("Enter");
-  await page.waitForFunction(() => /nobody can undo this redaction/.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
-  assertMatch(await editSaid(page), /Once the video is exported, nobody can undo this redaction\./, "the warning is said");
+  await page.waitForFunction(() => /nobody can take this cover off/.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
+  assertMatch(await editSaid(page), /Once the video is exported, nobody can take this cover off\./, "the warning is said");
   assertEqual(await stateText(page), "There are changes that are not saved.", "adding it is a change to save");
   for (const label of ["Cover colour", "Left (%)", "Top (%)", "Width (%)", "Height (%)"]) {
     assertEqual(await page.getByLabel(label, { exact: true }).count(), 1, `${label} can be set`);

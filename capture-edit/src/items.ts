@@ -86,6 +86,11 @@ const LOWER_THIRD: Rect = { x: 500, y: 7800, width: 9000, height: 1400 };
 const CENTRE: Rect = { x: 3000, y: 3000, width: 4000, height: 4000 };
 const YELLOW = "#FFD400";
 
+/** The kinds of item a track takes, in the words the author sees ("redact" is the name in the file; the tool is called Cover). */
+function kindWords(kinds: readonly string[]): string {
+  return kinds.map((k) => (k === "redact" ? "cover" : k)).join(", ");
+}
+
 function place(model: Model, trackId: string, build: (id: string) => Item, wanted: string): Result {
   const track = findTrack(model, trackId);
   if (track === undefined) return refuse(`There is no track with the id ${trackId}.`);
@@ -97,7 +102,7 @@ function place(model: Model, trackId: string, build: (id: string) => Item, wante
     return refuse(
       allowed.length === 0
         ? `The ${track.name} track holds clips, not overlays or zooms.`
-        : `A ${itemKindName(item)} cannot go on the ${track.name} track. That track takes ${allowed.join(", ")}.`,
+        : `A ${itemKindName(item)} cannot go on the ${track.name} track. That track takes ${kindWords(allowed)}.`,
     );
   }
   const next = withTrack(taken.model, { ...track, items: sortItems([...track.items, item]) });
@@ -232,14 +237,14 @@ export function addRedact(model: Model, trackId: string, request: Timing & { rea
     (id): RedactItem => ({
       id,
       kind: "redact",
-      name: request.name?.trim() || "Redaction",
+      name: request.name?.trim() || "Cover",
       ...timing(request),
       rect: request.rect,
       color: normalizeColor(request.color ?? "#000000") ?? (request.color ?? ""),
     }),
-    "redaction",
+    "cover",
   );
-  return result.ok ? { ...result, message: `${result.message} Once the video is exported, nobody can undo this redaction.` } : result;
+  return result.ok ? { ...result, message: `${result.message} Once the video is exported, nobody can take this cover off.` } : result;
 }
 
 /** How long a zoom takes to move in, and to move out, when nothing else is said: half a second. */
@@ -320,7 +325,7 @@ export function moveItemToTrack(model: Model, itemId: string, trackId: string): 
   if (!ALLOWED_ITEMS[to.kind].includes(item.kind)) {
     const allowed = ALLOWED_ITEMS[to.kind];
     return refuse(
-      `Cannot move ${quote(item.name)} to the ${to.name} track: ${allowed.length === 0 ? "that track holds clips, not overlays or zooms" : `that track takes ${allowed.join(", ")}`}.`,
+      `Cannot move ${quote(item.name)} to the ${to.name} track: ${allowed.length === 0 ? "that track holds clips, not overlays or zooms" : `that track takes ${kindWords(allowed)}`}.`,
     );
   }
   const moved = withTrack(model, { ...from, items: from.items.filter((i) => i.id !== item.id) });

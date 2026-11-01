@@ -402,8 +402,8 @@ await check("the timeline exposes a listbox of clips grouped by track, one Tab s
   const end = page.getByRole("slider", { name: 'End of "Open the gradebook"' });
   assertEqual([await end.getAttribute("aria-valuemin"), await end.getAttribute("aria-valuemax")], ["100", "30000"], "end grip range");
   assertEqual(await end.getAttribute("aria-valuetext"), "ends at 30 seconds, 30 seconds long", "end grip words");
-  // every box has a name for a screen reader
-  const unnamed = await page.locator("input:not([type=checkbox]), select").evaluateAll((all) => all.filter((el) => !el.labels?.length && !el.getAttribute("aria-label")).map((el) => el.id));
+  // every box has a name for a screen reader: a label, an aria-label, or an aria-labelledby that points at something that is there (the track form's name box is named by the form's title, which is filled in when the form is shown)
+  const unnamed = await page.locator("input:not([type=checkbox]), select").evaluateAll((all) => all.filter((el) => !el.labels?.length && !el.getAttribute("aria-label") && document.getElementById(el.getAttribute("aria-labelledby") ?? "") === null).map((el) => el.id));
   assertEqual(unnamed, [], "boxes with no label");
 });
 
@@ -1118,18 +1118,18 @@ await check("the editor does not scroll the page: the picture takes what is left
 
 const tools = (page) => page.getByRole("toolbar", { name: "Editing tools" });
 
-await check("the tool bar is one Tab stop; the arrow keys, Home and End move along it; it has Undo, Redo, Copy, Paste, Split and two Deletes and the Add track menu", async (page, t) => {
+await check("the tool bar is one Tab stop; the arrow keys, Home and End move along it; it has Undo, Redo, Copy, Paste, Split, two Deletes, the marks and the stretch tools, Snap and the Add track and Tracks menus", async (page, t) => {
   const bar = tools(page);
   const names = await bar.getByRole("button").evaluateAll((all) => all.map((b) => b.textContent.trim()));
-  assertEqual(names, ["Undo", "Redo", "Copy", "Paste", "Split", "Delete", "Delete, close gap", "Add track"], "the tools");
+  assertEqual(names, ["Undo", "Redo", "Copy", "Paste", "Split", "Delete", "Delete, close gap", "Mark start", "Mark end", "Remove stretch", "Remove, close gap", "Clear marks", "Snap", "Add track", "Tracks"], "the tools");
   assertEqual(await bar.locator('button[tabindex="0"]').count(), 1, "one Tab stop");
   await bar.getByRole("button", { name: "Undo" }).focus();
   await t.key("ArrowRight", "ArrowRight");
   assertEqual(await t.focusLabel(), "Copy", "two to the right");
   await t.key("End");
-  assertEqual(await t.focusLabel(), "Add track", "End");
+  assertEqual(await t.focusLabel(), "Tracks", "End");
   await t.key("ArrowRight");
-  assertEqual(await t.focusLabel(), "Add track", "no wrapping past the end");
+  assertEqual(await t.focusLabel(), "Tracks", "no wrapping past the end");
   await t.key("Home");
   assertEqual(await t.focusLabel(), "Undo", "Home");
   assertEqual(await bar.locator('button[tabindex="0"]').evaluate((b) => b.textContent.trim()), "Undo", "the Tab stop follows the focus");

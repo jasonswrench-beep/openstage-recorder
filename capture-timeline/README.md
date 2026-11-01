@@ -195,6 +195,7 @@ test/                   Node's own test runner
 npx tsc -p .                       type check (TypeScript 5.8 or newer, @types/node); clean on 2026-10-17 with TypeScript 6.0.3
 node --test "test/*.test.ts"       the tests
 node tools/browser-check.mjs       the browser check: PLAYWRIGHT_DIR=<folder of an installed playwright>
+node tools/preview-sound-check.mjs the preview must make sound when the recording comes from another web address than the page, as in the installed editor (needs Edge and Node 22.13, nothing else; muted)
 node demo/serve.mjs --open         the demo
 ```
 
