@@ -15,6 +15,8 @@ mod bmp;
 mod crash;
 mod crash_words;
 mod cue_player;
+#[cfg_attr(not(windows), allow(dead_code))]
+mod cursor_track;
 mod echo;
 mod export;
 mod interactions;

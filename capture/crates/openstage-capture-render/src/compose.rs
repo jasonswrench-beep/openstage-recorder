@@ -23,6 +23,7 @@
 //!   `zoom-aspect` warning already tells the author.)
 
 use crate::canvas::{Canvas, Picture, PixelRect, Rgb, SourceRect};
+use crate::cursor::{draw_cursor, CursorMark};
 use crate::plan::{FrameRecipe, Layer, LayerTransition, TransitionPhase};
 use crate::text::{TextRenderer, TextRequest};
 use openstage_capture_project::{EditItem, EditRect, EditShapeKind, EditTrackKind, EditTransitionKind, EDIT_FULL};
@@ -33,6 +34,12 @@ pub trait PictureSource {
     /// The picture of a layer at its moment: the frame of the recording, or the image. `Err` says in words why it
     /// cannot be had (the file is missing, or cannot be read).
     fn picture(&mut self, layer: &Layer) -> Result<Rc<Picture>, String>;
+
+    /// Where the pointer was over this layer's picture at its moment, in pixels of that picture, and whether a button was just
+    /// pressed, if the recording noted it. Asked for only when the pointer is to be shown. The default knows nothing.
+    fn cursor(&mut self, _layer: &Layer, _picture: &Picture) -> Option<CursorMark> {
+        None
+    }
 }
 
 /// Where a webcam sits when the edit does not say: a small picture in the bottom right corner. The same share of
@@ -240,6 +247,14 @@ pub fn compose_frame(
             h: fitted.h / frame.view.h,
         };
         draw_with(canvas, &picture, zoomed, layer.transition.as_ref());
+        // The pointer goes over the recorded picture and under what the author added, so a blur or a blackout hides it too.
+        if recipe.highlight_cursor {
+            if let Some(mark) = sources.cursor(layer, &picture) {
+                let cx = zoomed.x + mark.x * zoomed.w / picture.width as f64;
+                let cy = zoomed.y + mark.y * zoomed.h / picture.height as f64;
+                draw_cursor(canvas, cx, cy, &mark, recipe.reduce_motion);
+            }
+        }
     }
 
     // 2. What belongs to the picture, in the order the edit lists it.
@@ -335,6 +350,7 @@ mod tests {
     struct Pictures {
         by_media: HashMap<String, Rc<Picture>>,
         asked: Vec<(String, u64)>,
+        pointer: Option<CursorMark>,
     }
 
     impl PictureSource for Pictures {
@@ -342,6 +358,10 @@ mod tests {
             let EditSourceRef::Take { media, .. } = &layer.source else { return Err("only takes here".into()) };
             self.asked.push((media.clone(), layer.source_time_ms));
             self.by_media.get(media).cloned().ok_or_else(|| format!("{media} is missing"))
+        }
+
+        fn cursor(&mut self, _: &Layer, _: &Picture) -> Option<CursorMark> {
+            self.pointer
         }
     }
 
@@ -359,7 +379,7 @@ mod tests {
         let mut by_media = HashMap::new();
         by_media.insert("screen.mp4".to_string(), Rc::new(Picture::solid(160, 90, Rgb(10, 20, 30))));
         by_media.insert("webcam.mp4".to_string(), Rc::new(Picture::solid(64, 36, Rgb(200, 0, 0))));
-        Pictures { by_media, asked: Vec::new() }
+        Pictures { by_media, asked: Vec::new(), pointer: None }
     }
 
     fn layer(media: &str, track: EditTrackKind, kind: EditSourceKind, placement: Option<EditRect>) -> Layer {
@@ -387,7 +407,7 @@ mod tests {
     }
 
     fn recipe(layers: Vec<Layer>, overlays: Vec<EditItem>, zoom: ZoomView) -> FrameRecipe {
-        FrameRecipe { index: 0, time_us: 0, layers, overlays, zoom }
+        FrameRecipe { index: 0, time_us: 0, layers, overlays, zoom, highlight_cursor: false, reduce_motion: false }
     }
 
     fn rect(x: f64, y: f64, width: f64, height: f64) -> EditRect {
@@ -796,5 +816,78 @@ mod tests {
             draw_frame(&recipe(vec![l], vec![], whole_view()), &mut p, (160, 90)).0.bgra
         };
         assert_eq!(draw_it(), draw_it());
+    }
+
+    // ---- the pointer ----
+
+    fn with_pointer(x: f64, y: f64, age: Option<u64>) -> Pictures {
+        let mut p = pictures();
+        p.pointer = Some(CursorMark { x, y, click_age_ms: age });
+        p
+    }
+
+    fn highlighted(mut recipe: FrameRecipe) -> FrameRecipe {
+        recipe.highlight_cursor = true;
+        recipe
+    }
+
+    #[test]
+    fn the_pointer_is_drawn_over_the_picture_where_the_source_says_only_when_asked_for() {
+        let make = || recipe(vec![screen()], vec![], whole_view());
+        let (plain, _) = draw_frame(&make(), &mut with_pointer(80.0, 45.0, None), (160, 90));
+        assert_eq!(plain.pixel(80, 45), Rgb(10, 20, 30), "not asked for: the picture is untouched");
+        let (shown, _) = draw_frame(&highlighted(make()), &mut with_pointer(80.0, 45.0, None), (160, 90));
+        assert_ne!(shown.pixel(80, 45), Rgb(10, 20, 30), "asked for: the pointer is at the middle of the frame");
+        assert_eq!(shown.pixel(5, 5), Rgb(10, 20, 30), "and the rest of the picture is untouched");
+        let (nothing, _) = draw_frame(&highlighted(make()), &mut pictures(), (160, 90));
+        assert_eq!(nothing, plain, "a source that does not know the pointer draws nothing");
+    }
+
+    #[test]
+    fn the_pointer_moves_with_a_zoom_as_the_picture_under_it_does() {
+        // The view is the bottom right quarter of the picture, filling the frame; the pointer at 3/4 of the way across and down lands in the middle.
+        let zoom = ZoomView { rect: rect(5000.0, 5000.0, 5000.0, 5000.0), moving: false };
+        let r = highlighted(recipe(vec![screen()], vec![], zoom));
+        let (canvas, _) = draw_frame(&r, &mut with_pointer(120.0, 67.5, None), (160, 90));
+        assert_ne!(canvas.pixel(80, 45), Rgb(10, 20, 30), "the pointer is in the middle of the zoomed frame");
+        let (elsewhere, _) = draw_frame(&r, &mut with_pointer(40.0, 22.5, None), (160, 90));
+        assert_eq!(
+            elsewhere.pixel(80, 45),
+            Rgb(10, 20, 30),
+            "a pointer in the part that was zoomed away is not seen there"
+        );
+    }
+
+    #[test]
+    fn a_blacked_out_box_hides_the_pointer_as_it_hides_the_picture() {
+        let hidden = rect(3000.0, 3000.0, 4000.0, 4000.0);
+        let redact = EditItem::Redact {
+            id: "r".into(),
+            name: "Secret".into(),
+            start_ms: 0.0,
+            duration_ms: 1000.0,
+            rect: hidden,
+            color: "#000001".into(),
+        };
+        let r = highlighted(recipe(vec![screen()], vec![redact], whole_view()));
+        let (canvas, _) = draw_frame(&r, &mut with_pointer(80.0, 45.0, Some(50)), (160, 90));
+        assert_eq!(canvas.pixel(80, 45), Rgb(0, 0, 1), "the box covers the pointer");
+        assert_eq!(canvas.pixel(80 + 12, 45), Rgb(0, 0, 1), "and its press ring");
+    }
+
+    #[test]
+    fn the_press_ring_follows_the_choice_about_motion() {
+        let still = {
+            let mut r = highlighted(recipe(vec![screen()], vec![], whole_view()));
+            r.reduce_motion = true;
+            r
+        };
+        let moving = highlighted(recipe(vec![screen()], vec![], whole_view()));
+        let (a, _) = draw_frame(&still, &mut with_pointer(80.0, 45.0, Some(10)), (160, 90));
+        let (b, _) = draw_frame(&still, &mut with_pointer(80.0, 45.0, Some(250)), (160, 90));
+        assert_eq!(a, b, "for less motion the ring is the same early and late");
+        let (c, _) = draw_frame(&moving, &mut with_pointer(80.0, 45.0, Some(10)), (160, 90));
+        let (d, _) = draw_frame(&moving, &mut with_pointer(80.0, 45.0, Some(250)), (160, 90));
+        assert_ne!(c, d, "otherwise it opens and fades");
     }
 }
