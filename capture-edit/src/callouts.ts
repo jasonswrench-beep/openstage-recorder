@@ -10,8 +10,9 @@
  */
 
 import { addArrow, addBlur, addRedact, addShape, addText, addZoom, DEFAULT_ZOOM_TRANSITION_MS } from "./items.ts";
+import { addImportedFile, type ImportedFile } from "./media.ts";
 import { FULL, MIN_CLIP_MS, modelLengthMs, type Model, type Rect, type TrackKind } from "./model.ts";
-import { addTrack, type Result } from "./ops.ts";
+import { addTrack, setPlacement, type Result } from "./ops.ts";
 import { describeTime, wholeMs } from "./time.ts";
 
 export type CalloutKind = "text" | "title" | "lower-third" | "highlight" | "circle" | "arrow" | "blur" | "cover";
@@ -106,6 +107,34 @@ export function addCallout(model: Model, kind: CalloutKind, startMs: number, wan
         return addRedact(m, trackId, { ...timing, rect: HIDE });
     }
   });
+}
+
+/** Where the logo goes: a square (in the picture's pixels) at the left end of the lower third, which is 14 percent of the picture's height. */
+export const LOGO_PLACE: Rect = { x: 500, y: 7800, width: 790, height: 1400 };
+/** The words of a lower third that has a logo: the same band as a plain lower third, with room for the logo at its left. */
+export const LOWER_THIRD_BESIDE_LOGO: Rect = { x: 1390, y: 7800, width: 8110, height: 1400 };
+
+/**
+ * Put a lower third in at `startMs` with a logo beside it: the words as for a plain lower third, narrower, and the picture the author chose
+ * (already copied into the course by the host program) at its left end, for the same time. They are two rows, so the author can change each,
+ * and a single undo takes both away. The picture needs alt text (or to be marked decorative), as any imported picture does, and the sentence says so;
+ * the picture comes first in `focus`, so it is the one chosen and its alt text is what the author is taken to first.
+ */
+export function addLowerThirdWithLogo(model: Model, file: ImportedFile, startMs: number, wantedMs: number = DEFAULT_CALLOUT_MS): Result {
+  if (file.kind !== "image") return refuse("A logo has to be a picture, not a video or a sound.");
+  const start = wholeMs(startMs);
+  const length = lengthFor(model, start, wholeMs(wantedMs), MIN_CLIP_MS);
+  if (typeof length === "string") return refuse(length);
+  const words = onFirstTrack(model, "overlay", (m, trackId) =>
+    addText(m, trackId, { startMs: start, durationMs: length, text: "Name or caption", name: "Lower third", rect: LOWER_THIRD_BESIDE_LOGO }),
+  );
+  if (!words.ok) return words;
+  const picture = addImportedFile(words.model, file, start, length);
+  if (!picture.ok) return picture;
+  const clipId = picture.focus?.[0] ?? "";
+  const placed = setPlacement(picture.model, clipId, LOGO_PLACE);
+  if (!placed.ok) return placed;
+  return { ...placed, message: `${words.message} ${picture.message}`.replace(/\s+/g, " ").trim(), focus: [clipId, ...(words.focus ?? [])] };
 }
 
 /**

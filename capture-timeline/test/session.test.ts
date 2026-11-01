@@ -566,6 +566,28 @@ test("T gives the chosen picture a transition (a fade at the very start), change
   assert.equal((s.details as { transitionIn?: { kind: string } } | undefined)?.transitionIn?.kind, "cross-fade");
 });
 
+test("a lower third with a logo is added at the playhead in one step, the logo is chosen and needs alt text, and one undo takes both away", () => {
+  const s = open();
+  s.setPlayheadText("10");
+  const before = s.rows.length;
+  const added = s.addLowerThirdWithLogoHere({ asset: "images/logo.png", kind: "image", name: "Logo", durationMs: null });
+  assert.equal(added.ok, true);
+  assert.match(added.message, /Added the text overlay "Lower third"/);
+  assert.match(added.message, /Still needed: alt text/);
+  assert.equal(s.details?.name, "Logo");
+  assert.equal(s.details?.isImage, true);
+  assert.equal(s.rows.length, before + 2, "the words and the logo are two rows");
+  assert.match(s.setImageAlt("The company logo, a blue book").message, /now has alt text/);
+  assert.equal(s.undo().ok, true);
+  assert.equal(s.rows.length, before + 2, "the first undo takes the alt text away, and the pair stays");
+  assert.equal(s.undo().ok, true);
+  assert.equal(s.rows.length, before, "the second undo takes the pair away in one step");
+  const refused = s.addLowerThirdWithLogoHere({ asset: "video/intro.mp4", kind: "video", name: "Intro", durationMs: 9000 });
+  assert.equal(refused.ok, false);
+  assert.match(refused.message, /logo has to be a picture/);
+  assert.equal(s.rows.length, before, "a refused one changes nothing");
+});
+
 test("a sound clip, an overlay and several chosen rows get a sentence instead of a transition", () => {
   const sound = open("Voice, part 1");
   assert.match(sound.addTransitionHere().message, /sound only/);

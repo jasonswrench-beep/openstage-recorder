@@ -1521,9 +1521,39 @@ await check("pictures, video and sound are added from files: the buttons are in 
   assertEqual(await alt.isVisible(), false, "no alt text box for a video");
 }, { search: "?files=fake" });
 
+await check("a lower third with a logo is one button: the logo is chosen first and needs alt text, the picture shows the logo at the left end of the band, and one undo takes both away", async (page, t) => {
+  const playhead = page.getByLabel("Playhead time", { exact: true });
+  const bar = page.getByRole("toolbar", { name: "Add to the picture at the playhead" });
+  await playhead.fill("5");
+  await playhead.press("Enter");
+  await bar.getByRole("button", { name: "Lower third with logo" }).click();
+  await page.waitForTimeout(200);
+  assertMatch(await t.said(), /Added the text overlay "Lower third".*Added the clip "Logo" to the Imported media track at 5 seconds, 3 seconds long\. Still needed: alt text/, "said both and what is still needed");
+  const alt = page.getByLabel("Alt text: what the picture shows", { exact: true });
+  assertEqual(await alt.evaluate((el) => el === document.activeElement), true, "focus is on the alt text box of the logo");
+  const logo = page.locator(".os-pv-box img.os-pv-media");
+  assertEqual(await logo.count(), 1, "the preview shows the logo");
+  const place = await logo.evaluate((el) => {
+    const box = el.closest(".os-pv-box");
+    const picture = box?.parentElement?.getBoundingClientRect();
+    const mine = (box ?? el).getBoundingClientRect();
+    return picture === undefined ? null : { left: (mine.left - picture.left) / picture.width, top: (mine.top - picture.top) / picture.height, width: mine.width / picture.width, height: mine.height / picture.height };
+  });
+  assertEqual(place !== null && Math.abs(place.left - 0.05) < 0.01 && Math.abs(place.top - 0.78) < 0.01, true, `the logo is at the left end of the lower third band, not ${JSON.stringify(place)}`);
+  await alt.fill("The course logo, a blue book");
+  await alt.press("Enter");
+  assertMatch(await t.said(), /now has alt text/, "alt text said");
+  const undo = page.locator(".os-cl-commands").getByRole("button", { name: "Undo" });
+  await undo.click();
+  await undo.click();
+  assertEqual(await page.locator(".os-pv-box img.os-pv-media").count(), 0, "one undo for the pair took the logo away too");
+  assertEqual((await t.rowNames()).includes("Lower third"), false, "and the words");
+}, { search: "?files=fake" });
+
 await check("without the program that opens files, the buttons for files are not offered", async (page) => {
   const bar = page.getByRole("toolbar", { name: "Add to the picture at the playhead" });
   assertEqual(await bar.getByRole("button", { name: "Picture from a file" }).count(), 0, "no buttons");
+  assertEqual(await bar.getByRole("button", { name: "Lower third with logo" }).count(), 0, "no lower third with a logo");
 });
 
 await check("Add track is a menu button in the toolbar: Enter opens it, a choice adds a track, Escape gives focus back", async (page, t) => {
