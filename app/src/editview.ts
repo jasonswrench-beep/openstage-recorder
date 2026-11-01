@@ -19,7 +19,7 @@ import { backupName, libraryOf, readProject } from "../../capture-timeline/src/p
 import { EditSession, SOUND_NAMES, type BalanceSound } from "../../capture-timeline/src/session.ts";
 import { errorText, type RecorderBackend } from "./backend.ts";
 import { runOneShot } from "./capturecontroller.ts";
-import { applyExportLine, exportPlan, finishedWords, initialExport, type ExportPlan, type ExportState } from "./captureexport.ts";
+import { applyExportLine, exportPlan, finishedWords, initialExport, type ExportKind, type ExportPlan, type ExportState } from "./captureexport.ts";
 import { recordingFolder } from "./recordingfolder.ts";
 
 export interface EditViewOptions {
@@ -50,10 +50,10 @@ export const EXPORT_LIMIT_MS = 4 * 60 * 60 * 1000;
 export const CALLOUTS_OFFERED = ["blur", "cover"] as const;
 
 /** The question to ask before going back to the recordings or closing the window, or null when nothing would be lost. */
-export function closeQuestion(dirty: boolean, making: boolean, action: "leave" | "close" = "leave"): string | null {
+export function closeQuestion(dirty: boolean, making: boolean, action: "leave" | "close" = "leave", what: "video" | "sound file" = "video"): string | null {
   const go = action === "leave" ? "leave" : "close the window";
-  if (making && dirty) return `A video is still being made, and there are changes to the edit that are not saved. Stop the video, lose the changes and ${go}?`;
-  if (making) return `A video is still being made. Stop it and ${go}?`;
+  if (making && dirty) return `A ${what} is still being made, and there are changes to the edit that are not saved. Stop the ${what}, lose the changes and ${go}?`;
+  if (making) return `A ${what} is still being made. Stop it and ${go}?`;
   if (dirty) return `There are changes to this edit that are not saved. ${action === "leave" ? "Leave" : "Close the window"} and lose them?`;
   return null;
 }
@@ -85,8 +85,9 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const back = h("button", { type: "button", class: "os-cl-button" }, "Back to recordings");
   const save = h("button", { type: "button", class: "os-cl-button", "aria-describedby": id("state") }, "Save the edit");
   const make = h("button", { type: "button", class: "os-cl-button rv-primary" }, "Make a video from this edit");
+  const makeSound = h("button", { type: "button", class: "os-cl-button" }, "Make a sound file (WAV) from this edit");
   const cancelVideo = h("button", { type: "button", class: "os-cl-button", hidden: true }, "Cancel the video");
-  const actions = h("div", { class: "rv-actions" }, back, save, make, cancelVideo);
+  const actions = h("div", { class: "rv-actions" }, back, save, make, makeSound, cancelVideo);
   const reduceBox = h("input", { type: "checkbox", id: id("reduce") });
   reduceBox.checked = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const reduce = h(
@@ -101,7 +102,8 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const say = h("p", { id: id("say"), role: "status" });
   const notes = h("ul", { class: "rv-list", "aria-label": "What the recorder said about the video" });
   const reveal = h("button", { type: "button", class: "os-cl-button", hidden: true }, "Show the video in its folder");
-  const videoBox = h("section", { class: "rv-section", "aria-labelledby": id("video-title"), hidden: true }, h("h3", { id: id("video-title") }, "The video"), progress, say, notes, h("div", { class: "rv-actions" }, reveal));
+  const videoTitle = h("h3", { id: id("video-title") }, "The video");
+  const videoBox = h("section", { class: "rv-section", "aria-labelledby": id("video-title"), hidden: true }, videoTitle, progress, say, notes, h("div", { class: "rv-actions" }, reveal));
 
   // ---- the balance between your voice and the computer's sound, which a recording keeps on separate tracks
   const balanceHint = h(
@@ -126,6 +128,8 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   /** The saved edit that a new edit of the newest take replaces, until it has been copied aside. */
   let toKeep: { text: string; name: string } | undefined;
   let making = false;
+  /** What is being made while `making` is true. */
+  let makingWhat: ExportKind = "video";
   let plan: ExportPlan | null = null;
   /**
    * Whether the `edit.json` in the recording is the edit on the screen. It is not for an edit made fresh from the takes (there is none yet, or
@@ -169,30 +173,46 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
     notes.replaceChildren(...s.notes.map((n) => h("li", {}, h("strong", { class: n.ok ? "rv-pass" : "rv-problem" }, n.ok ? "Note. " : "Problem. "), h("span", {}, n.text))));
   }
 
-  /** Make the video from the saved edit. The edit is saved first, because the recorder reads edit.json. */
-  async function makeVideo(): Promise<void> {
+  /** What is being made, for the words around it. */
+  const thingOf = (kind: ExportKind): "video" | "sound file" => (kind === "video" ? "video" : "sound file");
+
+  /**
+   * Make the video, or only the sound as a WAV file, from the saved edit. The edit is saved first, because the recorder reads edit.json.
+   * The sound file is the voice and the computer's sound as they are mixed in the video, for listening to or using in another program.
+   */
+  async function makeFile(kind: ExportKind): Promise<void> {
     if (session === undefined) return;
     if (making) {
       videoBox.hidden = false;
-      say.textContent = "A video is already being made. Wait until it is finished, or cancel it.";
+      say.textContent = `A ${thingOf(makingWhat)} is already being made. Wait until it is finished, or cancel it.`;
       return;
     }
+    const thing = thingOf(kind);
     if ((session.dirty || !onDisk) && !(await saveEdit())) {
       videoBox.hidden = false;
-      say.textContent = "The edit could not be saved, so no video was made.";
+      say.textContent = `The edit could not be saved, so no ${thing} was made.`;
       return;
     }
     making = true;
-    plan = exportPlan(opts.library, opts.name, { reduceMotion: reduceBox.checked });
+    makingWhat = kind;
+    plan = exportPlan(opts.library, opts.name, { reduceMotion: reduceBox.checked, audioOnly: kind === "sound" });
     let s = initialExport();
+    videoTitle.textContent = kind === "video" ? "The video" : "The sound file";
+    notes.setAttribute("aria-label", `What the recorder said about the ${thing}`);
+    reveal.textContent = `Show the ${thing} in its folder`;
+    cancelVideo.textContent = `Cancel the ${thing}`;
     videoBox.hidden = false;
     reveal.hidden = true;
     notes.replaceChildren();
     progress.hidden = false;
     progress.value = 0;
     make.setAttribute("aria-disabled", "true");
+    makeSound.setAttribute("aria-disabled", "true");
     cancelVideo.hidden = false;
-    say.textContent = "Making the video. This can take a while for a long recording. You can keep editing, but the video is made from the edit as it was saved.";
+    say.textContent =
+      kind === "video"
+        ? "Making the video. This can take a while for a long recording. You can keep editing, but the video is made from the edit as it was saved."
+        : "Making the sound file. You can keep editing, but the sound file is made from the edit as it was saved.";
     const job = await runOneShot(
       b,
       plan.args,
@@ -207,28 +227,30 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
     );
     making = false;
     make.removeAttribute("aria-disabled");
+    makeSound.removeAttribute("aria-disabled");
     cancelVideo.hidden = true;
     progress.hidden = true;
-    const done = finishedWords(s, job.exit, job.problem);
+    const done = finishedWords(s, job.exit, job.problem, kind);
     say.textContent = done.sentence;
     drawNotes(s);
     reveal.hidden = !done.made;
-    // The button is shown only when there is a video to show, so moving to it is moving to the next thing to do.
+    // The button is shown only when there is a file to show, so moving to it is moving to the next thing to do.
     if (done.made) reveal.focus();
   }
 
   /** Leave for the Record screen, after asking if anything would be lost. */
   async function leaveNow(): Promise<void> {
-    const ask = closeQuestion(dirty(), making);
+    const ask = closeQuestion(dirty(), making, "leave", thingOf(makingWhat));
     if (ask !== null && !(await b.confirm(ask))) return;
     if (making) await b.streamStop().catch(() => false);
     opts.leave();
   }
 
   save.addEventListener("click", () => void saveEdit());
-  make.addEventListener("click", () => void makeVideo());
+  make.addEventListener("click", () => void makeFile("video"));
+  makeSound.addEventListener("click", () => void makeFile("sound"));
   cancelVideo.addEventListener("click", () => {
-    say.textContent = "Cancelling the video.";
+    say.textContent = `Cancelling the ${thingOf(makingWhat)}.`;
     void b.streamStop().catch(() => false);
   });
   reveal.addEventListener("click", () => {
@@ -349,7 +371,7 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   return {
     element: root,
     focus: () => (editor === undefined ? heading : editor).focus(),
-    closeQuestion: () => closeQuestion(dirty(), making, "close"),
+    closeQuestion: () => closeQuestion(dirty(), making, "close", thingOf(makingWhat)),
     destroy() {
       editor?.destroy();
       folder.release();

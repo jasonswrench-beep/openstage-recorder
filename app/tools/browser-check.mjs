@@ -708,6 +708,53 @@ await check("Make a video saves the edit first, shows progress, says it has no c
   assertMatch((await page.locator('[id$="-say"]').textContent()) ?? "", /^Could not show the folder\. This is a pretend recording/, "the pretend recording explains why it cannot");
 });
 
+await check("Make a sound file saves the edit first, shows progress, says what was made with no words about captions, and the focus moves to Show the sound file", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  assertEqual(await saved(page, "Edit demo.capture/edit.json"), undefined, "nothing has been saved yet, so the recorder would have nothing to read");
+  await page.getByRole("button", { name: "Make a sound file (WAV) from this edit" }).focus();
+  await t.key("Enter");
+  await page.getByRole("button", { name: "Show the sound file in its folder" }).waitFor();
+  assert((await saved(page, "Edit demo.capture/edit.json")) !== undefined, "the edit was saved first");
+  const said = (await page.locator('[id$="-say"]').textContent()) ?? "";
+  assertMatch(said, /^The sound file was made\. Exported 12\.0 seconds of sound as a WAV file \(two channels, 48000 samples a second\): .*Edit demo\.wav/, "what was made is said");
+  assertEqual(said.includes("captions"), false, "captions are about a video, so nothing is said about them");
+  assertEqual(await t.focusLabel(), "Show the sound file in its folder", "the focus moved to the next thing to do");
+  assertEqual(await page.locator("progress").isHidden(), true, "the progress bar is gone");
+  assertEqual(await page.getByRole("button", { name: "Cancel the sound file" }).isHidden(), true, "Cancel is gone");
+  assertEqual(await page.getByRole("heading", { name: "The sound file" }).count(), 1, "the section is named for what is made");
+  assert((await page.locator('[id$="-say"]').getAttribute("role")) === "status", "the line is a status for a screen reader");
+  const args = await page.evaluate(() => window.__openstageStandIn.started.at(-1));
+  assertEqual(args.includes("--audio-only"), true, "--audio-only is passed");
+  assertEqual(args.includes("--reduce-motion"), false, "motion has nothing to do with a sound file");
+  assert(args[args.indexOf("--out") + 1].endsWith(".wav"), "the name ends in .wav");
+  await page.getByRole("button", { name: "Show the sound file in its folder" }).click();
+  await page.waitForTimeout(100);
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.revealed.at(-1)), "Edit demo.capture/exports/Edit demo.wav", "it asks to show the sound file inside the recording's exports folder");
+});
+
+await check("a sound file can be cancelled, a second request while one is made is refused in words, and a video made afterwards is a video again", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  await page.evaluate(() => { window.__openstageStandIn.holdRender = true; });
+  await page.getByRole("button", { name: "Make a sound file (WAV) from this edit" }).click();
+  await page.getByRole("button", { name: "Cancel the sound file" }).waitFor();
+  for (const name of ["Make a sound file (WAV) from this edit", "Make a video from this edit"]) {
+    assertEqual(await page.getByRole("button", { name }).getAttribute("aria-disabled"), "true", `${name} is marked as not available while the sound file is made`);
+  }
+  await page.getByRole("button", { name: "Make a video from this edit" }).focus();
+  await t.key("Enter");
+  assertMatch((await page.locator('[id$="-say"]').textContent()) ?? "", /A sound file is already being made/, "the request is refused in the words for what is being made");
+  await page.getByRole("button", { name: "Cancel the sound file" }).click();
+  await page.waitForFunction(() => /^Making the sound file did not finish, so there is no sound file\./.test(document.querySelector('[id$="-say"]')?.textContent ?? ""));
+  assertEqual(await page.getByRole("button", { name: "Show the sound file in its folder" }).isHidden(), true, "nothing to show");
+  assertEqual(await page.getByRole("button", { name: "Make a video from this edit" }).getAttribute("aria-disabled"), null, "Make is available again");
+  await page.getByRole("button", { name: "Make a video from this edit" }).click();
+  await page.getByRole("button", { name: "Show the video in its folder" }).waitFor();
+  assertMatch((await page.locator('[id$="-say"]').textContent()) ?? "", /^The video was made\./, "a video is worded as a video");
+  assertEqual(await page.getByRole("heading", { name: "The video" }).count(), 1, "the section is named for the video again");
+});
+
 await check("the reduce-motion box is ticked for someone whose computer asks for less motion, and it reaches the video maker", async (page, t) => {
   await makeRecording(page, t);
   await openEdit(page, t);

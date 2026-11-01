@@ -153,7 +153,7 @@ class PretendRecorder {
         this.later(() => this.end(0), 20);
         break;
       case "render":
-        this.render(opt("--out") ?? "video.mp4", opt("--project") ?? "");
+        this.render(opt("--out") ?? "video.mp4", opt("--project") ?? "", args.includes("--audio-only"));
         break;
       case "record":
         this.record(opt("--project") ?? "", opt("--title") ?? "Recording", Number(opt("--countdown-ms") ?? "0"));
@@ -163,7 +163,7 @@ class PretendRecorder {
     }
   }
 
-  private render(out: string, project: string): void {
+  private render(out: string, project: string, audioOnly = false): void {
     this.mode = "render";
     const name = lastPart(out);
     // Like the real video maker, it reads the saved edit.json, and has nothing to make a video from without one.
@@ -175,10 +175,25 @@ class PretendRecorder {
       return;
     }
     this.later(() => this.emit({ event: "check", check: "edit", ok: true, message: "Exporting the edit in edit.json, 12.0 seconds long." }), 20);
-    [0, 40, 80].forEach((percent, i) => this.later(() => this.emit({ event: "progress", task: "export", percent, message: `Exporting: ${percent} percent.` }), 60 + i * 60));
+    if (audioOnly && !name.toLowerCase().endsWith(".wav")) {
+      // Like the real recorder: a sound-only export is a WAV file, and it says so before it makes anything.
+      this.later(() => {
+        this.emit({ event: "check", check: "export", ok: false, message: `A sound-only export is a WAV file, so its name has to end in .wav: ${out}` });
+        this.end(1);
+      }, 40);
+      return;
+    }
+    [0, 40, 80].forEach((percent, i) =>
+      this.later(() => this.emit({ event: "progress", task: "export", percent, message: audioOnly ? `Exporting: ${percent} percent of the sound.` : `Exporting: ${percent} percent.` }), 60 + i * 60),
+    );
     if (this.holdRender) return;
     this.later(() => {
-      this.emit({ event: "check", check: "export", ok: true, message: `Made ${name}: 12.0 seconds long, 1920 by 1080, with sound.` });
+      if (audioOnly) {
+        this.emit({ event: "check", check: "export", ok: true, message: `Exported 12.0 seconds of sound as a WAV file (two channels, 48000 samples a second): ${out}` });
+        this.emit({ event: "check", check: "audio-readback", ok: true, message: "The sound file reads back as 12.0 seconds of sound, the length it should be." });
+      } else {
+        this.emit({ event: "check", check: "export", ok: true, message: `Made ${name}: 12.0 seconds long, 1920 by 1080, with sound.` });
+      }
       this.end(0);
     }, 260);
   }
