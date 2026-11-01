@@ -150,3 +150,41 @@ test("when no video was made nothing is said about captions", () => {
     assert.equal(done.sentence.includes("captions"), false);
   }
 });
+
+test("a sound file is written in the recording's exports folder as a WAV, asked for with --audio-only, and motion has nothing to do with it", () => {
+  const p = exportPlan("D:\\Videos\\OpenStage Recorder", "Week 3 demo.capture", { audioOnly: true, reduceMotion: true });
+  assert.equal(p.out, "D:\\Videos\\OpenStage Recorder\\Week 3 demo.capture\\exports\\Week 3 demo.wav");
+  assert.equal(p.rel, "exports/Week 3 demo.wav", "the place inside the recording, for showing it");
+  assert.equal(p.audioOnly, true);
+  assert.deepEqual(p.args, ["render", "--project", "D:\\Videos\\OpenStage Recorder\\Week 3 demo.capture", "--out", p.out, "--audio-only"]);
+  assert.equal(p.args.includes("--reduce-motion"), false, "zooms are pictures, so cuts instead of zooms is not passed for a sound file");
+  const video = exportPlan("D:/c", "Demo.capture");
+  assert.equal(video.audioOnly, false);
+  assert.equal(video.args.includes("--audio-only"), false, "a video is the default");
+  assert.ok(video.out.endsWith(".mp4"));
+});
+
+test("a sound file that was made is called a sound file, with no words about captions, and a video keeps its words", () => {
+  const { state } = play([line({ event: "check", check: "export", ok: true, message: "Exported 12.0 seconds of sound as a WAV file (two channels, 48000 samples a second): x.wav" })]);
+  const sound = finishedWords(state, exit(), "", "sound");
+  assert.equal(sound.made, true);
+  assert.equal(sound.sentence, "The sound file was made. Exported 12.0 seconds of sound as a WAV file (two channels, 48000 samples a second): x.wav");
+  assert.equal(sound.sentence.includes("captions"), false, "captions are about a video");
+  assert.match(finishedWords(state, exit(), "", "video").sentence, /^The video was made\./);
+  assert.equal(finishedWords(state, exit()).sentence, finishedWords(state, exit(), "", "video").sentence, "video is the default");
+});
+
+test("every ending of a sound export says sound file, never video", () => {
+  const bad = play([line({ event: "check", check: "export", ok: false, message: "A sound-only export is a WAV file, so its name has to end in .wav: x.mp4" })]).state;
+  assert.equal(summariseExport(bad, exit({ code: 1 }), "sound").sentence, "The sound file could not be made. A sound-only export is a WAV file, so its name has to end in .wav: x.mp4");
+  assert.equal(summariseExport(initialExport(), null, "sound").sentence, "The sound file could not be made.");
+  assert.equal(summariseExport(initialExport(), exit({ code: 2 }), "sound").sentence, "Making a sound file works on Windows only.");
+  assert.equal(summariseExport(initialExport(), exit({ killed: true, code: null }), "sound").sentence, "Making the sound file did not finish, so there is no sound file.");
+  const unread = play([
+    line({ event: "check", check: "export", ok: true, message: "Exported 6.0 seconds of sound." }),
+    line({ event: "check", check: "audio-readback", ok: false, message: "The sound file holds 5.0 seconds but it should hold 6.0 seconds." }),
+  ]).state;
+  const summary = summariseExport(unread, exit(), "sound");
+  assert.equal(summary.ok, false, "a file that did not read back is never called good");
+  assert.match(summary.sentence, /^The sound file was made\. .* One check found a problem, so look at the list before using it\.$/);
+});

@@ -37,3 +37,10 @@ test("the first words say what was opened, how long it is, what it holds, and th
 test("only Blur and Cover are offered among the callouts: text, shapes and arrows are not part of this product", () => {
   assert.deepEqual([...CALLOUTS_OFFERED], ["blur", "cover"]);
 });
+
+test("a sound file that is still being made is asked about in its own words", () => {
+  assert.equal(closeQuestion(false, true, "leave", "sound file"), "A sound file is still being made. Stop it and leave?");
+  assert.equal(closeQuestion(false, true, "close", "sound file"), "A sound file is still being made. Stop it and close the window?");
+  assert.match(closeQuestion(true, true, "leave", "sound file") ?? "", /^A sound file is still being made, and there are changes .* Stop the sound file, lose the changes and leave\?$/);
+  assert.equal(closeQuestion(false, true, "leave", "video"), closeQuestion(false, true), "video stays the default");
+});

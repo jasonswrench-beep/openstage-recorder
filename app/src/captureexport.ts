@@ -15,12 +15,19 @@ export interface ExportPlan {
   rel: string;
   /** The options the recorder is started with. */
   args: string[];
+  /** Only the sound is made, as a WAV file, not a video. */
+  audioOnly: boolean;
 }
 
 export interface ExportOptions {
   /** Cuts instead of animated zooms, for a viewer who is bothered by movement (WCAG 2.3.3). */
   reduceMotion?: boolean;
+  /** Make only the sound, as a WAV file (`exports/<recording>.wav`), instead of a video. */
+  audioOnly?: boolean;
 }
+
+/** What is being made: a video, or only the sound. */
+export type ExportKind = "video" | "sound";
 
 /** The options for exporting a recording in the recordings folder. The separator follows the one the folder already uses. */
 export function exportPlan(library: string, name: string, options: ExportOptions = {}): ExportPlan {
@@ -28,11 +35,15 @@ export function exportPlan(library: string, name: string, options: ExportOptions
   const base = library.replace(/[\\/]+$/, "");
   const folder = `${base}${sep}${name}`;
   const stem = name.replace(/\.capture$/i, "") || "recording";
-  const rel = `exports/${stem}.mp4`;
-  const out = `${folder}${sep}exports${sep}${stem}.mp4`;
+  const audioOnly = options.audioOnly === true;
+  const extension = audioOnly ? "wav" : "mp4";
+  const rel = `exports/${stem}.${extension}`;
+  const out = `${folder}${sep}exports${sep}${stem}.${extension}`;
   const args = ["render", "--project", folder, "--out", out];
-  if (options.reduceMotion === true) args.push("--reduce-motion");
-  return { out, rel, args };
+  // Zooms are pictures, so "cuts instead of animated zooms" has nothing to say about a sound file.
+  if (audioOnly) args.push("--audio-only");
+  else if (options.reduceMotion === true) args.push("--reduce-motion");
+  return { out, rel, args, audioOnly };
 }
 
 export interface ExportNote {
@@ -112,17 +123,18 @@ export interface ExportSummary {
 }
 
 /** How it went, in one sentence. A video the recorder made but could not read back is never called good. */
-export function summariseExport(s: ExportState, exit: StreamExit | null): ExportSummary {
-  if (exit === null) return { ok: false, sentence: `The video could not be made.${s.problem === "" ? "" : ` ${s.problem}`}` };
-  if (exit.code === 2 && s.notes.length === 0) return { ok: false, sentence: "Making a video works on Windows only." };
-  if (exit.killed || exit.code === null) return { ok: false, sentence: "Making the video did not finish, so there is no video." };
+export function summariseExport(s: ExportState, exit: StreamExit | null, kind: ExportKind = "video"): ExportSummary {
+  const thing = kind === "video" ? "video" : "sound file";
+  if (exit === null) return { ok: false, sentence: `The ${thing} could not be made.${s.problem === "" ? "" : ` ${s.problem}`}` };
+  if (exit.code === 2 && s.notes.length === 0) return { ok: false, sentence: `Making a ${thing} works on Windows only.` };
+  if (exit.killed || exit.code === null) return { ok: false, sentence: `Making the ${thing} did not finish, so there is no ${thing}.` };
   const failed = s.notes.filter((n) => !n.ok);
   if (exit.code === 0 && s.made) {
     const unread = failed.length > 0 ? ` ${failed.length === 1 ? "One check found a problem" : `${failed.length} checks found a problem`}, so look at the list before using it.` : "";
-    return { ok: failed.length === 0, sentence: `The video was made. ${s.madeMessage}${unread}`.trim() };
+    return { ok: failed.length === 0, sentence: `The ${thing} was made. ${s.madeMessage}${unread}`.trim() };
   }
   const why = s.problem !== "" ? s.problem : failed[0]?.text ?? "";
-  return { ok: false, sentence: `The video could not be made.${why === "" ? "" : ` ${why}`}` };
+  return { ok: false, sentence: `The ${thing} could not be made.${why === "" ? "" : ` ${why}`}` };
 }
 
 /** Said whenever a video has been made. This product makes no captions yet, and an author must hear that now, not find out when a viewer asks. */
@@ -137,9 +149,10 @@ export interface FinishedWords {
 }
 
 /** The words for the end of the job. `problem` is what the job runner itself had to report (a time limit, a recorder that would not start). */
-export function finishedWords(s: ExportState, exit: StreamExit | null, problem = ""): FinishedWords {
-  const summary = summariseExport(s, exit);
+export function finishedWords(s: ExportState, exit: StreamExit | null, problem = "", kind: ExportKind = "video"): FinishedWords {
+  const summary = summariseExport(s, exit, kind);
   const made = exit !== null && exit.code === 0 && s.made;
   const how = problem === "" ? summary.sentence : `${summary.sentence} ${problem}`;
-  return { made, sentence: made ? `${how} ${NO_CAPTIONS}` : how };
+  // The caption note is about a video someone watches; a sound file has nothing to caption.
+  return { made, sentence: made && kind === "video" ? `${how} ${NO_CAPTIONS}` : how };
 }
