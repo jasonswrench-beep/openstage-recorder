@@ -26,6 +26,8 @@ export interface ExportOptions {
   reduceMotion?: boolean;
   /** Make only the sound, as a WAV file (`exports/<recording>.wav`), instead of a video. */
   audioOnly?: boolean;
+  /** Show where the mouse pointer is (a soft yellow ring, and a red ring where a button was pressed), for a recording that noted the mouse. A sound file has no picture. */
+  highlightCursor?: boolean;
   /** Make only the picture the video has at this moment, in milliseconds from its start, as a PNG file (`exports/<recording> at <seconds> seconds.png`). */
   frameMs?: number;
 }
@@ -53,6 +55,7 @@ export function exportPlan(library: string, name: string, options: ExportOptions
     if (frameMs !== null) args.push("--frame", String(frameMs));
     // A picture in the middle of a zoom is drawn as the video draws it, so it follows the same choice about motion.
     if (options.reduceMotion === true) args.push("--reduce-motion");
+    if (options.highlightCursor === true) args.push("--highlight-cursor");
   }
   return { out, rel, args, audioOnly, frameMs };
 }

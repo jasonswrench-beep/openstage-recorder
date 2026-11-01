@@ -91,6 +91,13 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const actions = h("div", { class: "rv-actions" }, back, save, make, makeSound, makePicture, cancelVideo);
   const reduceBox = h("input", { type: "checkbox", id: id("reduce") });
   reduceBox.checked = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const highlightBox = h("input", { type: "checkbox", id: id("highlight") });
+  const highlight = h(
+    "div",
+    { class: "rv-check" },
+    highlightBox,
+    h("label", { for: id("highlight") }, "Show where the mouse pointer is in the video and in pictures (a soft yellow ring, and a red ring where a button was pressed). Only a recording made with the mouse noted can show it."),
+  );
   const reduce = h(
     "div",
     { class: "rv-check" },
@@ -120,7 +127,7 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const balance = h("fieldset", { class: "rv-fieldset", hidden: true }, h("legend", {}, "Sound balance"), ...balanceBoxes.map((b) => b.field), balanceHint);
 
   const editorHost = h("div", { class: "ev-host" });
-  const root = h("section", { class: "rv-section ev", "aria-labelledby": id("title") }, heading, intro, actions, reduce, state, balance, videoBox, editorHost);
+  const root = h("section", { class: "rv-section ev", "aria-labelledby": id("title") }, heading, intro, actions, reduce, highlight, state, balance, videoBox, editorHost);
   host.append(root);
 
   const folder = recordingFolder(b, opts.library, opts.name);
@@ -196,7 +203,7 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
     }
     making = true;
     makingWhat = kind;
-    plan = exportPlan(opts.library, opts.name, { reduceMotion: reduceBox.checked, audioOnly: kind === "sound", ...(kind === "picture" ? { frameMs: session.playheadMs } : {}) });
+    plan = exportPlan(opts.library, opts.name, { reduceMotion: reduceBox.checked, highlightCursor: highlightBox.checked, audioOnly: kind === "sound", ...(kind === "picture" ? { frameMs: session.playheadMs } : {}) });
     let s = initialExport();
     videoTitle.textContent = kind === "video" ? "The video" : kind === "sound" ? "The sound file" : "The picture";
     notes.setAttribute("aria-label", `What the recorder said about the ${thing}`);

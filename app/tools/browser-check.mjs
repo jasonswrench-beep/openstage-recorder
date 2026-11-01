@@ -813,6 +813,29 @@ await check("the reduce-motion box is ticked for someone whose computer asks for
   assertEqual((await page.evaluate(() => window.__openstageStandIn.started.at(-1))).includes("--reduce-motion"), true, "--reduce-motion is passed");
 }, { reducedMotion: "reduce" });
 
+await check("the pointer box is off until the author ticks it, and then it reaches a video and a picture but not a sound file", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  const box = page.getByLabel(/^Show where the mouse pointer is in the video and in pictures/);
+  assertEqual(await box.isChecked(), false, "off to begin with");
+  assertMatch((await page.locator("label", { hasText: /^Show where the mouse pointer is/ }).textContent()) ?? "", /Only a recording made with the mouse noted can show it\./, "the box says what it needs");
+  await page.getByRole("button", { name: "Make a video from this edit" }).click();
+  await page.getByRole("button", { name: "Show the video in its folder" }).waitFor();
+  assertEqual((await page.evaluate(() => window.__openstageStandIn.started.at(-1))).includes("--highlight-cursor"), false, "not asked for, not passed");
+  await box.focus();
+  await t.key("Space");
+  assertEqual(await box.isChecked(), true, "Space ticks it from the keyboard");
+  await page.getByRole("button", { name: "Make a video from this edit" }).click();
+  await page.waitForFunction(() => window.__openstageStandIn.started.length >= 2 && window.__openstageStandIn.started.at(-1).includes("--highlight-cursor"));
+  await page.getByRole("button", { name: "Show the video in its folder" }).waitFor();
+  await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).click();
+  await page.waitForFunction(() => /^The picture was made\./.test(document.querySelector('[id$="-say"]')?.textContent ?? ""));
+  assertEqual((await page.evaluate(() => window.__openstageStandIn.started.at(-1))).includes("--highlight-cursor"), true, "a picture is asked to show it too");
+  await page.getByRole("button", { name: "Make a sound file (WAV) from this edit" }).click();
+  await page.waitForFunction(() => /^The sound file was made\./.test(document.querySelector('[id$="-say"]')?.textContent ?? ""));
+  assertEqual((await page.evaluate(() => window.__openstageStandIn.started.at(-1))).includes("--highlight-cursor"), false, "a sound file is never asked to, even with the box ticked");
+});
+
 await check("a video can be cancelled, and nothing is said about captions when there is no video", async (page, t) => {
   await makeRecording(page, t);
   await openEdit(page, t);
