@@ -12,7 +12,7 @@
 //   node tools/browser-check.mjs [screenshot-folder]
 
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
@@ -950,7 +950,7 @@ if (haveFixture) {
   await check("a folder that is not a recording is refused in words, and what was open stays open", async (page, t) => {
     const other = join(dir, "holiday");
     writeFileSync(join(dir, "holiday.txt"), "x");
-    spawnSync("mkdir", ["-p", other]);
+    mkdirSync(other, { recursive: true });
     writeFileSync(join(other, "notes.txt"), "not a recording");
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("button", { name: "Open a recording folder" }).click()]);
     await chooser.setFiles(other);
