@@ -355,6 +355,8 @@ pub struct WindowsPictures {
     /// The picture held still under an arriving one (a transition), kept for the frames that need it so the reader does
     /// not jump back for it every frame: the source, the moment, and the picture.
     held: Option<(EditSourceRef, u64, Rc<Picture>)>,
+    /// The pointer's track for each take that was asked about (`None`: the take did not note the mouse). Filled only when the pointer is to be shown.
+    cursors: HashMap<u32, Option<crate::cursor_track::CursorTrack>>,
 }
 
 impl WindowsPictures {
@@ -367,11 +369,29 @@ impl WindowsPictures {
             videos: HashMap::new(),
             images: HashMap::new(),
             held: None,
+            cursors: HashMap::new(),
         })
+    }
+
+    /// A sentence for the author when the pointer was asked for and none of the takes used had noted the mouse, else `None`.
+    pub fn cursor_note(&self) -> Option<String> {
+        if self.cursors.is_empty() || self.cursors.values().any(Option::is_some) {
+            return None;
+        }
+        Some("The mouse was not noted when this was recorded, so no pointer could be highlighted. Choose to note the mouse before recording to have it.".into())
     }
 }
 
 impl PictureSource for WindowsPictures {
+    fn cursor(&mut self, layer: &Layer, picture: &Picture) -> Option<openstage_capture_render::CursorMark> {
+        let EditSourceRef::Take { take, media } = &layer.source else { return None };
+        if !self.cursors.contains_key(take) {
+            let track = crate::cursor_track::load_cursor_track(&self.project, *take, media);
+            self.cursors.insert(*take, track);
+        }
+        self.cursors.get(take)?.as_ref()?.mark_at(layer.source_time_ms, picture.width, picture.height)
+    }
+
     fn picture(&mut self, layer: &Layer) -> Result<Rc<Picture>, String> {
         if layer.kind == EditSourceKind::Image {
             if let Some(found) = self.images.get(&layer.source) {

@@ -27,11 +27,21 @@ pub struct RenderSettings {
     /// Refuse an edit that is sound but still lacks something OpenStage requires (alt text, a
     /// description). On by default: export does not finish until it is given.
     pub require_complete: bool,
+    /// Show where the pointer is, where the recording noted it (the author turns that on before recording).
+    pub highlight_cursor: bool,
 }
 
 impl Default for RenderSettings {
     fn default() -> Self {
-        Self { fps: 30, width: 1920, height: 1080, sample_rate: 48_000, reduce_motion: false, require_complete: true }
+        Self {
+            fps: 30,
+            width: 1920,
+            height: 1080,
+            sample_rate: 48_000,
+            reduce_motion: false,
+            require_complete: true,
+            highlight_cursor: false,
+        }
     }
 }
 
@@ -118,6 +128,10 @@ pub struct FrameRecipe {
     /// The overlays showing, in the order they are drawn (later ones on top). Zooms are not here.
     pub overlays: Vec<EditItem>,
     pub zoom: ZoomView,
+    /// Show where the pointer is over the recorded picture.
+    pub highlight_cursor: bool,
+    /// Open no rings and move nothing for the viewer's sake: a press is shown as a steady ring.
+    pub reduce_motion: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -350,6 +364,8 @@ impl RenderPlan {
             layers,
             overlays,
             zoom: zoom_view(&self.zooms, time_us, self.settings.reduce_motion),
+            highlight_cursor: self.settings.highlight_cursor,
+            reduce_motion: self.settings.reduce_motion,
         }
     }
 }

@@ -450,6 +450,10 @@ enum Cmd {
         /// video. `--out` must then end in `.png`.
         #[arg(long)]
         frame: Option<u64>,
+        /// Show where the pointer is in the video (or the picture): a soft yellow ring that opens in red where a button was pressed. Only
+        /// a recording made with the mouse noted can show it. A viewer who asked for less motion gets a steady ring instead.
+        #[arg(long)]
+        highlight_cursor: bool,
         /// How the recorded videos are read back: `rgb32` (Windows converts the colours; the default) or `nv12`
         /// (this program converts them). For working around a fault in Windows' own reader; `TEST EXPORT.bat` uses
         /// `nv12` by itself if `rgb32` makes the program stop.
@@ -1300,6 +1304,7 @@ fn main() -> ExitCode {
             allow_unfinished,
             audio_only,
             frame,
+            highlight_cursor,
             picture_reader,
             plain,
         } => {
@@ -1335,6 +1340,7 @@ fn main() -> ExitCode {
                     allow_unfinished,
                     audio_only,
                     frame_ms: frame,
+                    highlight_cursor,
                 };
                 install_cancel_handler();
                 let video = system_video_platform();
@@ -1373,6 +1379,11 @@ fn main() -> ExitCode {
                         )
                     },
                 );
+                if highlight_cursor {
+                    if let Some(note) = pictures.cursor_note() {
+                        emit_check(plain, Check { check: "export-note".into(), ok: false, message: note });
+                    }
+                }
                 finish_checks_with(
                     plain,
                     ok,
@@ -1409,6 +1420,7 @@ fn main() -> ExitCode {
                     allow_unfinished,
                     audio_only,
                     frame,
+                    highlight_cursor,
                     reader,
                 );
                 emit_check(

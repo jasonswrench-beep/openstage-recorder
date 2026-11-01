@@ -42,6 +42,8 @@ pub struct RenderOptions {
     pub audio_only: bool,
     /// Make only the picture the video has at this moment (milliseconds from its start), as a PNG file, instead of a video.
     pub frame_ms: Option<u64>,
+    /// Show where the pointer is, if the recording noted it (the author turns that on before recording).
+    pub highlight_cursor: bool,
 }
 
 fn say(report: &mut dyn FnMut(Check), name: &str, ok: bool, message: impl Into<String>) -> bool {
@@ -200,6 +202,7 @@ fn run_frame_only(
             fps: opts.fps,
             reduce_motion: opts.reduce_motion,
             require_complete: !opts.allow_unfinished,
+            highlight_cursor: opts.highlight_cursor,
             ..RenderSettings::default()
         },
         size: opts.size,
@@ -285,6 +288,7 @@ pub fn run_render_with(
             fps: opts.fps,
             reduce_motion: opts.reduce_motion,
             require_complete: !opts.allow_unfinished,
+            highlight_cursor: opts.highlight_cursor,
             ..RenderSettings::default()
         },
         size: opts.size,
@@ -363,6 +367,10 @@ mod tests {
         fn picture(&mut self, layer: &Layer) -> Result<Rc<Picture>, String> {
             let (w, h) = if layer.track_kind == EditTrackKind::Webcam { (32, 18) } else { (64, 36) };
             Ok(Rc::new(Picture::solid(w, h, Rgb(0, 80, 160))))
+        }
+
+        fn cursor(&mut self, _: &Layer, _: &Picture) -> Option<openstage_capture_render::CursorMark> {
+            Some(openstage_capture_render::CursorMark { x: 32.0, y: 18.0, click_age_ms: None })
         }
     }
     struct Sounds;
@@ -470,6 +478,7 @@ mod tests {
             allow_unfinished: false,
             audio_only: false,
             frame_ms: None,
+            highlight_cursor: false,
         }
     }
 
@@ -754,5 +763,25 @@ mod tests {
         assert!(!o.ok);
         assert_eq!(o.checks.len(), 1, "it says so before anything else: {:?}", o.checks);
         assert_eq!(find(&o, "export").message, "Choose either --audio-only or --frame, not both.");
+    }
+
+    #[test]
+    fn the_pointer_is_in_the_picture_only_when_asked_for() {
+        let (dir, project) = project(10);
+        let read = |name: &str, highlight: bool| {
+            let out = dir.path().join(name);
+            let mut opts = options(&project, &out);
+            opts.frame_ms = Some(4_000);
+            opts.highlight_cursor = highlight;
+            let o = render(&opts, |_| {}, None);
+            assert!(o.ok, "{:?}", o.checks);
+            openstage_capture_render::read_back_png(&fs::read(&out).unwrap()).unwrap()
+        };
+        let plain = read("plain.png", false);
+        let shown = read("shown.png", true);
+        let centre = (18 * 64 + 32) * 3;
+        assert_eq!(&plain.rgb[centre..centre + 3], &[0, 80, 160], "the recorded picture, as it was");
+        assert_ne!(&shown.rgb[centre..centre + 3], &[0, 80, 160], "the pointer is over it where the source says");
+        assert_eq!(&shown.rgb[..3], &plain.rgb[..3], "and the far corner is the same");
     }
 }

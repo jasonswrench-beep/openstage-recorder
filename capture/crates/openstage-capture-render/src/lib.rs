@@ -12,6 +12,7 @@
 mod audio;
 mod canvas;
 mod compose;
+mod cursor;
 mod plan;
 mod png;
 mod text;
@@ -20,6 +21,7 @@ mod zoom;
 pub use audio::{gain_at, mix_block, AudioSpan, StereoFrames};
 pub use canvas::{Canvas, Picture, PixelRect, Rgb, SourceRect};
 pub use compose::{compose_frame, PictureSource, DEFAULT_WEBCAM_PLACE};
+pub use cursor::{draw_cursor, CursorMark, CLICK_SHOWN_MS};
 pub use plan::{
     plan, FrameRecipe, Layer, LayerTransition, RenderPlan, RenderSettings, SpanTransition, TransitionPhase, VideoSpan,
 };
