@@ -213,3 +213,12 @@ test("a picture that was made is called a picture, with no words about captions,
   assert.equal(summariseExport(initialExport(), exit({ code: 2 }), "picture").sentence, "Making a picture works on Windows only.");
   assert.equal(summariseExport(initialExport(), exit({ killed: true, code: null }), "picture").sentence, "Making the picture did not finish, so there is no picture.");
 });
+
+test("the pointer is shown only when the author asks, in a video and in a picture, and a sound file has nothing to show it on", () => {
+  assert.equal(exportPlan("D:/c", "Demo.capture").args.includes("--highlight-cursor"), false, "off unless asked for");
+  assert.equal(exportPlan("D:/c", "Demo.capture", { highlightCursor: false }).args.includes("--highlight-cursor"), false);
+  assert.equal(exportPlan("D:/c", "Demo.capture", { highlightCursor: true }).args.at(-1), "--highlight-cursor", "a video can show it");
+  const picture = exportPlan("D:/c", "Demo.capture", { frameMs: 2_000, highlightCursor: true, reduceMotion: true });
+  assert.deepEqual(picture.args.slice(-4), ["--frame", "2000", "--reduce-motion", "--highlight-cursor"], "a picture can show it, and follows the choice about motion");
+  assert.equal(exportPlan("D:/c", "Demo.capture", { audioOnly: true, highlightCursor: true }).args.includes("--highlight-cursor"), false, "a sound file has no picture");
+});
