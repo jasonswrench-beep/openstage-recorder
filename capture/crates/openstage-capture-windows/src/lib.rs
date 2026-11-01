@@ -78,8 +78,8 @@ pub use crash::{run_recorder_crash_report, MAX_LOSS_MS as RECORDER_CRASH_MAX_LOS
 pub use cue_player::{run_cue_test, run_cue_test_with, system_cue_player, CueTestOptions};
 pub use echo::{check_echo_in_files, describe_echo, detect_echo, envelope_of, EchoFinding, EchoVerdict, Envelope};
 pub use export::{
-    bitrate_for, export, source_path, ExportError, ExportJob, ExportReport, ExportTools, FileSounds, Progress,
-    SoundReader,
+    bitrate_for, export, export_audio, source_path, AudioReport, ExportError, ExportJob, ExportReport, ExportTools,
+    FileSounds, Progress, SoundReader,
 };
 pub use interactions::{
     announcement as interactions_announcement, classify_focus, explanation as interactions_explanation, key_name,
