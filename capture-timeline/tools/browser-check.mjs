@@ -526,6 +526,49 @@ await check("dragging a clip with the mouse moves it, is one undo step, and says
   assertEqual(await t.said(), "Undid: move clip.");
 });
 
+await check("dragging a clip far past the start line never draws it before the line, and where it is drawn when the button is let go is where it stays", async (page, t) => {
+  // Reported on 2026-10-16 (Windows ARM64): a clip dragged back "went past the start line and then settled onto it". Not reproduced; this keeps it from happening.
+  const dragFarLeft = async (el) => {
+    const zero = await el.evaluate((e) => e.offsetParent.getBoundingClientRect().left);
+    const box = await el.boundingBox();
+    const x0 = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x0, y);
+    await page.mouse.down();
+    let lowest = Infinity;
+    for (let step = 1; step <= 30; step++) {
+      await page.mouse.move(x0 + ((zero - 500 - x0) * step) / 30, y);
+      lowest = Math.min(lowest, (await el.boundingBox()).x - zero);
+    }
+    const atRelease = (await el.boundingBox()).x - zero;
+    await page.mouse.up();
+    const after = (await el.boundingBox()).x - zero;
+    return { lowest, atRelease, after };
+  };
+  const plain = await dragFarLeft(t.clip("Title: Open Settings")); // an overlay: it can move all the way to the start, while screen clips are held by their neighbours
+  if (plain.lowest < -0.5) throw new Error(`the clip was drawn ${(-plain.lowest).toFixed(1)} pixels before the start line while it was dragged`);
+  if (Math.abs(plain.after - plain.atRelease) > 0.5) throw new Error(`drawn at ${plain.atRelease.toFixed(1)} when the button was let go, then moved to ${plain.after.toFixed(1)}`);
+  if (Math.abs(plain.after) > 0.5) throw new Error(`the title came to rest ${plain.after.toFixed(1)} pixels from the start line instead of on it`);
+  await t.key("Control+z");
+  // the same after cutting a clip in half: the second piece, dragged back toward the start, stays on or after the first piece's end
+  const box = page.getByLabel("Playhead time", { exact: true });
+  await box.fill("15");
+  await box.press("Enter");
+  await t.focusRow("Open the gradebook");
+  await t.key("s");
+  const title = await dragFarLeft(t.clip("Title: Open Settings"));
+  if (title.lowest < -0.5) throw new Error(`after a cut, the title was drawn ${(-title.lowest).toFixed(1)} pixels before the start line while it was dragged`);
+  if (Math.abs(title.after - title.atRelease) > 0.5) throw new Error(`after a cut, the title was drawn at ${title.atRelease.toFixed(1)} when the button was let go, then moved to ${title.after.toFixed(1)}`);
+  const pieces = page.locator(".os-tl-clip", { hasText: "Open the gradebook" });
+  if ((await pieces.count()) !== 2) throw new Error("the clip was not cut in two");
+  const first = await pieces.nth(0).boundingBox();
+  const cut = await dragFarLeft(pieces.nth(1));
+  const second = await pieces.nth(1).boundingBox();
+  if (cut.lowest < -0.5) throw new Error(`after a cut, a piece was drawn ${(-cut.lowest).toFixed(1)} pixels before the start line while it was dragged`);
+  if (Math.abs(cut.after - cut.atRelease) > 0.5) throw new Error(`after a cut, drawn at ${cut.atRelease.toFixed(1)} when the button was let go, then moved to ${cut.after.toFixed(1)}`);
+  if (second.x < first.x + first.width - 1) throw new Error("after a cut, the second piece was left over the first");
+});
+
 await check("Escape during a mouse drag calls it off, and nothing is recorded", async (page, t) => {
   const box = await t.clip("Check the totals").boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
