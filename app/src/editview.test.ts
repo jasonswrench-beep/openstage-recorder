@@ -44,3 +44,8 @@ test("a sound file that is still being made is asked about in its own words", ()
   assert.match(closeQuestion(true, true, "leave", "sound file") ?? "", /^A sound file is still being made, and there are changes .* Stop the sound file, lose the changes and leave\?$/);
   assert.equal(closeQuestion(false, true, "leave", "video"), closeQuestion(false, true), "video stays the default");
 });
+
+test("a picture that is still being made is asked about in its own words", () => {
+  assert.equal(closeQuestion(false, true, "leave", "picture"), "A picture is still being made. Stop it and leave?");
+  assert.match(closeQuestion(true, true, "close", "picture") ?? "", /^A picture is still being made, and there are changes .* Stop the picture, lose the changes and close the window\?$/);
+});

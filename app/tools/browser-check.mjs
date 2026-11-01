@@ -755,6 +755,54 @@ await check("a sound file can be cancelled, a second request while one is made i
   assertEqual(await page.getByRole("heading", { name: "The video" }).count(), 1, "the section is named for the video again");
 });
 
+await check("Save the picture shown in the preview saves the edit first, asks for the playhead's moment as a PNG, names it for the moment, and the focus moves to Show the picture", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  const box = page.getByLabel("Playhead time", { exact: true });
+  await box.fill("7");
+  await box.press("Enter");
+  assertEqual(await saved(page, "Edit demo.capture/edit.json"), undefined, "nothing has been saved yet");
+  await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).focus();
+  await t.key("Enter");
+  await page.getByRole("button", { name: "Show the picture in its folder" }).waitFor();
+  assert((await saved(page, "Edit demo.capture/edit.json")) !== undefined, "the edit was saved first");
+  const said = (await page.locator('[id$="-say"]').textContent()) ?? "";
+  assertMatch(said, /^The picture was made\. Exported the picture at 7\.0 seconds as a PNG \(1920 by 1080 pixels\): .*Edit demo at 7\.0 seconds\.png$/, "what was made is said, with the moment");
+  assertEqual(said.includes("captions"), false, "captions are about a video, so nothing is said about them");
+  assertEqual(await t.focusLabel(), "Show the picture in its folder", "the focus moved to the next thing to do");
+  assertEqual(await page.locator("progress").isHidden(), true, "there is no progress bar for a picture");
+  assertEqual(await page.getByRole("button", { name: "Cancel the picture" }).isHidden(), true, "Cancel is gone");
+  assertEqual(await page.getByRole("heading", { name: "The picture" }).count(), 1, "the section is named for what is made");
+  const args = await page.evaluate(() => window.__openstageStandIn.started.at(-1));
+  assertEqual(args[args.indexOf("--frame") + 1], "7000", "the playhead's moment is asked for, in milliseconds");
+  assertEqual(args.includes("--audio-only"), false, "it is not a sound file");
+  assert(args[args.indexOf("--out") + 1].endsWith("Edit demo at 7.0 seconds.png"), "the name says the moment and ends in .png");
+  await page.getByRole("button", { name: "Show the picture in its folder" }).click();
+  await page.waitForTimeout(100);
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.revealed.at(-1)), "Edit demo.capture/exports/Edit demo at 7.0 seconds.png", "it asks to show the picture inside the recording's exports folder");
+  // a second moment makes a second picture beside the first, and the video button still makes a video
+  await box.fill("2.5");
+  await box.press("Enter");
+  await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).click();
+  await page.waitForFunction(() => /seconds as a PNG/.test(document.querySelector('[id$="-say"]')?.textContent ?? "") && /at 2\.5 seconds/.test(document.querySelector('[id$="-say"]')?.textContent ?? ""));
+  assertEqual((await page.evaluate(() => window.__openstageStandIn.started.at(-1))).includes("2500"), true, "the new moment is asked for");
+});
+
+await check("a picture request while a file is being made is refused in the words for that file, and Cancel names it", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  await page.evaluate(() => { window.__openstageStandIn.holdRender = true; });
+  await page.getByRole("button", { name: "Make a video from this edit" }).click();
+  await page.getByRole("button", { name: "Cancel the video" }).waitFor();
+  assertEqual(await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).getAttribute("aria-disabled"), "true", "the picture button is marked as not available while a video is made");
+  await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).focus();
+  await t.key("Enter");
+  assertMatch((await page.locator('[id$="-say"]').textContent()) ?? "", /A video is already being made/, "the request is refused in the words for what is being made");
+  await page.getByRole("button", { name: "Cancel the video" }).click();
+  await page.waitForFunction(() => /^Making the video did not finish/.test(document.querySelector('[id$="-say"]')?.textContent ?? ""));
+  assertEqual(await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).getAttribute("aria-disabled"), null, "the picture button is available again");
+});
+
 await check("the reduce-motion box is ticked for someone whose computer asks for less motion, and it reaches the video maker", async (page, t) => {
   await makeRecording(page, t);
   await openEdit(page, t);

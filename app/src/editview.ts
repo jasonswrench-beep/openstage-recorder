@@ -50,7 +50,7 @@ export const EXPORT_LIMIT_MS = 4 * 60 * 60 * 1000;
 export const CALLOUTS_OFFERED = ["blur", "cover"] as const;
 
 /** The question to ask before going back to the recordings or closing the window, or null when nothing would be lost. */
-export function closeQuestion(dirty: boolean, making: boolean, action: "leave" | "close" = "leave", what: "video" | "sound file" = "video"): string | null {
+export function closeQuestion(dirty: boolean, making: boolean, action: "leave" | "close" = "leave", what: "video" | "sound file" | "picture" = "video"): string | null {
   const go = action === "leave" ? "leave" : "close the window";
   if (making && dirty) return `A ${what} is still being made, and there are changes to the edit that are not saved. Stop the ${what}, lose the changes and ${go}?`;
   if (making) return `A ${what} is still being made. Stop it and ${go}?`;
@@ -86,8 +86,9 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const save = h("button", { type: "button", class: "os-cl-button", "aria-describedby": id("state") }, "Save the edit");
   const make = h("button", { type: "button", class: "os-cl-button rv-primary" }, "Make a video from this edit");
   const makeSound = h("button", { type: "button", class: "os-cl-button" }, "Make a sound file (WAV) from this edit");
+  const makePicture = h("button", { type: "button", class: "os-cl-button" }, "Save the picture shown in the preview (PNG)");
   const cancelVideo = h("button", { type: "button", class: "os-cl-button", hidden: true }, "Cancel the video");
-  const actions = h("div", { class: "rv-actions" }, back, save, make, makeSound, cancelVideo);
+  const actions = h("div", { class: "rv-actions" }, back, save, make, makeSound, makePicture, cancelVideo);
   const reduceBox = h("input", { type: "checkbox", id: id("reduce") });
   reduceBox.checked = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const reduce = h(
@@ -174,7 +175,7 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   }
 
   /** What is being made, for the words around it. */
-  const thingOf = (kind: ExportKind): "video" | "sound file" => (kind === "video" ? "video" : "sound file");
+  const thingOf = (kind: ExportKind): "video" | "sound file" | "picture" => (kind === "video" ? "video" : kind === "sound" ? "sound file" : "picture");
 
   /**
    * Make the video, or only the sound as a WAV file, from the saved edit. The edit is saved first, because the recorder reads edit.json.
@@ -195,24 +196,28 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
     }
     making = true;
     makingWhat = kind;
-    plan = exportPlan(opts.library, opts.name, { reduceMotion: reduceBox.checked, audioOnly: kind === "sound" });
+    plan = exportPlan(opts.library, opts.name, { reduceMotion: reduceBox.checked, audioOnly: kind === "sound", ...(kind === "picture" ? { frameMs: session.playheadMs } : {}) });
     let s = initialExport();
-    videoTitle.textContent = kind === "video" ? "The video" : "The sound file";
+    videoTitle.textContent = kind === "video" ? "The video" : kind === "sound" ? "The sound file" : "The picture";
     notes.setAttribute("aria-label", `What the recorder said about the ${thing}`);
     reveal.textContent = `Show the ${thing} in its folder`;
     cancelVideo.textContent = `Cancel the ${thing}`;
     videoBox.hidden = false;
     reveal.hidden = true;
     notes.replaceChildren();
-    progress.hidden = false;
+    // A picture is made in a moment and says nothing about progress, so there is no bar to show.
+    progress.hidden = kind === "picture";
     progress.value = 0;
     make.setAttribute("aria-disabled", "true");
     makeSound.setAttribute("aria-disabled", "true");
+    makePicture.setAttribute("aria-disabled", "true");
     cancelVideo.hidden = false;
     say.textContent =
       kind === "video"
         ? "Making the video. This can take a while for a long recording. You can keep editing, but the video is made from the edit as it was saved."
-        : "Making the sound file. You can keep editing, but the sound file is made from the edit as it was saved.";
+        : kind === "sound"
+          ? "Making the sound file. You can keep editing, but the sound file is made from the edit as it was saved."
+          : `Saving the picture at ${((plan.frameMs ?? 0) / 1000).toFixed(1)} seconds. You can keep editing, but the picture is made from the edit as it was saved.`;
     const job = await runOneShot(
       b,
       plan.args,
@@ -228,6 +233,7 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
     making = false;
     make.removeAttribute("aria-disabled");
     makeSound.removeAttribute("aria-disabled");
+    makePicture.removeAttribute("aria-disabled");
     cancelVideo.hidden = true;
     progress.hidden = true;
     const done = finishedWords(s, job.exit, job.problem, kind);
@@ -249,6 +255,7 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   save.addEventListener("click", () => void saveEdit());
   make.addEventListener("click", () => void makeFile("video"));
   makeSound.addEventListener("click", () => void makeFile("sound"));
+  makePicture.addEventListener("click", () => void makeFile("picture"));
   cancelVideo.addEventListener("click", () => {
     say.textContent = `Cancelling the ${thingOf(makingWhat)}.`;
     void b.streamStop().catch(() => false);

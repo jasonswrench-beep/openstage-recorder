@@ -188,3 +188,28 @@ test("every ending of a sound export says sound file, never video", () => {
   assert.equal(summary.ok, false, "a file that did not read back is never called good");
   assert.match(summary.sentence, /^The sound file was made\. .* One check found a problem, so look at the list before using it\.$/);
 });
+
+test("a picture is named for its moment, asked for with --frame in milliseconds, and still follows the choice about motion", () => {
+  const p = exportPlan("D:/Videos", "Week 3 demo.capture", { frameMs: 20_040 });
+  assert.equal(p.out, "D:/Videos/Week 3 demo.capture/exports/Week 3 demo at 20.0 seconds.png");
+  assert.equal(p.rel, "exports/Week 3 demo at 20.0 seconds.png");
+  assert.deepEqual(p.args, ["render", "--project", "D:/Videos/Week 3 demo.capture", "--out", p.out, "--frame", "20040"]);
+  assert.equal(p.frameMs, 20_040);
+  assert.equal(p.audioOnly, false);
+  const still = exportPlan("D:/Videos", "Demo.capture", { frameMs: 5_000, reduceMotion: true });
+  assert.deepEqual(still.args.slice(-3), ["--frame", "5000", "--reduce-motion"], "a picture in the middle of a zoom is drawn as the video draws it");
+  assert.equal(exportPlan("D:/Videos", "Demo.capture", { frameMs: 0 }).args.at(-1), "0", "the very start is a moment too");
+  assert.equal(exportPlan("D:/Videos", "Demo.capture", { frameMs: -50 }).frameMs, 0, "a time before the start is the start");
+  assert.equal(exportPlan("D:/Videos", "Demo.capture").frameMs, null, "a video has no moment");
+  assert.equal(exportPlan("D:/Videos", "Demo.capture", { audioOnly: true, frameMs: 5_000 }).args.includes("--frame"), false, "a sound file is never a picture");
+});
+
+test("a picture that was made is called a picture, with no words about captions, and every ending says picture", () => {
+  const { state } = play([line({ event: "check", check: "export", ok: true, message: "Exported the picture at 5.0 seconds as a PNG (1920 by 1080 pixels): x.png" })]);
+  const done = finishedWords(state, exit(), "", "picture");
+  assert.equal(done.made, true);
+  assert.equal(done.sentence, "The picture was made. Exported the picture at 5.0 seconds as a PNG (1920 by 1080 pixels): x.png");
+  assert.equal(summariseExport(initialExport(), null, "picture").sentence, "The picture could not be made.");
+  assert.equal(summariseExport(initialExport(), exit({ code: 2 }), "picture").sentence, "Making a picture works on Windows only.");
+  assert.equal(summariseExport(initialExport(), exit({ killed: true, code: null }), "picture").sentence, "Making the picture did not finish, so there is no picture.");
+});
