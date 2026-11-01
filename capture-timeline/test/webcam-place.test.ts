@@ -42,6 +42,14 @@ test("the corners are on the sides they say", () => {
   assert.equal(left.y, right.y);
 });
 
+test("small, medium and large are 18, 22 and 32 percent of the width, the sizes OpenStage Author uses, so an edit saved in one program shows the same choice in the other", () => {
+  assert.deepEqual(webcamRect("top-left", "small"), { x: 250, y: 450, width: 1800, height: 1800 });
+  assert.deepEqual(webcamRect("bottom-left", "small"), { x: 250, y: 7750, width: 1800, height: 1800 });
+  assert.deepEqual(webcamRect("bottom-right", "large"), { x: 6550, y: 6350, width: 3200, height: 3200 });
+  assert.deepEqual(webcamRect("top-right", "medium"), { x: 7550, y: 450, width: 2200, height: 2200 });
+  assert.deepEqual(webcamChoice({ x: 6550, y: 6350, width: 3200, height: 3200 }), { where: "bottom-right", size: "large" });
+});
+
 test("a place that is none of the choices is read back as custom", () => {
   assert.deepEqual(webcamChoice({ x: 1234, y: 4321, width: 2000, height: 1500 }), { where: "custom", size: "custom" });
 });
