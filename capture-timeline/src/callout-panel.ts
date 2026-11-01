@@ -91,6 +91,26 @@ export function mountCalloutBar(container: HTMLElement, session: EditSession, op
       ["video", "Video from a file", "Choose a video file. It is copied into the course and put in at the playhead (at most 30 seconds of it are used)."],
       ["audio", "Sound from a file", "Choose a sound file (WAV). It is copied into the course and put in at the playhead."],
     ];
+    bar.append(
+      add(
+        "Lower third with logo",
+        "Choose your logo, a picture file. It is copied into the course, and a lower third with the logo beside it is put in at the playhead.",
+        () => {
+          announcer.say("Choose your logo in the window that opens.");
+          void addMedia("image").then(
+            (picked) => {
+              if (!picked.ok) {
+                announcer.say(picked.message);
+                return;
+              }
+              const outcome = session.addLowerThirdWithLogoHere(picked.file);
+              afterAdd(outcome.message, outcome.ok);
+            },
+            (error: unknown) => announcer.say(`The logo could not be added. ${error instanceof Error ? error.message : String(error)}`),
+          );
+        },
+      ),
+    );
     for (const [kind, label, hint] of files) {
       bar.append(
         add(label, hint, () => {

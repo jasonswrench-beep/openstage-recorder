@@ -31,6 +31,7 @@ import {
   MIN_VOLUME_DB,
   addCallout,
   addImportedFile,
+  addLowerThirdWithLogo,
   setHasTextAlternative,
   setImageText,
   type ImportedFile,
@@ -955,6 +956,12 @@ export class EditSession {
   addMediaFile(file: ImportedFile): Outcome {
     const at = this.#playheadMs;
     return this.#addRow((m) => addImportedFile(m, file, at));
+  }
+
+  /** Put a lower third with a logo in at the playhead (the logo is a picture already copied into the course), and choose the logo (it needs alt text first). */
+  addLowerThirdWithLogoHere(file: ImportedFile): Outcome {
+    const at = this.#playheadMs;
+    return this.#addRow((m) => addLowerThirdWithLogo(m, file, at));
   }
 
   /** The chosen image clip, or a sentence saying why not. */

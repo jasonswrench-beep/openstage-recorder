@@ -24,7 +24,7 @@ must give the same findings.
 | `src/paste.ts` | Copy and paste of clips, overlays and zooms: a snapshot of chosen rows, pasted at a time, all or nothing, on the same kind of track |
 | `src/media.ts` | Putting an imported picture, video or sound in the edit (source, track, clip), and saying what text it still needs |
 | `src/transitions.ts` | Transitions (fade, cross-fade, two wipes, slide) on the way into or out of a clip: set, change, take away, and said in words (edit format 0.4) |
-| `src/callouts.ts` | The callout gallery (text, title, lower third, highlight box, circle, arrow, blur, cover) put in at a time on the first track that takes it, and a zoom from a rectangle made the picture's shape |
+| `src/callouts.ts` | The callout gallery (text, title, lower third, highlight box, circle, arrow, blur, cover) put in at a time on the first track that takes it, and a zoom from a rectangle made the picture's shape. A lower third with a logo (`addLowerThirdWithLogo`) puts in the words and an imported picture with a place of its own, in one step. |
 | `src/contrast.ts`, `src/regions.ts` | Colours and contrast; rectangles on the picture and saying where they are in words |
 | `src/history.ts` | Undo and redo, with a drag as one step |
 | `src/limits.ts` | How far a clip, overlay or zoom can be moved or trimmed (the ends of a slider), and how far a group can be moved together, found by asking the editing actions |

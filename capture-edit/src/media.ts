@@ -45,10 +45,10 @@ function hasRoom(track: Track, startMs: number, endMs: number): boolean {
 /**
  * Put an imported file in the edit at a time. A picture or video goes on the first Imported media track with room, a sound on
  * the first Audio track with room; a track is added if there is none. A video clip uses at most its first 30 seconds (the
- * limit for imported video), and a still image is shown for 5 seconds. Picture clips are drawn over the pictures of the
+ * limit for imported video), and a still image is shown for 5 seconds, or for `stillMs` when that is given. Picture clips are drawn over the pictures of the
  * tracks above them in the list, filling the frame unless given a place.
  */
-export function addImportedFile(model: Model, file: ImportedFile, startMs: number): Result {
+export function addImportedFile(model: Model, file: ImportedFile, startMs: number, stillMs?: number): Result {
   const ref: SourceRef = { kind: "asset", asset: file.asset };
   const existing = findSource(model, ref);
   const info: SourceInfo = existing ?? {
@@ -71,6 +71,7 @@ export function addImportedFile(model: Model, file: ImportedFile, startMs: numbe
     length = MAX_IMPORTED_VIDEO_MS;
     shortened = true;
   }
+  if (info.kind === "image" && stillMs !== undefined) length = wholeMs(stillMs);
   const kind = info.kind === "audio" ? "audio" : "media";
   const wanted = length ?? info.durationMs ?? 5000;
   let working: Model = existing === undefined ? { ...model, sources: [...model.sources, info] } : model;
