@@ -71,7 +71,7 @@ They fail in OpenStage Author's own copy of `capture-timeline/tools/browser-chec
 
 Neither is a fault in the screens. The checks need updating.
 
-**Status, 2026-11-01.** OpenStage Author repaired both checks in `7f6adf3`, and this copy has taken that version of the check. It has not been run here: no browser test tool is installed on this PC.
+**Status, 2026-11-01.** OpenStage Author repaired both checks in `7f6adf3`, and this copy has taken that version of the check. Run on 2026-11-01 with Playwright 1.64.1: 73 of 74 pass as written, including both repaired checks. The 74th ("a folder that is not a recording is refused in words") calls the Unix command `mkdir -p`, so it fails on plain Windows (ENOENT writing `holiday\notes.txt`) and passes when Git's `mkdir` is on the PATH. OpenStage Author's copy of the check has the same line; `mkdirSync(path, { recursive: true })` would make it portable.
 
 ### 7. The recorder's advice about sound is said as a problem, in a command line's words
 
