@@ -6,7 +6,7 @@
 //! reads the finished video back through Windows, the way a player would, and checks that its length, its size and
 //! its sound are what they should be. The pieces that need Windows are passed in, so all of it is tested here.
 
-use crate::export::{export, ExportError, ExportJob, ExportReport, ExportTools, Progress};
+use crate::export::{export, export_audio, ExportError, ExportJob, ExportReport, ExportTools, Progress, SoundReader};
 use crate::make_edit::{edit_from_take, EditOptions};
 use crate::video::{compare_audio_readback, compare_readback, compare_size_readback, SizeOf};
 use crate::{check, Check};
@@ -36,6 +36,8 @@ pub struct RenderOptions {
     pub reduce_motion: bool,
     /// Export even if the edit still lacks things OpenStage requires (alt text, descriptions).
     pub allow_unfinished: bool,
+    /// Make only the sound, as a WAV file, instead of a video.
+    pub audio_only: bool,
 }
 
 fn say(report: &mut dyn FnMut(Check), name: &str, ok: bool, message: impl Into<String>) -> bool {
@@ -82,6 +84,95 @@ fn seconds_text(seconds: f64) -> String {
     format!("{seconds:.1} seconds")
 }
 
+/// The sound of the edit as a WAV file, then a check that the file reads back as the length it should be.
+/// Pictures are not drawn, so the edit does not have to be complete (alt text and descriptions are for pictures).
+fn run_audio_only(
+    opts: &RenderOptions,
+    edit: &Edit,
+    sound: &mut dyn SoundReader,
+    cancelled: &dyn Fn() -> bool,
+    report: &mut dyn FnMut(Check),
+    progress: &mut dyn FnMut(Progress),
+) -> bool {
+    let is_wav = opts.out.extension().is_some_and(|e| e.eq_ignore_ascii_case("wav"));
+    if !is_wav {
+        return say(
+            report,
+            "export",
+            false,
+            format!("A sound-only export is a WAV file, so its name has to end in .wav: {}", opts.out.display()),
+        );
+    }
+    let settings = RenderSettings {
+        fps: opts.fps,
+        reduce_motion: opts.reduce_motion,
+        require_complete: false,
+        ..RenderSettings::default()
+    };
+    let done = match export_audio(edit, &opts.out, &settings, sound, cancelled, &mut |p| {
+        let tenth = (p.frame_count / 10).max(1);
+        if p.frames_done % tenth == 0 || p.frames_done == p.frame_count {
+            progress(p);
+        }
+    }) {
+        Ok(done) => done,
+        Err(ExportError::Cancelled) => {
+            return say(report, "export", false, "The export was cancelled. No sound file was made.")
+        }
+        Err(ExportError::Failed(why)) => return say(report, "export", false, why),
+    };
+    say(
+        report,
+        "export",
+        true,
+        format!(
+            "Exported {} of sound as a WAV file (two channels, {} samples a second): {}",
+            seconds_text(done.seconds),
+            done.sample_rate,
+            done.out.display()
+        ),
+    );
+    match read_wav_samples(&done.out) {
+        Ok(samples) if samples == done.samples => say(
+            report,
+            "audio-readback",
+            true,
+            format!("The sound file reads back as {} of sound, the length it should be.", seconds_text(done.seconds)),
+        ),
+        Ok(samples) => say(
+            report,
+            "audio-readback",
+            false,
+            format!(
+                "The sound file holds {} but it should hold {}.",
+                seconds_text(samples as f64 / done.sample_rate as f64),
+                seconds_text(done.seconds)
+            ),
+        ),
+        Err(why) => say(report, "audio-readback", false, why),
+    }
+}
+
+/// Read a WAV file this program wrote back: its header must say what the file holds, and the file must be that long.
+/// Returns how many samples (of both channels) it holds.
+fn read_wav_samples(path: &std::path::Path) -> Result<u64, String> {
+    use std::io::Read;
+    let problem = |e: std::io::Error| format!("The sound file could not be read back: {e}");
+    let length = std::fs::metadata(path).map_err(problem)?.len();
+    let mut head = [0u8; 44];
+    std::fs::File::open(path).map_err(problem)?.read_exact(&mut head).map_err(problem)?;
+    if &head[0..4] != b"RIFF" || &head[8..12] != b"WAVE" || &head[36..40] != b"data" {
+        return Err("The sound file does not start like a WAV file.".into());
+    }
+    let data = u32::from_le_bytes([head[40], head[41], head[42], head[43]]) as u64;
+    if length != 44 + data {
+        return Err(format!(
+            "The sound file is {length} bytes long but its header says it holds {data} bytes of sound."
+        ));
+    }
+    Ok(data / 4)
+}
+
 /// Run the command with everything it needs supplied. Reports checks as it goes; `progress` is told how far the
 /// export has got (about every tenth of the way, plus the end). Returns whether the export worked and the finished
 /// video read back as it should. Notes about the result (text that did not fit) are reported as `export-note`
@@ -98,6 +189,10 @@ pub fn run_render_with(
         Err(message) => return say(report, "edit", false, message),
     };
     say(report, "edit", true, format!("Exporting {what}, {} long.", seconds_text(edit.length_ms() / 1000.0)));
+    if opts.audio_only {
+        let ExportTools { sound, .. } = tools;
+        return run_audio_only(opts, &edit, sound, cancelled, report, progress);
+    }
 
     let job = ExportJob {
         settings: RenderSettings {
@@ -287,6 +382,7 @@ mod tests {
             size: None,
             reduce_motion: false,
             allow_unfinished: false,
+            audio_only: false,
         }
     }
 
@@ -464,5 +560,55 @@ mod tests {
         opts.allow_unfinished = true;
         let allowed = render(&opts, |_| {}, None);
         assert!(allowed.ok, "{:?}", allowed.checks);
+    }
+
+    #[test]
+    fn only_the_sound_is_exported_as_a_wav_and_read_back_in_words() {
+        let (dir, project) = project(10);
+        let out = dir.path().join("lesson.wav");
+        let mut opts = options(&project, &out);
+        opts.audio_only = true;
+        let o = render(&opts, |_| {}, None);
+        assert!(o.ok, "{:?}", o.checks);
+        let names: Vec<&str> = o.checks.iter().map(|c| c.check.as_str()).collect();
+        assert_eq!(names, ["edit", "export", "audio-readback"]);
+        assert!(
+            find(&o, "export")
+                .message
+                .starts_with("Exported 10.0 seconds of sound as a WAV file (two channels, 48000 samples a second): "),
+            "{}",
+            find(&o, "export").message
+        );
+        assert_eq!(
+            find(&o, "audio-readback").message,
+            "The sound file reads back as 10.0 seconds of sound, the length it should be."
+        );
+        assert_eq!(fs::metadata(&out).unwrap().len(), 44 + 10 * 48_000 * 4);
+        assert_eq!(o.state.borrow().frames, 0, "no picture was drawn and no video was written");
+        assert_eq!(o.progress.last().map(|p| p.frames_done), Some(100));
+    }
+
+    #[test]
+    fn a_sound_only_export_needs_a_wav_name_and_says_so() {
+        let (dir, project) = project(10);
+        let out = dir.path().join("lesson.mp4");
+        let mut opts = options(&project, &out);
+        opts.audio_only = true;
+        let o = render(&opts, |_| {}, None);
+        assert!(!o.ok);
+        assert!(find(&o, "export").message.contains("has to end in .wav"), "{}", find(&o, "export").message);
+        assert!(!out.exists());
+    }
+
+    #[test]
+    fn a_cancelled_sound_only_export_says_no_sound_file_was_made() {
+        let (dir, project) = project(10);
+        let out = dir.path().join("lesson.wav");
+        let mut opts = options(&project, &out);
+        opts.audio_only = true;
+        let o = render(&opts, |_| {}, Some(2));
+        assert!(!o.ok);
+        assert_eq!(find(&o, "export").message, "The export was cancelled. No sound file was made.");
+        assert!(!out.exists());
     }
 }

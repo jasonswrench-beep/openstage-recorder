@@ -307,6 +307,146 @@ pub fn export(
     }
 }
 
+/// What an audio-only export made.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AudioReport {
+    pub out: PathBuf,
+    /// Samples a second.
+    pub sample_rate: u32,
+    /// How many samples there are in each of the two channels.
+    pub samples: u64,
+    /// How long it plays: exactly as long as the video of the same edit would be.
+    pub seconds: f64,
+}
+
+/// Where a sound file is written until it is whole: `name.part.wav` beside `name.wav`.
+fn part_path_wav(out: &Path) -> PathBuf {
+    let name = out.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let stem = if name.to_ascii_lowercase().ends_with(".wav") { &name[..name.len() - 4] } else { name.as_str() };
+    out.with_file_name(format!("{stem}.part.wav"))
+}
+
+/// The 44 bytes that start a WAV file of plain 16-bit sound in two channels.
+fn wav_header(sample_rate: u32, data_bytes: u32) -> [u8; 44] {
+    let mut h = [0u8; 44];
+    h[0..4].copy_from_slice(b"RIFF");
+    h[4..8].copy_from_slice(&(36 + data_bytes).to_le_bytes());
+    h[8..12].copy_from_slice(b"WAVE");
+    h[12..16].copy_from_slice(b"fmt ");
+    h[16..20].copy_from_slice(&16u32.to_le_bytes());
+    h[20..22].copy_from_slice(&1u16.to_le_bytes()); // plain PCM
+    h[22..24].copy_from_slice(&2u16.to_le_bytes()); // two channels
+    h[24..28].copy_from_slice(&sample_rate.to_le_bytes());
+    h[28..32].copy_from_slice(&(sample_rate * 4).to_le_bytes()); // bytes a second
+    h[32..34].copy_from_slice(&4u16.to_le_bytes()); // bytes in one sample of both channels
+    h[34..36].copy_from_slice(&16u16.to_le_bytes()); // bits in a sample
+    h[36..40].copy_from_slice(b"data");
+    h[40..44].copy_from_slice(&data_bytes.to_le_bytes());
+    h
+}
+
+/// Make only the sound of an edit, as a WAV file: the voice, the computer's sound and any imported sound, mixed
+/// exactly as they are for a video, and exactly as long as the video would be. No picture is drawn and no video
+/// encoder is needed. The file is written as `name.part.wav` and renamed to `name.wav` only when it is whole; a
+/// cancelled or failed export deletes the part and leaves any earlier `name.wav` exactly as it was.
+/// `cancelled` is asked before every half second of sound; `progress` is told after each (in video frames).
+pub fn export_audio(
+    edit: &Edit,
+    out: &Path,
+    settings: &RenderSettings,
+    sound: &mut dyn SoundReader,
+    cancelled: &dyn Fn() -> bool,
+    progress: &mut dyn FnMut(Progress),
+) -> Result<AudioReport, ExportError> {
+    use std::io::Write;
+    let plan = plan_with(edit, settings)?;
+    if plan.frame_count == 0 {
+        return Err(failed("The edit is empty: there is nothing to put in a sound file yet."));
+    }
+    if plan.audio.is_empty() {
+        return Err(failed(
+            "This edit has no sound, so there is nothing to put in a sound file. \
+             Check that the voice or the computer's sound is on a track and is not muted.",
+        ));
+    }
+    let rate = settings.sample_rate as u64;
+    let fps = settings.fps as u64;
+    // The same stretch of time the video's frames add up to, so the sound is exactly as long as the video.
+    let total = plan.frame_count * rate / fps;
+    let data_bytes = total * 4;
+    if data_bytes + 36 > u32::MAX as u64 {
+        return Err(failed(
+            "The sound is longer than a WAV file can hold (about six hours at this quality). Export a shorter part.",
+        ));
+    }
+    let part = part_path_wav(out);
+    let _ = fs::remove_file(&part);
+    if let Some(folder) = out.parent().filter(|p| !p.as_os_str().is_empty()) {
+        fs::create_dir_all(folder)
+            .map_err(|e| failed(format!("The folder for the sound file could not be made: {e}")))?;
+    }
+    let result = (|| -> Result<(), ExportError> {
+        let write_problem = |e: std::io::Error| failed(format!("Writing the sound file stopped with a problem: {e}"));
+        let file = fs::File::create(&part).map_err(|e| failed(format!("The sound file could not be started: {e}")))?;
+        let mut writer = std::io::BufWriter::new(file);
+        writer.write_all(&wav_header(settings.sample_rate, data_bytes as u32)).map_err(write_problem)?;
+        let block = (rate / 2).max(1);
+        let mut first = 0u64;
+        while first < total {
+            if cancelled() {
+                return Err(ExportError::Cancelled);
+            }
+            let len = block.min(total - first);
+            let mut read_problem: Option<String> = None;
+            let mixed =
+                mix_block(&plan.audio, first, len as usize, settings.sample_rate, &mut |span, at, count| match sound
+                    .read(&span.source, at, count)
+                {
+                    Ok(frames) => frames,
+                    Err(why) => {
+                        read_problem.get_or_insert(why);
+                        Vec::new()
+                    }
+                });
+            if let Some(why) = read_problem {
+                return Err(failed(why));
+            }
+            let mut bytes = Vec::with_capacity(mixed.len() * 2);
+            for sample in &mixed {
+                bytes.extend_from_slice(&sample.to_le_bytes());
+            }
+            writer.write_all(&bytes).map_err(write_problem)?;
+            first += len;
+            progress(Progress {
+                frames_done: (first * fps / rate).min(plan.frame_count),
+                frame_count: plan.frame_count,
+            });
+        }
+        let file =
+            writer.into_inner().map_err(|e| failed(format!("Writing the sound file stopped with a problem: {e}")))?;
+        file.sync_all().map_err(write_problem)?;
+        Ok(())
+    })();
+    match result {
+        Ok(()) => {
+            if let Err(e) = fs::rename(&part, out) {
+                let _ = fs::remove_file(&part);
+                return Err(failed(format!("The finished sound file could not be put in place: {e}")));
+            }
+            Ok(AudioReport {
+                out: out.to_path_buf(),
+                sample_rate: settings.sample_rate,
+                samples: total,
+                seconds: total as f64 / rate as f64,
+            })
+        }
+        Err(e) => {
+            let _ = fs::remove_file(&part);
+            Err(e)
+        }
+    }
+}
+
 fn plan_with(edit: &Edit, settings: &RenderSettings) -> Result<openstage_capture_render::RenderPlan, ExportError> {
     plan(edit, settings).map_err(failed)
 }
@@ -807,5 +947,108 @@ mod tests {
         let r = run(&e, &dir.path().join("w.mp4"), Some(5), None, false);
         assert_eq!(r.result.unwrap_err(), ExportError::Cancelled);
         assert_eq!(r.written.borrow().size, (32, 18), "the size of the webcam picture, since it is the only picture");
+    }
+
+    // ---- audio only ----
+
+    fn audio_run(
+        edit: &Edit,
+        out: &Path,
+        cancel_after: Option<usize>,
+        sound_fails: bool,
+    ) -> (Result<AudioReport, ExportError>, Vec<Progress>) {
+        let mut sounds = Sounds { value: 1000, fail: sound_fails, reads: 0 };
+        let settings = RenderSettings { fps: 30, reduce_motion: false, ..RenderSettings::default() };
+        let calls = std::cell::Cell::new(0usize);
+        let cancelled = || {
+            calls.set(calls.get() + 1);
+            cancel_after.is_some_and(|n| calls.get() > n)
+        };
+        let mut progress = Vec::new();
+        let result = export_audio(edit, out, &settings, &mut sounds, &cancelled, &mut |p| progress.push(p));
+        (result, progress)
+    }
+
+    #[test]
+    fn the_sound_of_an_edit_is_a_wav_exactly_as_long_as_its_video_and_is_in_place_only_when_whole() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("lesson.wav");
+        let (result, progress) = audio_run(&edit("valid-basic.json"), &out, None, false);
+        let report = result.unwrap();
+        assert_eq!((report.sample_rate, report.samples), (48_000, 60 * 48_000), "60 seconds, as the video is");
+        assert!((report.seconds - 60.0).abs() < 1e-9);
+        assert!(!part_path_wav(&out).exists(), "no half-made file is left");
+        let bytes = fs::read(&out).unwrap();
+        assert_eq!(&bytes[0..4], b"RIFF");
+        assert_eq!(&bytes[8..16], b"WAVEfmt ");
+        assert_eq!(u16::from_le_bytes([bytes[20], bytes[21]]), 1, "plain PCM");
+        assert_eq!(u16::from_le_bytes([bytes[22], bytes[23]]), 2, "two channels");
+        assert_eq!(u32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]), 48_000);
+        assert_eq!(u32::from_le_bytes([bytes[28], bytes[29], bytes[30], bytes[31]]), 48_000 * 4);
+        assert_eq!(u16::from_le_bytes([bytes[34], bytes[35]]), 16);
+        let data = u32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]) as usize;
+        assert_eq!(data, 60 * 48_000 * 4, "the header says how much sound there is");
+        assert_eq!(bytes.len(), 44 + data, "and the file is exactly that long");
+        assert_eq!(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize, bytes.len() - 8);
+        // The voice and the computer's sound, both at 1000, added: the 2000 the video's sound has in its test too.
+        for at in [44, 46, 44 + 4 * 48_000 * 30, bytes.len() - 4, bytes.len() - 2] {
+            assert_eq!(i16::from_le_bytes([bytes[at], bytes[at + 1]]), 2000, "sample at byte {at}");
+        }
+        assert_eq!(progress.last(), Some(&Progress { frames_done: 1800, frame_count: 1800 }));
+        assert!(progress.windows(2).all(|w| w[0].frames_done <= w[1].frames_done), "progress only goes forward");
+    }
+
+    #[test]
+    fn an_edit_with_no_sound_is_refused_in_words_and_makes_no_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("quiet.wav");
+        let mut e = edit("valid-basic.json");
+        e.tracks.retain(|t| t.kind != EditTrackKind::Audio);
+        match audio_run(&e, &out, None, false).0 {
+            Err(ExportError::Failed(why)) => assert!(why.contains("has no sound"), "{why}"),
+            other => panic!("expected a refusal in words, got {other:?}"),
+        }
+        assert!(!out.exists() && !part_path_wav(&out).exists());
+    }
+
+    #[test]
+    fn a_cancelled_sound_export_leaves_nothing_and_keeps_an_earlier_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("lesson.wav");
+        fs::write(&out, b"an earlier export").unwrap();
+        let (result, _) = audio_run(&edit("valid-basic.json"), &out, Some(3), false);
+        assert_eq!(result, Err(ExportError::Cancelled));
+        assert_eq!(fs::read(&out).unwrap(), b"an earlier export", "the earlier file is exactly as it was");
+        assert!(!part_path_wav(&out).exists(), "and no half-made file is left");
+    }
+
+    #[test]
+    fn a_sound_file_that_cannot_be_read_ends_the_sound_export_in_words_and_leaves_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("lesson.wav");
+        let (result, _) = audio_run(&edit("valid-basic.json"), &out, None, true);
+        match result {
+            Err(ExportError::Failed(why)) => assert!(why.contains("mic.wav"), "{why}"),
+            other => panic!("expected a problem in words, got {other:?}"),
+        }
+        assert!(!out.exists() && !part_path_wav(&out).exists());
+    }
+
+    #[test]
+    fn the_unfinished_sound_file_is_named_so_that_it_is_plainly_unfinished() {
+        let name = |p: &str| part_path_wav(Path::new(p)).to_string_lossy().replace('\\', "/");
+        assert_eq!(name("out/lesson.wav"), "out/lesson.part.wav");
+        assert_eq!(name("out/Lesson.WAV"), "out/Lesson.part.wav");
+        assert_eq!(name("lesson"), "lesson.part.wav");
+        assert_eq!(name("out/lesson.mp3"), "out/lesson.mp3.part.wav");
+    }
+
+    #[test]
+    fn the_wav_header_is_right_for_another_rate() {
+        let h = wav_header(44_100, 400);
+        assert_eq!(&h[0..4], b"RIFF");
+        assert_eq!(u32::from_le_bytes([h[4], h[5], h[6], h[7]]), 436, "the file is 36 bytes more than the sound");
+        assert_eq!(u32::from_le_bytes([h[28], h[29], h[30], h[31]]), 176_400);
+        assert_eq!(u32::from_le_bytes([h[40], h[41], h[42], h[43]]), 400);
     }
 }

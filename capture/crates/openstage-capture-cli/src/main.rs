@@ -443,6 +443,9 @@ enum Cmd {
         /// Export even if the edit still lacks things OpenStage requires (alt text, descriptions).
         #[arg(long)]
         allow_unfinished: bool,
+        /// Make only the sound, as a WAV file, instead of a video. `--out` must then end in `.wav`.
+        #[arg(long)]
+        audio_only: bool,
         /// How the recorded videos are read back: `rgb32` (Windows converts the colours; the default) or `nv12`
         /// (this program converts them). For working around a fault in Windows' own reader; `TEST EXPORT.bat` uses
         /// `nv12` by itself if `rgb32` makes the program stop.
@@ -1291,6 +1294,7 @@ fn main() -> ExitCode {
             size,
             reduce_motion,
             allow_unfinished,
+            audio_only,
             picture_reader,
             plain,
         } => {
@@ -1324,6 +1328,7 @@ fn main() -> ExitCode {
                     size,
                     reduce_motion,
                     allow_unfinished,
+                    audio_only,
                 };
                 install_cancel_handler();
                 let video = system_video_platform();
@@ -1351,20 +1356,44 @@ fn main() -> ExitCode {
                             plain,
                             "export",
                             percent,
-                            format!("Exporting: {percent} percent ({} of {} pictures).", p.frames_done, p.frame_count),
+                            if audio_only {
+                                format!("Exporting: {percent} percent of the sound.")
+                            } else {
+                                format!(
+                                    "Exporting: {percent} percent ({} of {} pictures).",
+                                    p.frames_done, p.frame_count
+                                )
+                            },
                         )
                     },
                 );
                 finish_checks_with(
                     plain,
                     ok,
-                    "The video was exported.",
-                    "The export did not finish, or the finished video did not read back as it should.",
+                    if audio_only { "The sound file was exported." } else { "The video was exported." },
+                    if audio_only {
+                        "The export did not finish, or the finished sound file did not read back as it should."
+                    } else {
+                        "The export did not finish, or the finished video did not read back as it should."
+                    },
                 )
             }
             #[cfg(not(windows))]
             {
-                let _ = (project, out, edit, take, demo, assets, fps, size, reduce_motion, allow_unfinished, reader);
+                let _ = (
+                    project,
+                    out,
+                    edit,
+                    take,
+                    demo,
+                    assets,
+                    fps,
+                    size,
+                    reduce_motion,
+                    allow_unfinished,
+                    audio_only,
+                    reader,
+                );
                 emit_check(
                     plain,
                     Check {
