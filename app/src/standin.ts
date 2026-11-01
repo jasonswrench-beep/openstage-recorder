@@ -26,6 +26,16 @@ export interface StandInControls {
   soundFindings: boolean;
   /** Make the next video never finish by itself, so Cancel can be tried (a real video of a long recording takes minutes). */
   holdRender: boolean;
+  /** Choose from the menu of the icon in the notification area, as if from the taskbar (`quick` or `stop`). */
+  pressTray(id: string): void;
+  /** Everything put on the clipboard, in order. */
+  copied: string[];
+  /** Make the next copy to the clipboard fail. */
+  failNextCopy: boolean;
+  /** What the window was asked to do, in order: `minimize`, `restore`. */
+  windowCalls: string[];
+  /** The icon's tooltip as last set. */
+  tooltip: string;
 }
 
 declare global {
@@ -338,6 +348,7 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
   const speed = Math.max(1, options.speed ?? (Number(params.get("speed")) || 1));
   const files = new Map<string, string>();
   const hotkeyListeners = new Set<(id: string) => void>();
+  const trayListeners = new Set<(id: string) => void>();
   const controls: StandInControls = {
     pressKey: (id) => { for (const l of [...hotkeyListeners]) l(id); },
     recorderMissing: params.get("norecorder") === "1",
@@ -347,6 +358,11 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     started: [],
     soundFindings: false,
     holdRender: false,
+    pressTray: (id) => { for (const l of [...trayListeners]) l(id); },
+    copied: [],
+    failNextCopy: false,
+    windowCalls: [],
+    tooltip: "OpenStage Recorder",
   };
   if (typeof window !== "undefined") window.__openstageStandIn = controls;
   const recorder = new PretendRecorder(speed, files);
@@ -436,6 +452,26 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     async onHotkey(listener) {
       hotkeyListeners.add(listener);
       return () => { hotkeyListeners.delete(listener); };
+    },
+    async copyText(text) {
+      if (controls.failNextCopy) {
+        controls.failNextCopy = false;
+        throw new Error("The pretend clipboard was told to fail.");
+      }
+      controls.copied.push(text);
+    },
+    async onTray(listener) {
+      trayListeners.add(listener);
+      return () => { trayListeners.delete(listener); };
+    },
+    async traySet(tooltip) {
+      controls.tooltip = tooltip;
+    },
+    async windowMinimize() {
+      controls.windowCalls.push("minimize");
+    },
+    async windowRestore() {
+      controls.windowCalls.push("restore");
     },
     async confirm(message) {
       return window.confirm(message);

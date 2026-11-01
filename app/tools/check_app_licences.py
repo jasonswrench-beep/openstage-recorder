@@ -55,7 +55,7 @@ def allowed(expression):
 def rust_libraries():
     result = subprocess.run(
         ["cargo", "metadata", "--format-version", "1", "--offline", "--filter-platform", "x86_64-pc-windows-msvc", "--manifest-path", str(APP / "src-tauri" / "Cargo.toml")],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     if result.returncode != 0:
         print("Could not read the Rust libraries (cargo metadata failed). They must already be on this computer.")

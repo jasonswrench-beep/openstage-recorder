@@ -27,7 +27,7 @@ JavaScript packages (bundled into the app window)
   from the Tauri project. They are the only JavaScript libraries in the page.
 
 Rust libraries of the app window (app/src-tauri, the Tauri framework and what it uses)
-  259 libraries for Windows, checked by app/tools/check_app_licences.py. All but five are on the allowed
+  277 libraries for Windows, checked by app/tools/check_app_licences.py. All but five are on the allowed
   licence list. The five are under the Mozilla Public License 2.0, which applies to the files of those
   libraries and not to this program: cssparser, cssparser-macros, dtoa-short, option-ext and selectors.
   The project owner accepted them on 2026-10-24. They come in through Tauri, are used unmodified, and their

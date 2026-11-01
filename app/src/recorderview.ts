@@ -17,6 +17,7 @@ import {
   type RecordSettings, type Session, type Source, type Target, type WindowChoice,
 } from "./capturesession.ts";
 import { recordingNameOf } from "./recordingfolder.ts";
+import { describeQuick, quickSettings, type QuickRecord, type QuickState } from "./quickrecord.ts";
 import { freshName } from "./settings.ts";
 
 export interface RecorderViewOptions {
@@ -33,6 +34,8 @@ export interface RecorderViewOptions {
   editRecording: (name: string, newestTake?: boolean) => void;
   /** Say something through the app's own status line as well (a recording's news while another screen is open). */
   announce?: (message: string) => void;
+  /** Quick record: one press to record with the choices made here, and a finished video and its path afterwards. Without it, the button is not offered. */
+  quick?: QuickRecord;
 }
 
 export interface RecorderView {
@@ -42,6 +45,8 @@ export interface RecorderView {
   /** The recordings folder has changed. */
   setLibrary(dir: string): Promise<void>;
   refreshRecordings(): Promise<void>;
+  /** Start a quick recording with the choices as they stand. Returns why it could not be started, or null once it has begun. */
+  startQuick(fromTray?: boolean): Promise<string | null>;
   destroy(): void;
 }
 
@@ -148,6 +153,9 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
 
   const problem = h("p", { id: id("problem"), class: "rv-note" });
   const start = h("button", { type: "button", id: id("start"), class: "os-cl-button rv-primary", "aria-describedby": id("problem") }, "Start recording");
+  const quickNote = h("p", { id: id("quick-note"), class: "rv-note" });
+  const quickBtn = h("button", { type: "button", id: id("quick"), class: "os-cl-button", "aria-describedby": id("quick-note"), hidden: opts.quick === undefined }, "Quick record");
+  quickNote.hidden = opts.quick === undefined;
   const setupTitle = h("h2", { id: id("setup-title") }, "Record");
   const setup = h("section", { class: "rv-section", "aria-labelledby": id("setup-title") },
     setupTitle,
@@ -157,7 +165,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "Starting"),
       field(id("countdown"), `Countdown, in seconds (0 to ${MAX_COUNTDOWN})`, countdown),
       h("div", { class: "rv-check" }, sounds, " ", h("label", { for: id("sounds") }, "Play a short sound for each step (the countdown, start, pause, resume and stop). Recommended for anyone who cannot see the screen. The sounds are never recorded."))),
-    problem, h("div", { class: "rv-actions" }, start));
+    problem, h("div", { class: "rv-actions" }, start, quickBtn), quickNote);
 
   // ---- the recording as it goes
   const liveTitle = h("h2", { id: id("live-title"), tabindex: "-1" }, "Recording");
@@ -177,9 +185,17 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   const done = h("button", { type: "button", class: "os-cl-button" }, "Done");
   const editNow = h("button", { type: "button", class: "os-cl-button rv-primary" }, "Edit the recording I just made");
   const doneRow = h("div", { class: "rv-actions" }, editNow, show, done);
+  // ---- a quick recording: what is happening to it, and the path of the finished video
+  const quickTitle = h("h3", { id: id("quick-title") }, "Quick recording");
+  const quickSay = h("p", { id: id("quick-message") });
+  const quickPath = h("input", { type: "text", id: id("quick-path"), class: "os-cl-input rv-path", readonly: "", spellcheck: "false", autocomplete: "off" });
+  const quickPathField = h("div", { class: "os-cl-field" }, h("label", { for: id("quick-path") }, "Path of the finished video"), h("div", { class: "rv-control" }, quickPath));
+  const copyPath = h("button", { type: "button", class: "os-cl-button rv-primary" }, "Copy the path");
+  const showVideo = h("button", { type: "button", class: "os-cl-button" }, "Show the video in its folder");
+  const quickBox = h("section", { class: "rv-section", "aria-labelledby": id("quick-title"), hidden: true }, quickTitle, quickSay, quickPathField, h("div", { class: "rv-actions" }, copyPath, showVideo));
   const controls = h("div", { class: "rv-actions" }, pause, stop, again);
   const markerRow = h("div", { class: "os-cl-field" }, h("label", { for: id("marker") }, "Words for a marker (optional)"), h("div", { class: "rv-control" }, markerLabel, " ", addMarker));
-  const live = h("section", { class: "rv-section", "aria-labelledby": id("live-title"), hidden: true }, liveTitle, pretendLive, now, controls, markerRow,
+  const live = h("section", { class: "rv-section", "aria-labelledby": id("live-title"), hidden: true }, liveTitle, pretendLive, now, quickBox, controls, markerRow,
     h("h3", {}, "Markers"), markers, h("h3", {}, "What the recorder said"), notes, where, doneRow);
 
   // ---- the recordings already made
@@ -228,6 +244,13 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     return settingsProblem(readSettings());
   }
 
+  /** Why a quick recording cannot start now, or an empty text. The name is not asked for: it is made. */
+  function quickProblem(): string {
+    if (library === "") return "Choose a recordings folder first, with the button under Your recordings.";
+    if (!usable) return "The recording program was not found, so nothing can be recorded. See the message under the check.";
+    return settingsProblem(quickSettings(readSettings(), "Quick recording")) ?? "";
+  }
+
   function showSetup(): void {
     const isPractice = practice.checked;
     realGroup.hidden = isPractice;
@@ -239,6 +262,12 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     problem.textContent = why !== "" ? why : again;
     start.setAttribute("aria-disabled", why === "" ? "false" : "true");
     if (why === "") start.removeAttribute("aria-disabled");
+    if (opts.quick !== undefined) {
+      const quickWhy = busyQuery ? why : quickProblem();
+      quickNote.textContent = quickWhy !== "" ? quickWhy : describeQuick(readSettings());
+      if (quickWhy === "") quickBtn.removeAttribute("aria-disabled");
+      else quickBtn.setAttribute("aria-disabled", "true");
+    }
   }
 
   function showSession(session: Session): void {
@@ -262,6 +291,30 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
       : b.preview ? `This is a pretend recording. Nothing is kept on your computer: it stays inside this page until you close it. The real app would keep it in: ${session.folder}${asideWords}`
       : `Kept in: ${session.folder}${asideWords}`;
   }
+
+  function showQuick(state: QuickState): void {
+    const active = state.phase !== "idle";
+    quickBox.hidden = !active;
+    quickSay.textContent = state.message;
+    quickPath.value = state.video;
+    quickPathField.hidden = state.video === "";
+    copyPath.hidden = state.video === "";
+    showVideo.hidden = state.video === "";
+    // A quick recording is told about by its own box; the plain Edit and Show buttons of a finished recording stay for the recording itself.
+  }
+
+  let quickPhase: QuickState["phase"] = opts.quick?.state.phase ?? "idle";
+  const unsubscribeQuick = opts.quick?.subscribe((state, messages) => {
+    const before = quickPhase;
+    quickPhase = state.phase;
+    showQuick(state);
+    if (messages.length > 0) {
+      say(messages);
+      opts.announce?.(messages.join(" "));
+    }
+    // The next thing to do is on the video's path: when the video is ready the focus goes to its Copy button, as the editing screen does for Show the video.
+    if (state.phase === "ready" && before !== "ready") copyPath.focus();
+  });
 
   const unsubscribe = c.subscribe((session, messages) => {
     showSession(session);
@@ -293,6 +346,37 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     }
     liveTitle.focus();
   });
+  async function startQuick(fromTray = false): Promise<string | null> {
+    const quick = opts.quick;
+    if (quick === undefined) return "Quick record is not available here.";
+    if (c.busy || quick.busy) return "A recording is already going.";
+    const why = quickProblem();
+    if (why !== "") return why;
+    const chosen = readSettings();
+    opts.keepSettings(chosen);
+    return quick.start(chosen, existing, fromTray);
+  }
+  quickBtn.addEventListener("click", async () => {
+    if (quickBtn.getAttribute("aria-disabled") === "true") {
+      say([quickNote.textContent || "Something needs a choice first."]);
+      return;
+    }
+    const message = await startQuick(false);
+    if (message !== null) {
+      say([message]);
+      return;
+    }
+    liveTitle.focus();
+  });
+  copyPath.addEventListener("click", async () => {
+    const ok = (await opts.quick?.copyPath()) === true;
+    say([ok ? "The path is copied." : "The path could not be copied. Select it in the box above and copy it."]);
+  });
+  showVideo.addEventListener("click", () => {
+    const state = opts.quick?.state;
+    if (state === undefined || state.recording === "") return;
+    void b.revealRecording(library, state.recording, state.videoRel).catch((err: unknown) => say([`Could not show the folder. ${errorText(err)}`]));
+  });
   pause.addEventListener("click", () => void c.togglePause());
   stop.addEventListener("click", () => void c.act("stop"));
   again.addEventListener("click", () => void c.act("restart"));
@@ -309,6 +393,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   });
   done.addEventListener("click", () => {
     c.dismiss();
+    opts.quick?.dismiss();
     name.value = freshName();
     say([]);
     showSetup();
@@ -391,6 +476,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   }
   showFolder();
   showSession(c.session);
+  if (opts.quick !== undefined) showQuick(opts.quick.state);
   showSetup();
   found.textContent = "Looking for the recording program...";
   check.setAttribute("aria-disabled", "true");
@@ -419,8 +505,10 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
       await refreshRecordings();
     },
     refreshRecordings,
+    startQuick,
     destroy() {
       unsubscribe();
+      unsubscribeQuick?.();
       opts.keepSettings(readSettings());
       root.remove();
     },
