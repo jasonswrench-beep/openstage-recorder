@@ -15,6 +15,7 @@ pub mod files;
 pub mod hotkeys;
 pub mod program;
 pub mod stream;
+pub mod tray;
 
 /// Tests that use the one recorder slot take turns, because the slot is shared by the whole program.
 #[cfg(test)]

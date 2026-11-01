@@ -77,6 +77,18 @@ Found by reading the code before checking the screens, and then caught by a brow
 
 Both faults are in OpenStage Author's `editor/src/editrecording.ts` and `recordingfolder.ts` as copied (main, commit `01fc056`). I have not changed that repository and will not without the owner's yes.
 
+## Quick record (2026-11-01)
+
+Built from the list item "tray start, countdown, save, copy the path": the part of a quick-capture tool that needs no server. The choices below are mine and each can be reversed.
+
+- **No new settings.** Quick record uses the Record screen's choices as they stand (the screen, the voice, the computer's sound, the webcam, the countdown and the sounds for each step), with a name made from the time, such as `Quick recording 2026-11-01 1405`. A sentence under the button says exactly what it will do and how to stop it, worked out from the same choices, so nothing is recorded that the screen did not say.
+- **A window is not remembered from one run to the next**, so a quick recording of "one window" records the whole screen, and the sentence says so. A part of a screen is kept.
+- **Stopping makes the video.** When the recording is stopped (the Stop button, Ctrl+Shift+F11 from any program, or Stop recording in the icon's menu), the app makes an edit from the takes with no cuts, saves it, makes `exports/<name>.mp4` with the same video maker as Make a video, and puts the video's path on the clipboard. The Record screen then shows the path in a box (it can be selected), **Copy the path**, **Show the video in its folder**, and the usual **Edit the recording I just made**. If the clipboard cannot be used, it says so and Copy the path tries again. It is an ordinary recording, so it can be edited afterwards. The words about the missing captions are still said.
+- **The icon in the notification area** (the "tray"), with Quick record, Stop recording, Show OpenStage Recorder and Quit. A click on the icon shows the window. Quick record from the icon puts the window on the taskbar so it is not filmed, and brings it back when the recording ends, to show the video and its path. Its tooltip says what is happening ("recording. Stop with Ctrl+Shift+F11", "making the video", "your quick recording is ready"). Quit is the window closing, so a recording still going is asked about in the same way.
+- **Not built:** a key that starts a recording from any program (the keys work only while a recording goes on); a separate profile for quick recordings; starting with the window closed (the app has to be open, and can be on the taskbar); closing the window to the icon (closing still quits).
+- **The clipboard** is written by the shell through the official Tauri clipboard plugin, called from Rust, so the page gets no new permission. The icon needs Tauri's `tray-icon` feature. Together they add 18 libraries (277 in all); the licence check passes.
+- **Checked:** the plain rules and the whole run with the pretend recorder (11 tests), the Rust rules for the icon's tooltip and the clipboard text (5 tests), 7 browser checks, and the shell compiles. **Never tried on Windows**: the icon, putting the window away, the clipboard, and a recording started this way.
+
 ## What it is
 
 A light screen recorder for Windows that works on its own, away from OpenStage Author. You pick what to record: an app (one window), a screen, or part of a screen. It records your microphone and the computer's sound, and the webcam if you choose. A simple editor lets you cut it up, add transitions, blur part of the picture, zoom in, and highlight the cursor. It saves an MP4. Captions are made outside the program to start with.

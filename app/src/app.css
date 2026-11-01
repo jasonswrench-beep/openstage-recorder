@@ -181,6 +181,10 @@ body {
   margin: 0.75rem 0;
 }
 
+.rv-path {
+  width: 100%;
+}
+
 .rv-primary {
   background: var(--os-cl-accent);
   color: var(--os-cl-on-accent);

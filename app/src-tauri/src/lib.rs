@@ -8,10 +8,13 @@
 //! The recording program, `openstage-capture`, is a separate program. Nothing here records anything. Each line it prints reaches the page
 //! untouched as a `stream-line` event, and the end of a run as a `stream-exit` event.
 
-use openstage_recorder_core::{files, hotkeys, program, stream};
+use openstage_recorder_core::{files, hotkeys, program, stream, tray};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
+use tauri_plugin_clipboard_manager::ClipboardExt as _;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_opener::OpenerExt as _;
 
@@ -207,6 +210,90 @@ fn hotkeys_clear(app: tauri::AppHandle) -> Result<(), String> {
     app.global_shortcut().unregister_all().map_err(|e| e.to_string())
 }
 
+// ---- the icon in the notification area, the window, and the clipboard
+//
+// A quick recording can be started and stopped from the icon while the window is out of the way. The icon only tells the page which
+// choice was made (a `tray` event carrying its id); the page decides what that means, and sets the icon's tooltip to say what is happening.
+
+const TRAY_ID: &str = "recorder";
+
+/// Bring the window back from the taskbar or the icon, in front and ready for the keyboard.
+fn show_main(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+/// Put the window out of the way, on the taskbar, so a quick recording does not film it.
+#[tauri::command]
+fn window_minimize(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.minimize();
+    }
+}
+
+/// Bring the window back, for example when a quick recording has finished.
+#[tauri::command]
+fn window_restore(app: tauri::AppHandle) {
+    show_main(&app);
+}
+
+/// Say, in the icon's tooltip, what the recorder is doing.
+#[tauri::command]
+fn tray_set_tooltip(app: tauri::AppHandle, tooltip: String) -> Result<(), String> {
+    match app.tray_by_id(TRAY_ID) {
+        Some(icon) => icon.set_tooltip(Some(tray::tooltip_text(&tooltip))).map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
+}
+
+/// Put a path (or a short sentence) on the clipboard.
+#[tauri::command]
+fn copy_text(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    tray::clipboard_text_ok(&text)?;
+    app.clipboard().write_text(text).map_err(|e| e.to_string())
+}
+
+/// Make the icon and its menu. If the system will not make one, the program carries on without it: everything it does is also in the window.
+fn make_tray(app: &tauri::App) -> tauri::Result<()> {
+    let items = tray::MENU
+        .iter()
+        .map(|(id, words)| MenuItem::with_id(app, *id, *words, true, None::<&str>))
+        .collect::<tauri::Result<Vec<_>>>()?;
+    let refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = items.iter().map(|i| i as &dyn tauri::menu::IsMenuItem<tauri::Wry>).collect();
+    let menu = Menu::with_items(app, &refs)?;
+    let mut builder = TrayIconBuilder::with_id(TRAY_ID)
+        .tooltip("OpenStage Recorder")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            // Quitting is the window closing, so a recording that is still going is asked about in one place (the page).
+            "quit" => {
+                show_main(app);
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.close();
+                }
+            }
+            "show" => show_main(app),
+            id @ ("quick" | "stop") => {
+                let _ = app.emit("tray", id.to_string());
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|icon, event| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                show_main(icon.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+    builder.build(app)?;
+    Ok(())
+}
+
 // ---- the program
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -215,6 +302,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .setup(|app| {
+            if let Err(err) = make_tray(app) {
+                eprintln!("The icon in the notification area could not be made: {err}");
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             default_library,
             ensure_library,
@@ -233,6 +327,10 @@ pub fn run() {
             stream_stop,
             hotkeys_set,
             hotkeys_clear,
+            window_minimize,
+            window_restore,
+            tray_set_tooltip,
+            copy_text,
         ])
         .on_window_event(|window, event| {
             // If the window is gone, a recording must not carry on with nothing to command it, and the keys are let go.

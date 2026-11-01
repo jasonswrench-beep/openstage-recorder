@@ -25,6 +25,10 @@ The layout and the paths of the first four are the same as in OpenStage Author o
 
 The cursor highlight. The installer is set up but has never been built or run (`docs/recorder/INSTALLER-AND-SIGNING.md`), and is not signed. `docs/recorder/plan.md` says what each is and the order.
 
+## Quick record
+
+On the Record screen, **Quick record** starts a recording at once with the choices on the screen (a sentence under the button says what they are), and when you stop it, it makes the video and copies the video's path, ready to paste into a message. The icon in the notification area can start and stop it too, with the window out of the way. It has not been tried on Windows yet. How it works and what was left out: `docs/recorder/plan.md`.
+
 ## Trying it
 
 On Windows, double-click one of these, in the `app` folder. Both ask before they download anything.

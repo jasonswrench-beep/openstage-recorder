@@ -868,6 +868,129 @@ await check("a video that is being made is asked about before leaving, and leavi
   assertEqual(await page.locator(".os-ed").count(), 1, "answering no keeps the editing screen");
 });
 
+// ---- Quick record ----
+
+await check("Quick record sits beside Start recording, says in a sentence what it will do from the choices on the screen, and the sentence follows them", async (page, t) => {
+  const quick = page.getByRole("button", { name: "Quick record" });
+  assertEqual(await quick.count(), 1, "one Quick record button");
+  assertMatch((await quick.getAttribute("aria-describedby")) ?? "", /quick-note/, "the sentence is the button's description");
+  const note = page.locator('[id$="-quick-note"]');
+  assertMatch(await note.textContent(), /^Quick record starts after a countdown of 3 seconds and records the whole of screen 1, with your voice \(the default microphone\), the computer's own sound and no webcam\. Stop it with Ctrl\+Shift\+F11 from any program/, "what it will do");
+  await page.getByLabel(/^Countdown/).fill("0");
+  await page.getByLabel("Your voice", { exact: true }).selectOption("none");
+  assertMatch(await note.textContent(), /^Quick record starts at once and records the whole of screen 1, with no voice, /, "the sentence follows the choices");
+  assertEqual(await quick.getAttribute("aria-disabled"), null, "available");
+  await page.getByLabel("Name of the recording").fill("");
+  assertEqual(await quick.getAttribute("aria-disabled"), null, "a missing name does not stop it: the name is made");
+  await page.getByLabel(/^Countdown/).fill("99");
+  assertEqual(await quick.getAttribute("aria-disabled"), "true", "a wrong countdown does");
+  assertMatch(await note.textContent(), /countdown is a whole number of seconds/, "and says why");
+  await quick.focus();
+  await t.key("Enter");
+  assertMatch(await t.said(), /countdown is a whole number of seconds/, "pressing it says so");
+  assertEqual(await page.getByRole("heading", { name: "Recording", exact: true }).isVisible().catch(() => false), false, "nothing started");
+});
+
+await check("Quick record records at once, and when it is stopped makes the video, copies its path, says so, and puts the focus on Copy the path", async (page, t) => {
+  await page.getByLabel(/^Countdown/).fill("0");
+  await page.getByLabel("Name of the recording").fill("Typed name");
+  await page.getByRole("button", { name: "Quick record" }).focus();
+  await t.key("Enter");
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  await t.waitNow(/^Recording take 1/);
+  const args = await page.evaluate(() => window.__openstageStandIn.started.find((a) => a[0] === "record"));
+  assertEqual(args?.[0], "record", "the recorder was started");
+  assertMatch(args[args.indexOf("--title") + 1], /^Quick recording \d{4}-\d{2}-\d{2} \d{4}$/, "named for the time, not the typed name");
+  assertEqual(args[args.indexOf("--source") + 1], "screen", "the real screen, not a practice");
+  await page.waitForTimeout(150);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("button", { name: "Copy the path" }).waitFor();
+  await page.waitForFunction(() => document.activeElement?.textContent === "Copy the path");
+  assertEqual(await t.focusLabel(), "Copy the path", "the focus is on the next thing to do");
+  const path = await page.getByLabel("Path of the finished video").inputValue();
+  assertMatch(path, /\\exports\\Quick recording \d{4}-\d{2}-\d{2} \d{4}\.mp4$/, "the path of the video is shown");
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.copied), [path], "and it was put on the clipboard");
+  const said = await page.locator('[id$="-quick-message"]').textContent();
+  assertMatch(said, /^The video was made\. /, "the video was made");
+  assertMatch(said, /This video has no captions\./, "the missing captions are still said");
+  assertMatch(said, /Its path is copied: paste it where you need it\.$/, "the path is said to be copied");
+  assertMatch(await t.said(), /Its path is copied/, "and it is spoken through the status line");
+  assertEqual(await page.getByLabel("Path of the finished video").getAttribute("readonly"), "", "the path can be selected but not changed");
+  await page.getByRole("button", { name: "Show the video in its folder" }).click();
+  await page.waitForTimeout(100);
+  assertMatch(await page.evaluate(() => window.__openstageStandIn.revealed.at(-1)), /^Quick recording \d{4}-\d{2}-\d{2} \d{4}\.capture\/exports\/Quick recording \d{4}-\d{2}-\d{2} \d{4}\.mp4$/, "it asks to show the video in the recording's exports folder");
+  await page.getByRole("button", { name: "Copy the path" }).click();
+  assertEqual((await page.evaluate(() => window.__openstageStandIn.copied)).length, 2, "Copy the path copies again");
+  assertMatch(await t.said(), /The path is copied\./, "and says so");
+  await page.getByRole("button", { name: "Edit the recording I just made" }).click();
+  await page.getByRole("heading", { level: 2, name: /^Edit the recording: Quick recording / }).waitFor();
+  assertEqual(await t.standIn(() => [...window.__openstageStandIn.files.keys()].filter((k) => k.endsWith("edit.json")).length), 1, "a quick recording is an ordinary recording: its edit was saved and it opens for editing");
+  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  assertEqual(await page.locator('[id$="-quick-message"]').isHidden(), true, "Done puts the quick box away");
+});
+
+await check("when the clipboard cannot be used the path is still shown, the failure is said, and Copy the path tries again", async (page, t) => {
+  await page.evaluate(() => { window.__openstageStandIn.failNextCopy = true; });
+  await page.getByLabel(/^Countdown/).fill("0");
+  await page.getByRole("button", { name: "Quick record" }).click();
+  await t.waitNow(/^Recording take 1/);
+  await page.waitForTimeout(150);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("button", { name: "Copy the path" }).waitFor();
+  assertMatch(await page.locator('[id$="-quick-message"]').textContent(), /The path could not be copied\. Press Copy the path, or select it above and copy it\.$/, "the failure is said in words");
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.copied), [], "nothing was copied");
+  assert((await page.getByLabel("Path of the finished video").inputValue()).endsWith(".mp4"), "the path is there to select");
+  await page.getByRole("button", { name: "Copy the path" }).click();
+  assertEqual((await page.evaluate(() => window.__openstageStandIn.copied)).length, 1, "pressing the button copies it");
+});
+
+await check("from the icon in the notification area: Quick record puts the window away and starts, Stop makes the video and brings the window back, and the tooltip says what is happening", async (page, t) => {
+  await page.getByLabel(/^Countdown/).fill("0");
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.tooltip), "OpenStage Recorder", "the tooltip names the app to begin with");
+  await page.evaluate(() => window.__openstageStandIn.pressTray("quick"));
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.windowCalls), ["minimize"], "the window was put away so it is not filmed");
+  await page.waitForFunction(() => /recording\. Stop with Ctrl\+Shift\+F11$/.test(window.__openstageStandIn.tooltip));
+  await page.waitForTimeout(150);
+  await page.evaluate(() => window.__openstageStandIn.pressTray("stop"));
+  await page.getByRole("button", { name: "Copy the path" }).waitFor();
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.windowCalls), ["minimize", "restore"], "the window came back, once, to show the video");
+  assertEqual((await page.evaluate(() => window.__openstageStandIn.copied)).length, 1, "the path is on the clipboard");
+  await page.waitForFunction(() => /your quick recording is ready$/.test(window.__openstageStandIn.tooltip));
+  await page.getByRole("button", { name: "Done" }).click();
+  await page.waitForFunction(() => window.__openstageStandIn.tooltip === "OpenStage Recorder");
+});
+
+await check("Quick record from the icon says why it did not start and brings the window back, instead of hiding it for nothing", async (page, t) => {
+  await page.getByLabel(/^Countdown/).fill("99");
+  await page.evaluate(() => window.__openstageStandIn.pressTray("quick"));
+  await page.waitForFunction(() => window.__openstageStandIn.windowCalls.includes("restore"));
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.windowCalls), ["restore"], "the window was not put away");
+  assertMatch(await t.said(), /countdown is a whole number of seconds/, "the reason is on the status line");
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.started.filter((a) => a[0] === "record").length), 0, "nothing was recorded");
+});
+
+await check("Stop from the icon with nothing recording says so, and Quick record is refused in words while the editing screen is open", async (page, t) => {
+  await page.evaluate(() => window.__openstageStandIn.pressTray("stop"));
+  assertMatch(await t.said(), /Nothing is recording\./, "stop with nothing going");
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  await page.evaluate(() => window.__openstageStandIn.pressTray("quick"));
+  await page.waitForFunction(() => window.__openstageStandIn.windowCalls.includes("restore"));
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.windowCalls), ["restore"], "the window came forward, not away");
+  assertEqual(await page.evaluate(() => window.__openstageStandIn.started.filter((a) => a[0] === "record").length), 1, "only the earlier recording was ever started");
+});
+
+await check("Quick record cannot start without the recording program, and says so", async (page, t) => {
+  const quick = page.getByRole("button", { name: "Quick record" });
+  assertEqual(await quick.getAttribute("aria-disabled"), "true", "marked unavailable");
+  assertMatch(await page.locator('[id$="-quick-note"]').textContent(), /The recording program was not found, so nothing can be recorded/, "the reason is the description");
+  await quick.focus();
+  await t.key("Enter");
+  assertMatch(await t.said(), /nothing can be recorded/, "pressing it says so");
+}, { search: "&norecorder=1" });
+
 await check("every box, choice and button on the editing screen has a name, and the screen fits 320 pixels without sideways scrolling", async (page, t) => {
   await makeRecording(page, t, { webcam: true });
   await openEdit(page, t);

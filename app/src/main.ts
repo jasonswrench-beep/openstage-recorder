@@ -5,6 +5,7 @@ import { h } from "../../capture-timeline/src/dom.ts";
 import { backend, errorText } from "./backend.ts";
 import { RecorderController } from "./capturecontroller.ts";
 import { mountEditView, type EditView } from "./editview.ts";
+import { QuickRecord, trayWords } from "./quickrecord.ts";
 import { mountRecorderView } from "./recorderview.ts";
 import { loadSettings, saveSettings, type StoredSettings } from "./settings.ts";
 
@@ -14,6 +15,7 @@ async function main(): Promise<void> {
   const stored: StoredSettings = loadSettings();
   const controller = new RecorderController(backend);
   let library = stored.library ?? (await backend.defaultLibrary().catch(() => ""));
+  const quick = new QuickRecord(backend, controller, () => library);
 
   const heading = h("h1", {}, "OpenStage Recorder");
   // The icon is decoration: the heading already says what the app is, so the picture has no words of its own.
@@ -26,6 +28,12 @@ async function main(): Promise<void> {
   app.replaceChildren(header, main);
   document.documentElement.lang = "en";
   void backend.setTitle("OpenStage Recorder");
+
+  /** Say something on the Record screen's status line. */
+  const statusLine = (message: string): void => {
+    const status = main.querySelector<HTMLElement>("[role=status]");
+    if (status) status.replaceChildren(h("span", { class: "rv-said" }, message));
+  };
 
   const keep = (): void => {
     saveSettings(stored);
@@ -73,9 +81,46 @@ async function main(): Promise<void> {
       return picked;
     },
     editRecording: openEditor,
+    quick,
   });
 
-  backend.guardClose(() => (controller.busy ? "A recording is still going. Closing the window stops it. Close anyway?" : editing?.closeQuestion() ?? null));
+  // ---- the icon in the notification area: Quick record and Stop from the taskbar, with the window out of the way
+  // The tooltip says what is happening. A quick recording started from the icon puts the window away so it is not filmed, and brings it back when
+  // the recording ends, to show the video and its path.
+  let windowAway = false;
+  const showTooltip = (): void => {
+    void backend.traySet(trayWords(controller.session.phase, quick.state.phase)).catch(() => undefined);
+  };
+  controller.subscribe(showTooltip);
+  quick.subscribe((state) => {
+    showTooltip();
+    if (windowAway && state.phase !== "recording" && state.phase !== "idle") {
+      windowAway = false;
+      void backend.windowRestore().catch(() => undefined);
+    }
+  });
+  void backend.onTray(async (id) => {
+    if (id === "stop") {
+      await controller.act("stop");
+      return;
+    }
+    if (id !== "quick") return;
+    if (editing !== undefined) {
+      await backend.windowRestore().catch(() => undefined);
+      statusLine("The editing screen is open. Go back to the recordings with Back to recordings, then use Quick record.");
+      return;
+    }
+    const message = await view.startQuick(true);
+    if (message !== null) {
+      await backend.windowRestore().catch(() => undefined);
+      statusLine(message);
+      return;
+    }
+    windowAway = true;
+    await backend.windowMinimize().catch(() => { windowAway = false; });
+  }).catch(() => undefined);
+
+  backend.guardClose(() => (controller.busy ? "A recording is still going. Closing the window stops it. Close anyway?" : quick.busy ? "The video of your quick recording is still being made. Closing the window stops it. Close anyway?" : editing?.closeQuestion() ?? null));
   view.focus();
   if (library === "") {
     const status = main.querySelector<HTMLElement>("[role=status]");

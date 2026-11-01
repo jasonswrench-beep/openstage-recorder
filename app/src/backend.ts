@@ -71,6 +71,19 @@ export interface RecorderBackend {
   /** Called with the id of a key each time it is pressed. */
   onHotkey(listener: (id: string) => void): Promise<() => void>;
 
+  // ---- the icon in the notification area, the window and the clipboard (for a quick recording)
+
+  /** Put text (a path) on the clipboard. Rejects if it could not be done. */
+  copyText(text: string): Promise<void>;
+  /** Called with the id of a choice made in the menu of the icon in the notification area: `quick` or `stop`. */
+  onTray(listener: (id: string) => void): Promise<() => void>;
+  /** Say, in the icon's tooltip, what the recorder is doing. */
+  traySet(tooltip: string): Promise<void>;
+  /** Put the window out of the way, on the taskbar, so a quick recording does not film it. */
+  windowMinimize(): Promise<void>;
+  /** Bring the window back in front, ready for the keyboard. */
+  windowRestore(): Promise<void>;
+
   // ---- the window
 
   confirm(message: string): Promise<boolean>;
@@ -124,6 +137,11 @@ const tauriBackend: RecorderBackend = {
   hotkeysSet: (bindings) => invoke<HotkeyResult[]>("hotkeys_set", { bindings }),
   hotkeysClear: () => invoke<void>("hotkeys_clear"),
   onHotkey: (listener) => listen<string>("hotkey", (e) => listener(e.payload)),
+  copyText: (text) => invoke<void>("copy_text", { text }),
+  onTray: (listener) => listen<string>("tray", (e) => listener(e.payload)),
+  traySet: (tooltip) => invoke<void>("tray_set_tooltip", { tooltip }),
+  windowMinimize: () => invoke<void>("window_minimize"),
+  windowRestore: () => invoke<void>("window_restore"),
   confirm: (message) => confirmDialog(message, { title: "OpenStage Recorder", kind: "warning" }),
   setTitle: (title) => getCurrentWindow().setTitle(title),
   guardClose(question) {
