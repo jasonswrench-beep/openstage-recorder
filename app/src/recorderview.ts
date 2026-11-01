@@ -86,6 +86,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   const display = h("select", { id: id("display"), class: "os-cl-input" });
   const windowSel = h("select", { id: id("window"), class: "os-cl-input" }, h("option", { value: "" }, "No window chosen yet"));
   const findWindows = h("button", { type: "button", class: "os-cl-button" }, "Look for windows");
+  const pickWindow = h("button", { type: "button", class: "os-cl-button" }, "Pick a window by clicking it");
   const region = (key: string, label: string, value: string) => {
     const input = h("input", { type: "text", id: id(`region-${key}`), class: "os-cl-input", inputmode: "numeric", size: "6", value });
     return { input, field: h("div", { class: "os-cl-field os-cl-field-inline" }, h("label", { for: id(`region-${key}`) }, label), input) };
@@ -106,6 +107,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   sounds.checked = s.sounds;
   const noteMouse = h("input", { type: "checkbox", id: id("notemouse") });
   noteMouse.checked = s.interactions !== "off";
+  const hideBox = h("input", { type: "text", id: id("hide"), class: "os-cl-input", maxlength: "400", value: s.hide, autocomplete: "off", spellcheck: "false" });
 
   const field = (fieldId: string, label: string, control: HTMLElement, extra: Node[] = []) =>
     h("div", { class: "os-cl-field" }, h("label", { for: fieldId }, label), h("div", { class: "rv-control" }, control, ...extra));
@@ -136,12 +138,14 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
       systemGainDb: systemGain.value.trim() === "" ? Number.NaN : Number(systemGain.value),
       // The keys that are pressed are never noted from here: the mouse is, or nothing is.
       interactions: noteMouse.checked ? "no-keys" : "off",
+      hide: hideBox.value,
       countdownSeconds: countdown.value.trim() === "" ? Number.NaN : Number(countdown.value), sounds: sounds.checked,
     };
   }
 
   const screenGroup = h("div", {}, field(id("display"), "Which screen", display));
-  const windowGroup = h("div", {}, field(id("window"), "Which window", windowSel, [findWindows]));
+  const windowGroup = h("div", {}, field(id("window"), "Which window", windowSel, [findWindows, document.createTextNode(" "), pickWindow]),
+    h("p", { class: "rv-note" }, "Or press Pick a window by clicking it, then click the window you want. The click only chooses the window, and nothing in it is pressed. This window goes out of the way first, and comes back after. Press Escape to cancel."));
   const regionGroup = h("div", {}, h("p", { class: "rv-note" }, "Choose which screen above, then the part of it, in pixels, counted from the top left corner. It must be at least 64 by 64."),
     h("div", { class: "os-cl-fields" }, left.field, top.field, width.field, height.field));
   const realGroup = h("div", {},
@@ -149,6 +153,9 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "The mouse"),
       h("div", { class: "rv-check" }, noteMouse, " ", h("label", { for: id("notemouse") }, "Note where the mouse goes and where I click. This lets a video show a ring round the pointer, and lets the editor suggest zooms from your clicks.")),
       h("p", { class: "rv-note" }, "The notes stay inside the recording, on this computer, and are never published. They also say which window was in front and the name of what you clicked, which can give away private things such as the title of a page. The keys you press are never noted. Leave this off when you do not need it.")),
+    h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "Windows to hide"),
+      field(id("hide"), "Hide windows with these words in their title or program name (separate several with semicolons, for example KeePass; Outlook)", hideBox),
+      h("p", { class: "rv-note" }, "Wherever such a window is on the screen, the video has a plain dark box instead, and nothing of the window is kept. This is for recording a screen or part of one, not one window. The whole window is covered even where another window is in front of it, and a window that has only just opened can show for a moment. The notes of the mouse still name the window that is in front, and the sound and the webcam are not changed. Nothing is hidden from anyone looking at your screen while you record.")),
     h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "Sound, and a picture of you"),
       field(id("microphone"), "Your voice", microphone), field(id("output"), "The computer's own sound", output), field(id("camera"), "A webcam", camera),
       h("p", { class: "rv-note" }, "A webcam, and your voice, are recorded only if you choose them. The computer's own sound includes a screen reader's speech."),
@@ -426,7 +433,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     say([`Recordings are now kept in ${chosen}.`]);
     changeFolder.focus();
   });
-  for (const el of [name, practice, target, display, windowSel, microphone, output, camera, micGain, systemGain, countdown, sounds, noteMouse, left.input, top.input, width.input, height.input]) {
+  for (const el of [name, practice, target, display, windowSel, microphone, output, camera, micGain, systemGain, countdown, sounds, noteMouse, hideBox, left.input, top.input, width.input, height.input]) {
     el.addEventListener("input", showSetup);
     el.addEventListener("change", showSetup);
   }
@@ -447,6 +454,42 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     if (listed.length > 0) windowSel.focus();
   }
   findWindows.addEventListener("click", () => { if (findWindows.getAttribute("aria-disabled") !== "true") void lookForWindows(); });
+
+  /** Choose the window by clicking it: the recorder waits for the click, this window steps aside, and what it says is the chosen window (or why none). */
+  async function pickByClicking(): Promise<void> {
+    if (busyQuery || !usable || c.busy) { say([c.busy ? "A recording is going, so a window cannot be picked now." : usable ? "Already looking." : "The recording program was not found."]); return; }
+    busyQuery = true;
+    pickWindow.setAttribute("aria-disabled", "true");
+    findWindows.setAttribute("aria-disabled", "true");
+    say(["Click the window you want to record. This window goes out of the way first. Press Escape to cancel."]);
+    showSetup();
+    const chosen: WindowChoice[] = [];
+    let why = "";
+    await b.windowMinimize().catch(() => undefined);
+    const job = await runOneShot(b, ["pick-window", "--timeout-ms", "30000"], (line) => {
+      const w = parseWindow(line);
+      if (w) chosen.push(w);
+      const f = parseFinding(line);
+      if (f && f.check === "window-chosen" && !f.ok) why = f.message;
+    }, 45_000);
+    await b.windowRestore().catch(() => undefined);
+    busyQuery = false;
+    pickWindow.removeAttribute("aria-disabled");
+    findWindows.removeAttribute("aria-disabled");
+    const picked = chosen[0];
+    if (picked !== undefined) {
+      if (![...windowSel.options].some((o) => o.value === picked.title)) windowSel.append(h("option", { value: picked.title }, picked.label));
+      windowSel.value = picked.title;
+      say([`Chosen: ${picked.label}.`]);
+      showSetup();
+      windowSel.focus();
+      return;
+    }
+    say([why !== "" ? why : job.problem !== "" ? `No window was chosen. ${job.problem}` : "No window was chosen."]);
+    showSetup();
+    pickWindow.focus();
+  }
+  pickWindow.addEventListener("click", () => { if (pickWindow.getAttribute("aria-disabled") !== "true") void pickByClicking(); });
 
   async function runCheck(): Promise<void> {
     if (!usable || checking || c.busy) { say([c.busy ? "A recording is going, so the check waits until it is over." : "The recording program was not found."]); return; }

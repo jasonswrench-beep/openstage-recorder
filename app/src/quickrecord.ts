@@ -15,7 +15,7 @@ import { editText, readProject } from "../../capture-timeline/src/project.ts";
 import type { RecorderBackend } from "./backend.ts";
 import { runOneShot, type CaptureBackend, type RecorderController } from "./capturecontroller.ts";
 import { applyExportLine, exportPlan, finishedWords, initialExport } from "./captureexport.ts";
-import { recordingPath, recordingFolderName, settingsProblem, type Phase, type RecordSettings } from "./capturesession.ts";
+import { hideWords, recordingPath, recordingFolderName, settingsProblem, type Phase, type RecordSettings } from "./capturesession.ts";
 import { EXPORT_LIMIT_MS } from "./editview.ts";
 import { DEFAULT_HOTKEYS } from "./recorder.ts";
 import { recordingFolder, recordingNameOf, type RecordingBackend } from "./recordingfolder.ts";
@@ -58,7 +58,7 @@ export function describeQuick(base: RecordSettings): string {
       : `the whole of screen ${s.display}${base.target === "window" ? " (a window is not remembered from one time to the next, so a quick recording takes the whole screen)" : ""}`;
   const start = s.countdownSeconds === 0 ? "at once" : `after a countdown of ${s.countdownSeconds} ${s.countdownSeconds === 1 ? "second" : "seconds"}`;
   const stop = KEYS.get("stop") ?? "the stop key";
-  return `Quick record starts ${start} and records ${what}, with ${voiceWords(s.microphone)}, ${soundWords(s.output)} and ${cameraWords(s.camera)}. Stop it with ${stop} from any program, the Stop button, or Stop recording in the menu of the icon in the notification area. ${s.interactions === "off" ? "" : "The mouse is noted too: where it goes and where you click. "}Then the video is made and its path is copied, ready to paste.`;
+  return `Quick record starts ${start} and records ${what}, with ${voiceWords(s.microphone)}, ${soundWords(s.output)} and ${cameraWords(s.camera)}. Stop it with ${stop} from any program, the Stop button, or Stop recording in the menu of the icon in the notification area. ${s.interactions === "off" ? "" : "The mouse is noted too: where it goes and where you click. "}${hideWords(s.hide).length === 0 || s.target === "window" ? "" : `Windows with ${hideWords(s.hide).join(", ")} in their title or program name are covered in the video. `}Then the video is made and its path is copied, ready to paste.`;
 }
 
 /** The icon's tooltip: what the recorder is doing, short enough to read at a glance. */

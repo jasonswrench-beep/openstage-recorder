@@ -128,6 +128,15 @@ impl Platform for WindowsPlatform {
         crate::win_windows::list_windows()
     }
 
+    fn pick_window(&self, wait: std::time::Duration) -> Result<crate::WindowPick, ScreenError> {
+        crate::win_pick_window::pick_window(wait)
+    }
+
+    fn hide_windows(&self, words: &[String]) -> Result<crate::HideProvider, ScreenError> {
+        crate::win::prepare();
+        Ok(crate::win_windows::hide_provider(words))
+    }
+
     fn start_window_capture(
         &self,
         window: &crate::WindowInfo,
