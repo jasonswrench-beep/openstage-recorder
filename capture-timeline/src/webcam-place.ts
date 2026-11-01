@@ -22,13 +22,14 @@ export const WEBCAM_WHERES: ReadonlyArray<{ readonly value: WebcamWhere; readonl
   { value: "fill", label: "Fills the whole picture" },
 ];
 
-/** The width of the small picture as a share of the picture's width, in ten-thousandths. Its height is the same share, so the picture keeps its shape. */
-const SIZES: Readonly<Record<WebcamSize, number>> = { small: 1500, medium: 2200, large: 3500 };
+/** The width of the small picture as a share of the picture's width, in ten-thousandths. Its height is the same share, so the picture keeps its shape.
+ * These are OpenStage Author's sizes (`capture-edit/src/webcamPlace.ts` there), so that an edit saved in one program shows the same choice in the other. */
+const SIZES: Readonly<Record<WebcamSize, number>> = { small: 1800, medium: 2200, large: 3200 };
 
 export const WEBCAM_SIZES: ReadonlyArray<{ readonly value: WebcamSize; readonly label: string }> = [
-  { value: "small", label: "Small, 15 percent of the width" },
+  { value: "small", label: "Small, 18 percent of the width" },
   { value: "medium", label: "Medium, 22 percent (the default)" },
-  { value: "large", label: "Large, 35 percent" },
+  { value: "large", label: "Large, 32 percent" },
 ];
 
 /** The gap left at the side and at the top or bottom, in ten-thousandths. The same as the default's. */
