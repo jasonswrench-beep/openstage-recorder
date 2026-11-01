@@ -9,8 +9,8 @@ What was copied into OpenStage Recorder from OpenStage Author, and from which co
 | Source commit | `01fc056b2e121295c798a86f001f3f48c1620e3a` |
 | Source commit date | 2026-10-23T18:32:44-04:00 |
 | Files copied | 246 |
-| Files changed after copying | 10: `capture-edit/src/fromTakes.ts`, `capture-edit/test/fromTakes.test.ts`, `capture-timeline/src/callout-panel.ts`, `editor.ts`, `index.ts`, `panel.ts`, `preview-panel.ts`, `project.ts`, `session.ts` and `docs/capture/capture-project-format.md`. What changed and why is in `EXTRACTED-FROM-OPENSTAGE.md`, under "Changes made inside the copied folders". The checksums in the table below are of the files as copied |
-| Files added to the copied folders after copying | 3: `capture-timeline/src/webcam-place.ts`, `capture-timeline/test/webcam-place.test.ts` and `capture-timeline/test/balance.test.ts` (not in the table below) |
+| Files changed after copying | 17: `capture-edit/src/fromTakes.ts`, `capture-edit/test/fromTakes.test.ts`, `capture-timeline/src/callout-panel.ts`, `editor.ts`, `index.ts`, `panel.ts`, `preview-panel.ts`, `project.ts`, `session.ts` and `docs/capture/capture-project-format.md`; and, set to OpenStage Author's own versions on 2026-11-01, `capture-edit/src/items.ts`, `preview.ts`, `validate.ts`, `capture-edit/test/items.test.ts`, `tracks.test.ts`, `capture-timeline/README.md` and `capture-timeline/tools/browser-check.mjs`. What changed and why is in `EXTRACTED-FROM-OPENSTAGE.md`, under "Changes made inside the copied folders". The checksums in the table below are of the files as copied |
+| Files added to the copied folders after copying | 4: `capture-timeline/src/webcam-place.ts`, `capture-timeline/test/webcam-place.test.ts`, `capture-timeline/test/balance.test.ts` and `capture-timeline/tools/preview-sound-check.mjs` (not in the table below) |
 
 ## What was copied
 
@@ -51,7 +51,7 @@ The paths are the same as in OpenStage Author on purpose.
 | `cargo check --workspace --all-targets --target x86_64-pc-windows-msvc` (the Windows-only code, type-checked from Linux) | Clean. This says it compiles, nothing about how it behaves on Windows |
 | `capture-edit`: `tsc` and `node --test` | Clean; 217 tests passed |
 | `capture-timeline`: `tsc` and `node --test` | Clean; 143 tests passed |
-| `capture-timeline`: `node tools/browser-check.mjs` (a real browser, keyboard only) | 73 passed, **2 failed** (see below) |
+| `capture-timeline`: `node tools/browser-check.mjs` (a real browser, keyboard only) | 73 passed, **2 failed** (see below; OpenStage Author's repaired versions of those two checks were taken in on 2026-11-01 and have not been run here) |
 
 ### The two browser checks that fail
 

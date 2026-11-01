@@ -178,7 +178,7 @@ test("blur and redaction say that the viewer cannot undo them", () => {
   const blur = ok(addBlur(t.model, t.overlays, { startMs: 1000, durationMs: 4000, rect: HALF }));
   assert.match(blur.message, /Added the blur "Blur" .* Once the video is exported, nobody can undo this blur\.$/);
   const redact = ok(addRedact(t.model, t.overlays, { startMs: 1000, durationMs: 4000, rect: HALF, color: "#222222" }));
-  assert.match(redact.message, /Added the redaction "Redaction" .* nobody can undo this redaction\.$/);
+  assert.match(redact.message, /Added the cover "Cover" .* nobody can take this cover off\.$/);
   assert.deepEqual(validate(redact.model), [], "neither needs alt text");
 });
 

@@ -48,6 +48,19 @@ The four copied folders are meant to stay the same as OpenStage Author's. Two sm
 
 Not run on a real screen reader. The two boxes are ordinary labelled selects with a hint tied to them by `aria-describedby`, and Escape returns to the list like the other selects.
 
+## Taken back from OpenStage Author (2026-11-01)
+
+OpenStage Author carried back this product's findings 8 and 9, and the repairs of the two browser checks in finding 6, on 2026-10-28 (its commit `7f6adf3`). This copy had not taken them in turn. On 2026-11-01 these files were set to OpenStage Author's versions, and one was added, so that the two copies drift less.
+
+| File | What it is |
+|---|---|
+| `capture-edit/src/items.ts`, `preview.ts`, `validate.ts`, and the tests `capture-edit/test/items.test.ts` and `tracks.test.ts` | The Cover tool is called a cover everywhere an author reads or hears it: `Added the cover "Cover" ... nobody can take this cover off`, `a cover over ... of the picture`, `That track takes text, shape, arrow, blur, cover`. It said "redaction" before (finding 8 in `CARRY-BACK-TO-OPENSTAGE.md`). The kind is still `redact` in the file, so no saved edit changes |
+| `capture-timeline/tools/browser-check.mjs` | The two checks that failed when the code was copied are repaired: the tool bar's list of buttons is brought up to date, and a box named by `aria-labelledby` counts as named (finding 6) |
+| `capture-timeline/tools/preview-sound-check.mjs` (new) and one line in `capture-timeline/README.md` | A check that the editing preview makes sound when the recording is served from another web address than the page, as in the installed app. It runs a muted browser and plays nothing aloud (finding 9) |
+| `app/tools/browser-check.mjs` (this product's own) | The Cover check expects the new words |
+
+Still different from OpenStage Author: the `callouts` option (this copy only); the webcam place boxes; the loudness code; and the comment above the preview's CORS line. For the webcam boxes, both write the same clip `placement`, so an edit opens in either program, but the sizes differ. Small and large here are 15 and 35 percent of the width, and OpenStage Author's are 18 and 32, so a small or large saved in one shows as set some other way in the other (medium and the corners agree). OpenStage Author also has an extra "usual place" choice. Which sizes to keep is the owner's choice and has not been made. For the loudness code, both read the same `mix` field with the same limits; where the numbers are checked differs, and how a number out of range is treated was not compared.
+
 ## Something to carry back to OpenStage Author
 
 Two faults in OpenStage Author's recording editor dialog (`editor/src/editrecording.ts` and `recordingfolder.ts`, as at `01fc056`). Both were found by reading and then shown by a browser check here. Neither loses an author's work: the first refuses to save, the second makes the video maker refuse.

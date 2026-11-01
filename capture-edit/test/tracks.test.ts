@@ -86,7 +86,7 @@ test("an overlay moves to another overlay track, and a zoom only to a zoom track
   assert.match(refused(moveItemToTrack(text.model, id, s.screenTrack)), /that track holds clips, not overlays or zooms\./);
   const rect = { x: 2000, y: 2000, width: 5000, height: 5000 };
   const zoom = ok(addZoom(z.model, z.focus?.[0] ?? "", { startMs: 1000, durationMs: 3000, rect, description: "part", name: "Close up" }));
-  assert.match(refused(moveItemToTrack(zoom.model, zoom.focus?.[0] ?? "", a.focus?.[0] ?? "")), /^Cannot move "Close up" to the Overlays track: that track takes text, shape, arrow, blur, redact\./);
+  assert.match(refused(moveItemToTrack(zoom.model, zoom.focus?.[0] ?? "", a.focus?.[0] ?? "")), /^Cannot move "Close up" to the Overlays track: that track takes text, shape, arrow, blur, cover\./);
   assert.equal(moveItemToTrack(text.model, id, a.focus?.[0] ?? "").ok && moveItemToTrack(text.model, id, a.focus?.[0] ?? "").message, 'Text overlay "Greeting" is already on the Overlays track.');
 });
 

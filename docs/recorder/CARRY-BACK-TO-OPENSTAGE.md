@@ -50,6 +50,8 @@ How sure each item is: items 1 and 2 were read in the code and then shown by a b
 
 **OpenStage Author.** Its editing dialog uses the same preview, and serves recordings (and assets) with `b.mediaUrl`, which is the same file protocol, so it very probably has the same fault. Not tried.
 
+**Status, 2026-11-01.** OpenStage Author made the same one-line fix in `7f6adf3` and wrote a muted check for it, `capture-timeline/tools/preview-sound-check.mjs`. This copy has taken that check.
+
 ## Smaller things
 
 ### 4. The recorder dialog's status line can lose a message
@@ -69,6 +71,8 @@ They fail in OpenStage Author's own copy of `capture-timeline/tools/browser-chec
 
 Neither is a fault in the screens. The checks need updating.
 
+**Status, 2026-11-01.** OpenStage Author repaired both checks in `7f6adf3`, and this copy has taken that version of the check. It has not been run here: no browser test tool is installed on this PC.
+
 ### 7. The recorder's advice about sound is said as a problem, in a command line's words
 
 The recorder program's findings about the balance of the voice and the computer's sound, and about the computer's sound not being heard, are `ok: false` checks or warnings, and the dialog says "Problem." for them. But they are advice: the recording is whole. They also name `--system-gain-db`, `mic.wav`, `system.wav` and `FIND SOUND OUTPUT.bat`, which mean nothing to an author using the window. The recorder says the balance twice (a check and a warning). The Recorder's `soundAdvice` in `app/src/capturesession.ts` says them once, as notes, in the app's own words, and keeps a silent microphone a problem. Not heard with a screen reader.
@@ -76,6 +80,8 @@ The recorder program's findings about the balance of the voice and the computer'
 ### 8. The Cover tool is announced as a "redaction"
 
 The button says "Cover", but adding one announces `Added the redaction "Redaction" ... nobody can undo this redaction`, and the clip list names it "Redaction" (`capture-edit/src/items.ts`, `addRedact`). An author who has only seen "Cover" may not connect the two.
+
+**Status, 2026-11-01.** OpenStage Author changed the words in `7f6adf3` ("cover" everywhere an author reads or hears it; the kind in the file is still `redact`), and this copy has taken the same words, with the tests that check them.
 
 ### 10. Other notes still name the recorder program's command line options
 

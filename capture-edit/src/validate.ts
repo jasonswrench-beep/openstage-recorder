@@ -103,7 +103,7 @@ export function itemKindName(item: Item): string {
     case "blur":
       return "blur";
     case "redact":
-      return "redaction";
+      return "cover";
     case "zoom":
       return "zoom";
   }
