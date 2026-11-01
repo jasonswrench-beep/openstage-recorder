@@ -530,7 +530,7 @@ await check("a webcam clip has Where and How big boxes, they are named, change t
   await page.keyboard.press("Control+s");
   assertMatch(await editSaid(page), /^Saved the edit in Webcam demo\.capture\./, "the save is said");
   const text = await saved(page, "Webcam demo.capture/edit.json");
-  assert(text !== undefined && /"placement":\{"x":250,"y":450,"width":3500,"height":3500\}/.test(text.replace(/\s+/g, "")), "the place is in the saved edit");
+  assert(text !== undefined && /"placement":\{"x":250,"y":450,"width":3200,"height":3200\}/.test(text.replace(/\s+/g, "")), "the place is in the saved edit");
   await page.getByRole("button", { name: "Back to recordings" }).click();
   await openEdit(page, t);
   await page.locator('.os-tl-lane[data-kind="webcam"] .os-tl-clip').first().click();

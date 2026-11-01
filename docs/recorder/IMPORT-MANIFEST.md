@@ -51,7 +51,7 @@ The paths are the same as in OpenStage Author on purpose.
 | `cargo check --workspace --all-targets --target x86_64-pc-windows-msvc` (the Windows-only code, type-checked from Linux) | Clean. This says it compiles, nothing about how it behaves on Windows |
 | `capture-edit`: `tsc` and `node --test` | Clean; 217 tests passed |
 | `capture-timeline`: `tsc` and `node --test` | Clean; 143 tests passed |
-| `capture-timeline`: `node tools/browser-check.mjs` (a real browser, keyboard only) | 73 passed, **2 failed** (see below; OpenStage Author's repaired versions of those two checks were taken in on 2026-11-01 and have not been run here) |
+| `capture-timeline`: `node tools/browser-check.mjs` (a real browser, keyboard only) | 73 passed, **2 failed** (see below). Those two checks were repaired by OpenStage Author, and its versions were taken in on 2026-11-01. Run again that day with Playwright 1.64.1: 73 of 74 pass as written, and the 74th passes when a Unix `mkdir` is available (it calls `mkdir -p`, which plain Windows lacks) |
 
 ### The two browser checks that fail
 
