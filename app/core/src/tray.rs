@@ -9,12 +9,8 @@
 pub const MAX_TOOLTIP: usize = 127;
 
 /// The choices in the icon's menu, as the ids that reach the page, in the order shown, with the words on each.
-pub const MENU: [(&str, &str); 4] = [
-    ("quick", "Quick record"),
-    ("stop", "Stop recording"),
-    ("show", "Show OpenStage Recorder"),
-    ("quit", "Quit"),
-];
+pub const MENU: [(&str, &str); 4] =
+    [("quick", "Quick record"), ("stop", "Stop recording"), ("show", "Show OpenStage Recorder"), ("quit", "Quit")];
 
 /// A tooltip the system will show: one line, no control characters, never longer than the system allows, with a mark where it was cut.
 pub fn tooltip_text(text: &str) -> String {
@@ -84,7 +80,10 @@ mod tests {
 
     #[test]
     fn only_a_path_sized_plain_text_is_copied() {
-        assert!(clipboard_text_ok(r"C:\Users\You\Videos\OpenStage Recorder\Quick recording.capture\exports\Quick recording.mp4").is_ok());
+        assert!(clipboard_text_ok(
+            r"C:\Users\You\Videos\OpenStage Recorder\Quick recording.capture\exports\Quick recording.mp4"
+        )
+        .is_ok());
         assert!(clipboard_text_ok("").is_err());
         assert!(clipboard_text_ok(&"x".repeat(2001)).is_err());
         assert!(clipboard_text_ok(&"x".repeat(2000)).is_ok());
