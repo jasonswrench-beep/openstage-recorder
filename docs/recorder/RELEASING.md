@@ -28,6 +28,10 @@ The workflow runs the app's own checks (type check and tests) on the Windows mac
 6. After it is created, it is checked: that the tag points at the right commit, that GitHub's own SHA-256 of the installer is the one that was computed, that there are exactly two files, that it is a published pre-release, and that the repository is still public (as authorized). The workflow checks the first four itself and stops with an error if one is wrong. A person or session also looks at the release page and gives the owner the link and says what was checked.
 7. Where a check cannot be done from where a session runs (for example downloading the installer back and hashing it, when the network blocks GitHub's file storage), the report says so plainly, and does not say it was done.
 
+## Releases so far
+
+- **v0.1.0-alpha.1**, published 2026-11-03 as a pre-release, built from commit `a4ce118d8e0937eaab3a5ba29c66483b324cbe1b` by run 7 of the workflow (a dry run, run 6, was done first). The installer is `OpenStage.Recorder_0.1.0_x64-setup.exe` (3,568,266 bytes), SHA-256 `0c517a37e0df5c2970023c0b2df5ac20f88f650dce3a08614a3cbcd7c8ee059c`. Checked afterwards with GitHub's API: a published pre-release, the tag points at that commit, exactly two files, GitHub's hash of the installer is the hash in the notes, no em dash in the notes, the repository public as authorized. The installer was also downloaded back from GitHub and hashed, and the hash matched, and the `.sha256.txt` line matched too. Nobody has run this exact build, and it is unsigned.
+
 ## The earlier draft
 
 `v0.1.0` exists as a **draft** pre-release made on 2026-11-01 by the tag-push step of the same workflow (an unsigned test release with the installer and the portable zip). It was made before this rule. It has not been published and has not been changed. The owner decides what to do with it.
