@@ -262,7 +262,8 @@ fn make_tray(app: &tauri::App) -> tauri::Result<()> {
         .iter()
         .map(|(id, words)| MenuItem::with_id(app, *id, *words, true, None::<&str>))
         .collect::<tauri::Result<Vec<_>>>()?;
-    let refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = items.iter().map(|i| i as &dyn tauri::menu::IsMenuItem<tauri::Wry>).collect();
+    let refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> =
+        items.iter().map(|i| i as &dyn tauri::menu::IsMenuItem<tauri::Wry>).collect();
     let menu = Menu::with_items(app, &refs)?;
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("OpenStage Recorder")
