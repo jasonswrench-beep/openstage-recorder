@@ -1,6 +1,8 @@
 # Builds the OpenStage Recorder installer on a Windows machine from what is in this repository.
 #
 # Run it by hand from the Actions tab ("Run workflow"), or it runs when a version tag such as v0.1.0 is pushed.
+# "Run workflow" has a choice called release: no (only build), dry-run (say what a release would be, publish nothing), or publish (make a
+# PRE-RELEASE of exactly this commit, with only the setup file and its .sha256.txt attached). docs/recorder/RELEASING.md has the rules.
 # When a version tag is pushed it also makes a DRAFT, PRE-RELEASE page on GitHub with the two downloads attached and the words of
 # docs/recorder/RELEASE-NOTES.md, which nobody sees until it is published by hand from the Releases tab. A draft can be deleted.
 # Two downloads are kept with the run:
@@ -16,6 +18,12 @@ name: Build the Windows installer
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "no: only build. dry-run: work out the tag, file name and hash a release would use, and publish nothing. publish: publish a PRE-RELEASE of this commit (see docs/recorder/RELEASING.md)."
+        type: choice
+        options: ["no", "dry-run", "publish"]
+        default: "no"
   push:
     tags: ["v*"]
 
@@ -51,6 +59,14 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm run build
+
+      # For a release, the app's own checks are run on this machine too, before the installer is made.
+      - name: Check the app before a release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release != 'no' }}
+        working-directory: app
+        run: |
+          npm run typecheck
+          npm test
 
       - name: Make the installer
         working-directory: app
@@ -130,3 +146,73 @@ jobs:
           name: OpenStage-Recorder-installer-signed
           path: signed-installer/*.exe
           if-no-files-found: error
+
+      # The release, only when asked for in "Run workflow" (release: dry-run or publish). The steps follow the owner's standing release rule,
+      # written out in docs/recorder/RELEASING.md: a pre-release, tagged at exactly this commit, named for the app's version with -alpha.N
+      # (the next number, never a tag that exists), with only the setup .exe and its .sha256.txt attached, and plain notes.
+      # A dry run does everything except publish, and says what it would have done in notices on the run.
+      - name: Make the release files, and publish them if asked
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release != 'no' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_MODE: ${{ inputs.release }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $repo = $env:GITHUB_REPOSITORY
+          $commit = $env:GITHUB_SHA
+          if (Test-Path "signed-installer") { throw "Signing is switched on, so this step would still describe an unsigned installer. Update docs/recorder/RELEASE-NOTES-ALPHA.md and this step first." }
+          $version = (Get-Content "app/src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json).version
+
+          # The next alpha number: one more than the highest already used for this version. A tag is never reused or moved.
+          $prefix = "v$version-alpha."
+          $used = @(git ls-remote --tags origin "refs/tags/$prefix*") | ForEach-Object { if ($_ -match ('refs/tags/' + [regex]::Escape($prefix) + '(\d+)(\^\{\})?$')) { [int]$Matches[1] } }
+          $highest = ($used | Measure-Object -Maximum).Maximum
+          if ($null -eq $highest) { $highest = 0 }
+          $number = $highest + 1
+          $tag = "$prefix$number"
+          if (@(git ls-remote --tags origin "refs/tags/$tag").Count -gt 0) { throw "The tag $tag already exists. A tag is never reused or moved." }
+
+          # The two files, and the notes.
+          $built = Get-ChildItem "app/src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
+          $name = $built.Name -replace ' ', '.'
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Copy-Item $built.FullName "release/$name"
+          $hash = (Get-FileHash "release/$name" -Algorithm SHA256).Hash.ToLower()
+          $utf8 = New-Object System.Text.UTF8Encoding $false
+          [IO.File]::WriteAllText("$PWD/release/$name.sha256.txt", "$hash  $name`n", $utf8)
+          $runUrl = "$env:GITHUB_SERVER_URL/$repo/actions/runs/$env:GITHUB_RUN_ID"
+          $notes = (Get-Content "docs/recorder/RELEASE-NOTES-ALPHA.md" -Raw) `
+            -replace '\{\{VERSION\}\}', $version -replace '\{\{N\}\}', "$number" -replace '\{\{INSTALLER\}\}', $name `
+            -replace '\{\{HASH\}\}', $hash -replace '\{\{COMMIT\}\}', $commit -replace '\{\{RUN_URL\}\}', $runUrl
+          if ($notes -match '\{\{') { throw "The release notes still have a marker that was not filled in." }
+          if ($notes.Contains([string][char]0x2014)) { throw "The release notes contain a dash that this project does not use." }
+          [IO.File]::WriteAllText("$PWD/release/notes.md", $notes, $utf8)
+
+          $title = "OpenStage Recorder $version alpha $number"
+          Write-Host "::notice title=Release plan::tag=$tag title=$title commit=$commit file=$name sha256=$hash bytes=$($built.Length) mode=$env:RELEASE_MODE"
+          "Release plan ($env:RELEASE_MODE): tag $tag, title '$title', commit $commit, file $name, SHA-256 $hash" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+          if ($env:RELEASE_MODE -ne "publish") { Write-Host "Dry run: nothing was published."; return }
+
+          gh release create $tag --repo $repo --target $commit --prerelease --title $title --notes-file "release/notes.md" "release/$name" "release/$name.sha256.txt"
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed." }
+
+          # Check what was made: the tag, the kind of release, the files, and GitHub's own hash of the installer.
+          $ref = gh api "repos/$repo/git/ref/tags/$tag" | ConvertFrom-Json
+          $target = $ref.object.sha
+          if ($ref.object.type -eq "tag") { $target = (gh api "repos/$repo/git/tags/$target" | ConvertFrom-Json).object.sha }
+          if ($target -ne $commit) { throw "The tag $tag points at $target, not at $commit." }
+          $release = $null
+          $exe = $null
+          foreach ($try in 1..6) {
+            $release = gh api "repos/$repo/releases/tags/$tag" | ConvertFrom-Json
+            $exe = $release.assets | Where-Object { $_.name -eq $name }
+            if ($exe -and $exe.digest) { break }
+            Start-Sleep -Seconds 5
+          }
+          if ($release.draft -or -not $release.prerelease) { throw "The release is not a published pre-release." }
+          if (@($release.assets).Count -ne 2) { throw "The release has $(@($release.assets).Count) files, not 2." }
+          if ($exe.digest -ne "sha256:$hash") { throw "GitHub's SHA-256 of the installer is $($exe.digest), not sha256:$hash." }
+          Write-Host "::notice title=Release published and checked::$($release.html_url) tag $tag points at $commit; GitHub's SHA-256 of $name is $($exe.digest); 2 files"
+          "Published: $($release.html_url)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
