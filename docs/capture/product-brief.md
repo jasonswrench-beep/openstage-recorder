@@ -25,7 +25,7 @@
 | Process model | Separate process with **no interface of its own**. OpenStage's UI and global hotkeys drive it; JSON on stdout; the same launch pattern OpenStage already uses for `publish.ts`, `narrate.py`, and `validate.py`, extended so a live recording can be controlled (9.1) |
 | Interface | Native HTML controls inside OpenStage. No separate GUI toolkit |
 | Platforms | **Windows 11 and later only for Release 1.** macOS and JAWS testing only if a Mac user and a JAWS license become available later; Linux is not planned |
-| Editing | **A mid-level video editor** (owner: basic video editing, text overlays, and zooming into parts, like a screen recording studio), with a **multi-track timeline, in Release 1**. Images, audio, and short video clips from outside the recording are accepted (owner: option B). Not a full or professional editor; section 5 lists what is in and out |
+| Editing | **A mid-level video editor** (owner: basic video editing, text overlays, and zooming into parts), with a **multi-track timeline, in Release 1**. Images, audio, and short video clips from outside the recording are accepted (owner: option B). Not a full or professional editor; section 5 lists what is in and out |
 | Publishing | **One publisher only: OpenStage's.** Any capture path hands assets to it; OpenStage Capture never ships its own exporter. Release 1 targets **SCORM 1.2 only**. Today the publisher produces a folder of plain web files and a SCORM 1.2 zip; SCORM 2004 and xAPI are on OpenStage's roadmap as later *(confirmed)* |
 | Narration | Text-first. Audio generation is **download on first use, never bundled** in the installer. Nothing breaks if it is never downloaded |
 | Speech | Local only, permissive licenses only |
@@ -36,7 +36,7 @@
 | Rule exceptions | **Accepted (owner)** for the Capture module: Windows first, a mid-level video editor, and a Rust capture program. To be recorded in OpenStage's CLAUDE.md by the owner or the OpenStage session (section 12, item 7) |
 | Video output | **MP4** (H.264 video, AAC audio) using Windows's built-in encoders. WebM is not in Release 1. A legal check on patents is still advised before shipping |
 | Narration helper tools (GPL) | **Option 1, for now:** they stay separate and the user installs them; OpenStage never includes or hosts them |
-| Code from other projects | **None** copied from the existing OpenScreen project (owner: cleaner). Rules for any future outside code stay in section 7 |
+| Code from other projects | **None** copied from other recorder projects (owner: cleaner). Rules for any future outside code stay in section 7 |
 | Compliance deadline | **None** at present (owner). The accessibility targets are quality goals, not deadlines |
 | Contribution rules | **None** for now; development is by the owner and collaborators only. Revisit before accepting outside contributors |
 
@@ -44,7 +44,7 @@
 
 ## 1. Summary
 
-An open-source, accessible screen recorder for people who make **instructional video and software training**. It covers the ground a screen recording studio holds for video and an eLearning authoring platform / an eLearning authoring platform hold for e-learning software simulations. The capture engine is a permissively licensed Rust process; the recorder and editing experience live inside OpenStage's accessible HTML interface.
+An open-source, accessible screen recorder for people who make **instructional video and software training**. It combines recording, video editing, and interactive software training. The capture engine is a permissively licensed Rust process; the recorder and editing experience live inside OpenStage's accessible HTML interface.
 
 Three ideas drive the design:
 
@@ -54,8 +54,6 @@ Three ideas drive the design:
 
 ## 2. Problem and opportunity
 
-- a screen recording studio is excellent for video but closed, paid, and not embeddable.
-- eLearning authoring platforms do software simulations well but are heavy authoring suites; screen capture is a means to an end.
 - Open-source recorders capture well but typically lack accessible editing, interaction data, and e-learning output. The most capable ones are GPL, so they cannot be embedded in an Apache-2.0 project.
 - Timeline editors in this category are generally built around mouse drag-and-drop, which is a barrier for authors who use a keyboard, switch device, voice control, or screen reader. Accessible output is usually left to the author to assemble by hand.
 - **Gap:** a permissively licensed, embeddable engine that records interaction data, is usable by authors with disabilities, and helps every author produce accessible video and training.
@@ -71,22 +69,22 @@ Three ideas drive the design:
 | **Authors with disabilities** | Do all of the above with keyboard, screen reader, voice control, or switch access |
 | **Learners using assistive technology** | Watch, practice, and be assessed with the same quality of experience as other learners |
 
-## 4. Reference products: what we take and what we skip
+## 4. Release scope
 
-| Capability | a screen recording studio | an eLearning authoring platform | the eLearning authoring platform | Our stance |
-|---|---|---|---|---|
-| Screen + audio + webcam capture | ✔ | ✔ | ✔ (step-by-step) | **Release 1** |
-| Editing | multi-track timeline | basic | basic | **Release 1: a mid-level editor with a multi-track timeline**, built on an accessible track/clip model with a keyboard-operable table view as its foundation |
-| Editable cursor, click effects | ✔ | ✔ | partial | **Release 1**, enabled by separate interaction data |
-| Auto zoom/pan | ✔ (SmartFocus) | ✔ | no | **Release 1** |
-| Callouts, annotations, shapes | ✔ | ✔ | ✔ | **Release 1.** In slide-per-step content they are ordinary OpenStage objects (real text, timed with appear/disappear). Inside a video they are rendered into the MP4, with text equivalents alongside (9.3) |
-| Captions / transcript | ✔ | ✔ | ✔ | **Release 1**: from the narration script, and from speech-to-text for human-recorded audio (fallback rule in section 8) |
-| Auto step-by-step slides from clicks | no | ✔ | ✔ | **Release 1** |
-| Demo / Practice / Assessment modes | no | ✔ | ✔ | **Release 1** |
-| SCORM / xAPI export | partial (quizzes) | ✔ | ✔ | **One publisher (OpenStage's).** Release 1: SCORM 1.2 only. SCORM 2004 and xAPI: after Release 1 |
-| Audio description track | ? | ? | ? | **Release 1** *(competitor support not verified)* |
-| Branching, variables, full authoring suite | no | ✔ | ✔ | **Non-goal**; that is OpenStage |
-| Templates, asset library, themes | ✔ | ✔ | ✔ | Later |
+| Capability | Scope |
+|---|---|
+| Screen + audio + webcam capture | **Release 1** |
+| Editing | **Release 1: a mid-level editor with a multi-track timeline**, built on an accessible track/clip model with a keyboard-operable table view as its foundation |
+| Editable cursor, click effects | **Release 1**, enabled by separate interaction data |
+| Auto zoom/pan | **Release 1** |
+| Callouts, annotations, shapes | **Release 1.** In slide-per-step content they are ordinary OpenStage objects (real text, timed with appear/disappear). Inside a video they are rendered into the MP4, with text equivalents alongside (9.3) |
+| Captions / transcript | **Release 1**: from the narration script, and from speech-to-text for human-recorded audio (fallback rule in section 8) |
+| Auto step-by-step slides from clicks | **Release 1** |
+| Demo / Practice / Assessment modes | **Release 1** |
+| SCORM / xAPI export | **One publisher (OpenStage's).** Release 1: SCORM 1.2 only. SCORM 2004 and xAPI: after Release 1 |
+| Audio description track | **Release 1** |
+| Branching, variables, full authoring suite | **Non-goal**; that is OpenStage |
+| Templates, asset library, themes | Later |
 
 ## 5. Goals and non-goals
 
@@ -102,8 +100,7 @@ Three ideas drive the design:
 **Non-goals (for now)**
 - A GUI of its own, or any native GUI toolkit.
 - **A second exporter**, or any SCORM/xAPI writer outside OpenStage's publisher.
-- Matching a screen recording studio's effects/transitions catalog or the authoring platform's full interaction model.
-- Live streaming or multi-camera production (OBS's territory).
+- Live streaming or multi-camera production.
 - Cloud hosting, review/collab workflows, or an LMS.
 - Mobile-device and browser-based capture.
 - **A professional-grade video editor.** The editor is mid-level, as described in "What 'mid-level video editor' means" below. Color correction, green screen, multi-camera editing, a large effects and transitions catalog, motion graphics, and advanced audio mixing are not planned.
@@ -111,7 +108,7 @@ Three ideas drive the design:
 
 ### What "mid-level video editor" means
 
-The owner's words: "a middle-video editor. Some basic video editing and text overlays and the ability to zoom into parts. Again, like a screen recording studio." In plain terms, that is more than a trimmer and well short of a professional editing suite.
+The editor supports basic editing, text overlays and zoom within recordings.
 
 **Included in Release 1**
 - **Cutting:** trim, split, delete, join, and reorder clips, all non-destructive and undoable.
@@ -122,7 +119,7 @@ The owner's words: "a middle-video editor. Some basic video editing and text ove
 - **Shapes, arrows, and blur or redact regions.**
 - **Audio basics:** volume, mute, and fade in and out.
 - **Captions:** edited on their own track alongside the audio.
-- **Media from outside the recording:** images, audio (such as music or a voice-over), and short video clips on the timeline, the way a screen recording studio's media bin works.
+- **Media from outside the recording:** images, audio (such as music or a voice-over), and short video clips on the timeline.
 
 **Not planned for now,** so the scope stays mid-level: color correction and filters, green screen, multi-camera editing, a large effects and transitions catalog, motion graphics and animation curves beyond zoom and pan, and advanced audio mixing or noise removal. Small additions such as playback speed changes, freeze frames, or simple fades between clips can be added later if wanted.
 
@@ -191,13 +188,13 @@ The project is **Apache-2.0** and will be part of OpenStage, so every dependency
 |---|---|---|
 | **Allowed** | Apache-2.0, MIT, BSD-2/3, ISC, zlib, Unlicense/CC0, dual "MIT OR Apache-2.0" (the Rust norm) | Tauri, windows-rs, Opus, libvpx, libaom, SVT-AV1, OpenH264, Kokoro-82M (code and weights Apache-2.0) |
 | **Case-by-case** | MPL-2.0 (file-level copyleft; keep modifications isolated); LGPL **only** if dynamically linked, replaceable, and not required for core function | FFmpeg LGPL builds, GStreamer plugins |
-| **Prohibited** | GPL, AGPL, SSPL, any LGPL static linking, "source-available" / non-commercial / proprietary-with-conditions licenses | FFmpeg `--enable-gpl` builds, x264, x265, a free streaming recorder code, `phonemizer-fork` (GPLv3+), espeak-ng (GPL) |
+| **Prohibited** | GPL, AGPL, SSPL, any LGPL static linking, "source-available" / non-commercial / proprietary-with-conditions licenses | FFmpeg `--enable-gpl` builds, x264, x265, third-party recording software code, `phonemizer-fork` (GPLv3+), espeak-ng (GPL) |
 
 Practical consequences:
 
 - **Do not bundle FFmpeg.** Release 1 produces MP4 (H.264 video, AAC audio) with **Windows's built-in encoders** (Media Foundation), so FFmpeg is not needed. If FFmpeg is ever optional, it must be a user-supplied, dynamically loaded, LGPL build, never a default dependency.
 - **FFmpeg guard before any integration.** `cargo-deny` does not see native libraries. Add a CI check that fails the build if any FFmpeg build configuration contains `--enable-gpl` or `--enable-nonfree`, and flags `--enable-version3` for review, **before** any code or build configuration from another project is brought in. A GPL FFmpeg build entering through an imported build configuration would silently relicense the combined work.
-- **Reusing code from other projects, even permissively licensed ones** (the owner has decided that no code is copied from the existing OpenScreen project): attribution in `NOTICE`, a license check on the specific files, and no imported build configuration until it has been audited. Never copy build configurations wholesale.
+- **Reusing code from other projects, even permissively licensed ones** (the owner has decided that no code is copied from other recorder projects): attribution in `NOTICE`, a license check on the specific files, and no imported build configuration until it has been audited. Never copy build configurations wholesale.
 - **Codec patents are separate from copyright licenses.** Apache-2.0 grants patent rights only for the project's own contributions. H.264/AAC (and HEVC) carry third-party patent pools. Using Windows's built-in encoder shifts this to Microsoft; patent-free formats (VP9, AV1, Opus) avoid it. **The owner has chosen MP4 (H.264/AAC) as the output; a legal review is still advised before shipping.** Also check early that the Windows editions you support include the media components (the "N" editions of Windows may need Microsoft's Media Feature Pack; verify).
 - **Housekeeping:** SPDX header on every source file, a `NOTICE` file for third-party attributions, `cargo-deny` license checks in CI, and no contribution agreement while development is limited to the owner and collaborators (Apache-2.0 already says contributions submitted to the project come under the same license unless stated otherwise; set rules before accepting outside contributors).
 - **Bundled assets** (fonts, icons, cursor sets, sample media, default caption fonts) meet the same bar. Many are CC-BY-SA or SIL OFL; check each.
@@ -431,7 +428,7 @@ If a capture folder were ever placed inside a project, the publisher would need 
 
 ## 12. Open questions
 
-*Resolved: all three differences from CLAUDE.md are accepted as exceptions (Windows first, a mid-level video editor, a Rust capture program); media from outside the recording is accepted (option B); the editor is mid-level (basic editing, text overlays, zoom, like a screen recording studio); reflow (fix responsive output first, as a Release 1 prerequisite); the owner will add the timing-follows-video request to OpenStage's roadmap; name (OpenStage Capture); the studio-style timeline is in Release 1; one big first release; Release 1 scope confirmed; no code from the existing OpenScreen project; GPL helper tools: option 1; MP4 output; no compliance deadline; no contribution rules; Brightspace and Moodle as real-LMS test targets, with Canvas access on the way; no VPAT yet (accessibility statement instead); and every fact previously listed to confirm in OpenStage's files (below).*
+*Resolved: all three differences from CLAUDE.md are accepted as exceptions (Windows first, a mid-level video editor, a Rust capture program); media from outside the recording is accepted (option B); the editor is mid-level (basic editing, text overlays, zoom); reflow (fix responsive output first, as a Release 1 prerequisite); the owner will add the timing-follows-video request to OpenStage's roadmap; name (OpenStage Capture); the timeline is in Release 1; one big first release; Release 1 scope confirmed; no code from other recorder projects; GPL helper tools: option 1; MP4 output; no compliance deadline; no contribution rules; Brightspace and Moodle as real-LMS test targets, with Canvas access on the way; no VPAT yet (accessibility statement instead); and every fact previously listed to confirm in OpenStage's files (below).*
 
 ### Confirmed from the OpenStage Author repository
 
@@ -462,7 +459,7 @@ Read by the author of this brief from `jasonswrench-beep/openstage-author` (read
    - **Cross-platform from the start:** Windows only for now.
    - **"Not a video editor":** the Capture module includes a mid-level video editor (section 5).
    - **"TypeScript throughout":** the capture program is Rust, because screen capture needs native Windows code. The repository already uses Rust (the shell) and Python (the tools).
-   - Each is a one-line edit to CLAUDE.md in the OpenStage repository, which only you or your OpenStage session should make (this session has read-only access). Suggested wording: *"Not a full or professional video editor. The Capture module includes a mid-level editor for recordings: trimming, splitting, text overlays, and zoom, in the manner of a screen recording studio."* / *"Cross-platform from the start, except the Capture module, which is Windows first."* / *"TypeScript throughout, except the Capture program, which is Rust because screen capture needs native code."*
+   - Each is a one-line edit to CLAUDE.md in the OpenStage repository, which only you or your OpenStage session should make (this session has read-only access). Suggested wording: *"Not a full or professional video editor. The Capture module includes a mid-level editor for recordings: trimming, splitting, text overlays, and zoom."* / *"Cross-platform from the start, except the Capture module, which is Windows first."* / *"TypeScript throughout, except the Capture program, which is Rust because screen capture needs native code."*
 8. ~~Ask for timing that follows a video.~~ **Done:** the owner will add it to OpenStage's roadmap as a request. It is not a Release 1 requirement; Capture works without it (effects rendered in, with text equivalents).
 9. ~~Canvas.~~ **In progress:** the owner is getting access to Canvas. OpenStage's release gate names Moodle, Canvas, and Brightspace, so Canvas joins Brightspace and Moodle as a test target once access arrives. Until then, the accessibility statement and release notes say Canvas was not tested.
 10. ~~Media from outside the recording.~~ **Decided (owner): option B.** The editor also accepts images, audio, and short video clips, drawn from the course's asset library, with the validator's rules applying to each (section 5).
@@ -483,9 +480,9 @@ Read by the author of this brief from `jasonswrench-beep/openstage-author` (read
 
 **Decided: OpenStage Capture** (by the owner). It replaces the working title "OpenScreen".
 
-**Why the working title was dropped.** "OpenScreen" is already the name of an existing, MIT-licensed open-source screen recorder (an Electron and TypeScript alternative to Screen Studio, per its documentation and directory listings; its repository was not examined for this brief) and of a W3C standard, the Open Screen Protocol. Sharing the name would have caused search confusion and attribution questions, and might have suggested a relationship to that project that does not exist.
+**Naming rationale.** The chosen name identifies the recorder as part of the OpenStage family.
 
-**No code is being reused** from the existing OpenScreen project (owner decision: cleaner).
+**No code is being reused** from other recorder projects (owner decision: cleaner).
 
 **Conventions to follow** *(confirmed, CLAUDE.md)*. The product is OpenStage Author (website openstageauthor.com), and "OpenStage" is the accepted short form. The `.osproj` extension, `openstage-editor.exe`, the `OPENSTAGE_*` settings, and the `os-` CSS prefix keep the short name on purpose. OpenStage Capture follows suit: `openstage-capture` for the program and crates, and `OPENSTAGE_CAPTURE` for its location setting. The crate names `openstage-capture` and `openstage_capture` were unregistered on crates.io when checked (this does not cover GitHub, npm, or trademarks).
 
@@ -518,7 +515,7 @@ Read by the author of this brief from `jasonswrench-beep/openstage-author` (read
 | **Capture engine** | The part that records the screen, sound, and mouse and keyboard activity. |
 | **Separate process** | A program that runs on its own, apart from OpenStage. If it crashes, OpenStage keeps running. |
 | **Crash-safe** | The recording is saved in small pieces as it goes, so a crash loses seconds, not the whole take. |
-| **Timeline** | The strip in editors like a screen recording studio where video, audio, captions, and effects are arranged over time in layers. |
+| **Timeline** | The strip in editors where video, audio, captions, and effects are arranged over time in layers. |
 | **Track / clip** | A track is one layer (for example the screen video, or the narration). A clip is one piece on a track. |
 | **Project format** | The way a recording and all its edits are saved in files, so other tools can read them. |
 | **Publisher** | The part of OpenStage that turns a finished course into a package a learning system can run. |

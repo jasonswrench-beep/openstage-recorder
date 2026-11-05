@@ -38,7 +38,7 @@
 **Kind:** Blocks Release 1 (a rule that the work must agree with) | **Size:** S
 
 **What.** Change three lines in `CLAUDE.md` so they allow the Capture module. Suggested wording:
-- Replace "Not a video editor." with: *"Not a full or professional video editor. The Capture module includes a mid-level editor for recordings: trimming, splitting, text overlays, and zoom, in the manner of a screen recording studio."*
+- Replace "Not a video editor." with: *"Not a full or professional video editor. The Capture module includes a mid-level editor for recordings: trimming, splitting, text overlays, and zoom."*
 - Replace "Cross-platform from the start: Windows, macOS and Linux all matter." with: *"Cross-platform from the start, except the Capture module, which is Windows first."*
 - Replace "TypeScript throughout." with: *"TypeScript throughout, except the Capture program, which is Rust because screen capture needs native code."*
 

@@ -9,7 +9,7 @@
 
 ## 1. Purpose
 
-OpenStage Capture is a module of OpenStage Author. It lets an author record their screen, edit the recording in a mid-level video editor (like a screen recording studio), add captions, narration, and text overlays, and turn a recording into step-by-step training. OpenStage's own publisher then ships the result as part of a course. Everything is designed so that authors and learners who use assistive technology get the same quality of experience as everyone else.
+OpenStage Capture is a module of OpenStage Author. It lets an author record their screen, edit the recording in a mid-level video editor, add captions, narration, and text overlays, and turn a recording into step-by-step training. OpenStage's own publisher then ships the result as part of a course. Everything is designed so that authors and learners who use assistive technology get the same quality of experience as everyone else.
 
 ## 2. Who it is for
 
@@ -245,7 +245,7 @@ OpenStage Capture is a module of OpenStage Author. It lets an author record thei
 **Accessibility checks**
 - Each action has a documented keyboard route. No mouse-only action.
 
-#### C3. Multi-track timeline (studio-style)
+#### C3. Multi-track timeline
 **As an** author, **I want** a timeline with separate tracks for screen, sound, webcam, captions, and overlays, **so that** I can arrange everything over time.
 
 **Done when**
