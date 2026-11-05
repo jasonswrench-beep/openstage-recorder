@@ -35,7 +35,7 @@ This project is Apache 2.0. Apache 2.0 cannot incorporate GPL or AGPL code: the 
 
 Before adding any dependency, check its licence. Permissive (MIT, BSD, Apache 2.0, ISC) is fine. LGPL is dynamic-linking only. GPL and AGPL are refused. Open model weights are not automatically open source, so audit those one by one. Record anything adopted in `NOTICE` with its attribution. `capture/tools/check_rules.py` enforces this for the Rust dependencies on every change.
 
-**FFmpeg is not used.** Do not adopt a third-party recorder's code: outside recorders are copyleft.
+**FFmpeg is not used.** Do not adopt copyleft recorder code.
 
 ### Architecture
 

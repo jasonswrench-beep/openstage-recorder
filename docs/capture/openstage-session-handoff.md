@@ -7,7 +7,7 @@
 
 ## Read this first
 
-**What Capture is.** OpenStage Capture is a separate Windows-first module: a recording program (`openstage-capture`, written in Rust), a mid-level editor for recordings (trim, split, text overlays, zoom, like a screen recording studio), and accessible step-by-step and software-simulation output. It will become part of OpenStage Author. Its code and plans live today in the repository `jasonswrench-beep/claude-test` (code in `capture/`, plans in `docs/`). It does not change how OpenStage works until the owner agrees to each step.
+**What Capture is.** OpenStage Capture is a separate Windows-first module: a recording program (`openstage-capture`, written in Rust), a mid-level editor for recordings (trim, split, text overlays, zoom), and accessible step-by-step and software-simulation output. It will become part of OpenStage Author. Its code and plans live today in the repository `jasonswrench-beep/claude-test` (code in `capture/`, plans in `docs/`). It does not change how OpenStage works until the owner agrees to each step.
 
 **What is asked here.** Three small document edits (OS-1, OS-2, OS-3) and two verification jobs (OS-16, OS-17). Nothing here changes the player, the format, the validator, or the editor code. If you find that a task seems to need such a change, stop and ask the owner.
 
@@ -48,7 +48,7 @@ Replace with exactly:
 ```
 Not a template tool. Not an LMS. Not a cloud platform. Not a full or professional video editor.
 The Capture module includes a mid-level editor for recordings: trimming, splitting, text overlays,
-and zoom, in the manner of a screen recording studio.
+and zoom.
 ```
 
 **Edit 2 and 3.** In `CLAUDE.md`, section "Architecture" (lines 67 and 68, one bullet wrapped over two lines).
