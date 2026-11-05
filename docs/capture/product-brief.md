@@ -54,9 +54,9 @@ Three ideas drive the design:
 
 ## 2. Problem and opportunity
 
-- Open-source recorders capture well but typically lack accessible editing, interaction data, and e-learning output. The most capable ones are GPL, so they cannot be embedded in an Apache-2.0 project.
-- Timeline editors in this category are generally built around mouse drag-and-drop, which is a barrier for authors who use a keyboard, switch device, voice control, or screen reader. Accessible output is usually left to the author to assemble by hand.
-- **Gap:** a permissively licensed, embeddable engine that records interaction data, is usable by authors with disabilities, and helps every author produce accessible video and training.
+- A recording should keep interaction data, be editable with accessible tools, and produce e-learning output. The engine must stay permissively licensed so it can be embedded in an Apache-2.0 project, so no GPL code goes into it.
+- Editing must work fully by keyboard, switch device, voice control, or screen reader, not only by mouse drag-and-drop, and accessible output should not have to be assembled by hand.
+- **Aim:** a permissively licensed, embeddable engine that records interaction data, is usable by authors with disabilities, and helps every author produce accessible video and training.
 
 ## 3. Target users and jobs-to-be-done
 
