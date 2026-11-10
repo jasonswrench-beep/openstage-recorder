@@ -34,3 +34,11 @@ app/src-tauri/gen/
 # The installer made by app/BUILD INSTALLER.bat
 app/installer/
 app/portable/
+
+# Local AI-assistant files and credentials: never commit these
+.claude/
+.env
+.env.*
+*.pem
+*.key
+!.env.example
