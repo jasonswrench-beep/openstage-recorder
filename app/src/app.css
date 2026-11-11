@@ -1,59 +1,262 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /*
- * The page around the Recorder's screens. The colours are the editing screens' own tokens (clip-list.css), so the whole app changes
- * together between light, dark and Windows high contrast. Nothing here moves, fades or animates.
+ * The page around the Recorder's screens, in the OpenStage suite's look (2026-11-10, after the design specification's mockups R01 to R03):
+ * a navy bar, tabs, white cards on a pale page, the Recorder's rose for what you press. The colours are the suite's (openstage-ui.css,
+ * version 1, which the build puts first), measured in the Author repository's design/DESIGN-GUIDE.md. The editing screens' own colour names
+ * (clip-list.css) are pointed at the suite's here, so the whole app changes together, without changing the files OpenStage Author shares.
+ * Dark mode (when Windows asks for it) keeps the Recorder's own dark colours, with the rose for what you press; Windows high contrast
+ * (forced colours) has its own marks. Nothing here moves, fades or animates.
  */
 
+/* ---- the colours */
+:root {
+  --rv-page: var(--os-page);
+  --rv-surface: var(--os-surface);
+  --rv-subtle: var(--os-subtle);
+  --rv-text: var(--os-text);
+  --rv-muted: var(--os-muted);
+  --rv-divider: var(--os-divider);
+  --rv-edge: var(--os-control-edge);
+  --rv-accent: var(--os-recorder-action);
+  --rv-accent-hover: var(--os-recorder-action-hover);
+  --rv-on-accent: #ffffff;
+  --rv-tint: var(--os-recorder-tint);
+  --rv-success: var(--os-success);
+  --rv-success-tint: var(--os-success-tint);
+  --rv-warning: var(--os-warning);
+  --rv-danger: var(--os-danger);
+  --rv-focus: var(--os-focus);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --os-cl-bg: var(--os-surface);
+    --os-cl-fg: var(--os-text);
+    --os-cl-muted: var(--os-muted);
+    --os-cl-line: var(--os-control-edge);
+    --os-cl-accent: var(--os-recorder-action);
+    --os-cl-on-accent: #ffffff;
+    --os-cl-selected-bg: var(--os-recorder-tint);
+    --os-cl-head-bg: var(--os-subtle);
+    --os-cl-attention: var(--os-warning);
+    --os-cl-focus: var(--os-focus);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --rv-page: #16181d;
+    --rv-surface: #20232b;
+    --rv-subtle: #1b1e25;
+    --rv-text: #eceef3;
+    --rv-muted: #b6bac6;
+    --rv-divider: #343945;
+    --rv-edge: #8a90a0;
+    --rv-accent: #f7a9b6;
+    --rv-accent-hover: #f48da0;
+    --rv-on-accent: #16181d;
+    --rv-tint: #3a2330;
+    --rv-success: #7fd3a8;
+    --rv-success-tint: #1d3329;
+    --rv-warning: #f2c27b;
+    --rv-danger: #ff9aa2;
+    --rv-focus: #ffcc66;
+    --os-cl-accent: #f7a9b6;
+    --os-cl-on-accent: #16181d;
+    --os-cl-selected-bg: #3a2330;
+  }
+}
+
+:root[data-theme="dark"] {
+  --rv-page: #16181d;
+  --rv-surface: #20232b;
+  --rv-subtle: #1b1e25;
+  --rv-text: #eceef3;
+  --rv-muted: #b6bac6;
+  --rv-divider: #343945;
+  --rv-edge: #8a90a0;
+  --rv-accent: #f7a9b6;
+  --rv-accent-hover: #f48da0;
+  --rv-on-accent: #16181d;
+  --rv-tint: #3a2330;
+  --rv-success: #7fd3a8;
+  --rv-success-tint: #1d3329;
+  --rv-warning: #f2c27b;
+  --rv-danger: #ff9aa2;
+  --rv-focus: #ffcc66;
+  --os-cl-accent: #f7a9b6;
+  --os-cl-on-accent: #16181d;
+  --os-cl-selected-bg: #3a2330;
+}
+
+/* ---- the page */
+/* Something hidden stays hidden, whatever display its look gives it (a button styled as a flex box would otherwise show). */
+[hidden] {
+  display: none !important;
+}
+
 html {
-  background: var(--os-cl-bg);
+  background: var(--rv-page);
 }
 
 body {
   margin: 0;
-  color: var(--os-cl-fg);
-  background: var(--os-cl-bg);
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: var(--rv-text);
+  background: var(--rv-page);
+  font-family: var(--os-font);
   font-size: 1rem;
   line-height: 1.5;
 }
 
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.ui-icon {
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+}
+
+/* ---- the navy bar: the app's name, and what it is doing in a word */
 .app-header {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--os-cl-line);
-  background: var(--os-cl-head-bg);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 1.25rem;
+  color: var(--os-on-shell);
+  background: var(--os-shell);
 }
 
 .app-title {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 0.75rem;
+  gap: 0.6rem;
   min-width: 0;
 }
 
 .app-icon {
   flex: none;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2rem;
+  height: 2rem;
 }
 
 .app-header h1 {
   min-width: 0;
-  overflow-wrap: anywhere;
   margin: 0;
-  font-size: 1.5rem;
+  overflow-wrap: anywhere;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--os-on-shell);
+}
+
+.app-name-product {
+  font-weight: 400;
+  color: var(--os-recorder-on-shell);
+}
+
+.app-bar-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.app-preview,
+.app-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.2rem 0.75rem;
+  border: 1px solid #3a4a66;
+  border-radius: 999px;
+  font-size: var(--os-small-size);
+  font-weight: 600;
+  color: var(--os-on-shell);
 }
 
 .app-preview {
-  margin: 0.25rem 0 0;
-  color: var(--os-cl-attention);
-  font-weight: 600;
+  color: var(--os-on-shell-muted);
+  font-weight: 400;
 }
 
-.app-main {
-  max-width: 60rem;
+.app-state-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #7fd3a8;
+}
+
+.app-state[data-state="recording"] .app-state-dot,
+.app-state[data-state="counting-down"] .app-state-dot,
+.app-state[data-state="starting"] .app-state-dot {
+  background: var(--os-recorder-on-shell);
+}
+
+.app-state[data-state="paused"] .app-state-dot,
+.app-state[data-state="finishing"] .app-state-dot,
+.app-state[data-state="making-the-video"] .app-state-dot {
+  background: #f2c27b;
+}
+
+.app-state[data-state="did-not-finish"] .app-state-dot {
+  background: #ff9aa2;
+}
+
+/* ---- the tabs */
+.app-tab-row {
+  padding: 0 1.25rem;
+  background: var(--rv-surface);
+  border-bottom: 1px solid var(--rv-divider);
+}
+
+.app-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  max-width: 75rem;
   margin: 0 auto;
-  padding: 1rem;
+}
+
+.app-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--rv-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+
+.app-tab:hover {
+  color: var(--rv-text);
+  background: var(--rv-subtle);
+}
+
+.app-tab[aria-selected="true"] {
+  color: var(--rv-accent);
+  border-bottom-color: var(--rv-accent);
+}
+
+/* ---- the main area, the status line and the footer */
+.app-main {
+  flex: 1;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 75rem;
+  margin: 0 auto;
+  padding: 1.25rem;
   overflow-wrap: anywhere;
 }
 
@@ -64,6 +267,30 @@ body {
 /* The editing screens want the whole width of the window: a timeline is wider than a form. */
 .app-main.is-editing {
   max-width: none;
+}
+
+.app-panel[hidden],
+.app-status-host[hidden],
+.app-tab-row[hidden] {
+  display: none;
+}
+
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  padding: 0.5rem 1.25rem;
+  font-size: var(--os-small-size);
+  color: var(--rv-muted);
+  background: var(--rv-surface);
+  border-top: 1px solid var(--rv-divider);
+}
+
+.app-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .ev-host {
@@ -87,10 +314,11 @@ body {
   z-index: 1;
   min-height: 1.5rem;
   margin: 0 0 1rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--os-cl-line);
-  border-radius: 0.25rem;
-  background: var(--os-cl-head-bg);
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--rv-divider);
+  border-left: 4px solid var(--rv-accent);
+  border-radius: var(--os-radius-sm);
+  background: var(--rv-surface);
 }
 
 .rv-status:empty {
@@ -107,15 +335,14 @@ body {
   display: block;
 }
 
+/* ---- sections and cards */
 .rv-section {
   margin: 0 0 1.5rem;
-  padding: 0 0 1rem;
-  border-bottom: 1px solid var(--os-cl-line);
 }
 
 .rv-section h2 {
   margin: 0 0 0.75rem;
-  font-size: 1.25rem;
+  font-size: 1.35rem;
 }
 
 .rv-section h3 {
@@ -123,12 +350,69 @@ body {
   font-size: 1.05rem;
 }
 
+.app-panel > .rv-section:not(.rv-setup),
+.app-panel > .rv > .rv-section:not(.rv-setup),
+.rv-card,
+.rv-step {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 1.1rem 1.25rem;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-divider);
+  border-radius: var(--os-radius-lg);
+}
+
+.rv-card {
+  margin: 0 0 1rem;
+}
+
+.rv-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.35rem;
+}
+
+.rv-card h3 .ui-icon {
+  color: var(--rv-accent);
+}
+
+.rv-privacy {
+  border-left: 4px solid var(--rv-accent);
+}
+
+/* The Record screen: a heading, then the steps and the cards beside them. */
+.rv-setup-head h2 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.rv-lead {
+  margin: 0.25rem 0 1.25rem;
+  color: var(--rv-muted);
+}
+
+.rv-setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.rv-steps {
+  min-width: 0;
+}
+
+.rv-side {
+  min-width: 0;
+}
+
 .rv-fieldset {
   min-width: 0;
   margin: 0 0 1rem;
   padding: 0.5rem 1rem 1rem;
-  border: 1px solid var(--os-cl-line);
-  border-radius: 0.25rem;
+  border: 1px solid var(--rv-edge);
+  border-radius: var(--os-radius-sm);
 }
 
 .rv-fieldset legend {
@@ -136,6 +420,237 @@ body {
   font-weight: 600;
 }
 
+/* A numbered step: its legend is a heading inside the card, with the number in a circle (only to look at; it is hidden from screen readers). */
+.rv-fieldset.rv-step {
+  margin: 0 0 1rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--rv-divider);
+  border-radius: var(--os-radius-lg);
+}
+
+.rv-step > legend {
+  float: left;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.rv-step > legend + * {
+  clear: both;
+}
+
+.rv-step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  color: var(--rv-on-accent);
+  background: var(--rv-accent);
+}
+
+/* What to record: three cards that are radio buttons. The radio itself is kept (out of sight, but in the page and in the tab order), so the
+   keyboard and screen readers have a real radio group; the card is its label. */
+.rv-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.rv-choice-cell {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.rv-choice-input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rv-choice {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  color: var(--rv-text);
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-edge);
+  border-radius: var(--os-radius);
+  cursor: pointer;
+}
+
+.rv-choice > .ui-icon:first-child {
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-bottom: 0.35rem;
+  color: var(--rv-accent);
+}
+
+.rv-choice-title {
+  font-weight: 700;
+}
+
+.rv-choice-detail {
+  font-size: 0.9rem;
+  color: var(--rv-muted);
+}
+
+.rv-choice-tick {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: none;
+  padding: 0.15rem;
+  border-radius: 50%;
+  color: var(--rv-on-accent);
+  background: var(--rv-accent);
+}
+
+.rv-choice-input:hover + .rv-choice {
+  background: var(--rv-subtle);
+}
+
+.rv-choice-input:checked + .rv-choice {
+  border: 2px solid var(--rv-accent);
+  padding: calc(0.9rem - 1px) calc(1rem - 1px);
+  background: var(--rv-tint);
+}
+
+.rv-choice-input:checked + .rv-choice .rv-choice-tick {
+  display: block;
+}
+
+.rv-choice-input:focus-visible + .rv-choice {
+  outline: 3px solid var(--rv-focus);
+  outline-offset: 2px;
+}
+
+.rv-sub {
+  min-width: 0;
+}
+
+/* The voice, the computer's sound and a webcam: a card each, with its list. */
+.rv-devices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+  gap: 0.75rem;
+}
+
+.rv-device {
+  min-width: 0;
+  padding: 0.8rem 0.9rem;
+  background: var(--rv-subtle);
+  border: 1px solid var(--rv-divider);
+  border-radius: var(--os-radius);
+}
+
+.rv-device-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+
+.rv-device-head .ui-icon {
+  color: var(--rv-accent);
+}
+
+.rv-device select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.rv-start-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0 1.5rem;
+}
+
+.rv-start-options .rv-check {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.rv-start-options .os-cl-field {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The choices most people leave alone: sections that open and close. */
+.rv-more {
+  margin: 0.5rem 0 0;
+  border-top: 1px solid var(--rv-divider);
+}
+
+.rv-more summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.5rem;
+  padding: 0.35rem 0.25rem;
+  font-weight: 650;
+  list-style: none;
+  cursor: pointer;
+}
+
+.rv-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.rv-more summary .ui-icon {
+  color: var(--rv-accent);
+}
+
+.rv-more-title {
+  flex: 1;
+}
+
+/* A chevron that points down when the section is closed and up when it is open. */
+.rv-more summary::after {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin: 0 0.35rem 0.25rem 0;
+  border-right: 2px solid var(--rv-muted);
+  border-bottom: 2px solid var(--rv-muted);
+  transform: rotate(45deg);
+}
+
+.rv-more[open] summary::after {
+  margin: 0.25rem 0.35rem 0 0;
+  transform: rotate(-135deg);
+}
+
+.rv-more summary:hover {
+  background: var(--rv-subtle);
+}
+
+.rv-more-body {
+  padding: 0 0.25rem 0.75rem;
+}
+
+/* ---- boxes, lists and buttons on these screens */
 .rv-control {
   display: flex;
   flex-wrap: wrap;
@@ -155,6 +670,16 @@ body {
   box-sizing: border-box;
 }
 
+.rv-section .os-cl-input,
+.app-panel .os-cl-input {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.6rem;
+  color: var(--rv-text);
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-edge);
+  border-radius: var(--os-radius-sm);
+}
+
 .rv-check {
   display: flex;
   align-items: flex-start;
@@ -167,11 +692,16 @@ body {
   width: 1.25rem;
   height: 1.25rem;
   margin-top: 0.2rem;
+  accent-color: var(--rv-accent);
 }
 
 .rv-section .os-cl-field {
   min-width: 0;
   margin: 0 0 0.75rem;
+}
+
+.rv-section .os-cl-field > label {
+  font-weight: 600;
 }
 
 .rv-actions {
@@ -181,19 +711,55 @@ body {
   margin: 0.75rem 0;
 }
 
+.app-panel .os-cl-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--rv-text);
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-edge);
+  border-radius: var(--os-radius-sm);
+  cursor: pointer;
+}
+
+.app-panel .os-cl-button:hover {
+  background: var(--rv-subtle);
+}
+
+.app-panel .os-cl-button .ui-icon {
+  color: var(--rv-accent);
+}
+
 .rv-path {
   width: 100%;
 }
 
-.rv-primary {
-  background: var(--os-cl-accent);
-  color: var(--os-cl-on-accent);
-  font-weight: 600;
+.rv-primary,
+.app-panel .os-cl-button.rv-primary {
+  color: var(--rv-on-accent);
+  background: var(--rv-accent);
+  border-color: var(--rv-accent);
+  font-weight: 700;
 }
 
-.rv-primary:hover {
-  background: var(--os-cl-accent);
-  text-decoration: underline;
+.rv-primary:hover,
+.app-panel .os-cl-button.rv-primary:hover {
+  background: var(--rv-accent-hover);
+  border-color: var(--rv-accent-hover);
+}
+
+.app-panel .os-cl-button.rv-primary .ui-icon {
+  color: inherit;
+}
+
+.rv-start-row .os-cl-button {
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  font-size: 1.05rem;
 }
 
 [aria-disabled="true"] {
@@ -204,15 +770,15 @@ body {
 .rv-pretend {
   margin: 0.5rem 0;
   padding: 0.5rem 0.75rem;
-  border: 2px solid var(--os-cl-attention);
-  border-radius: 0.25rem;
-  color: var(--os-cl-attention);
+  border: 2px solid var(--rv-warning);
+  border-radius: var(--os-radius-sm);
+  color: var(--rv-warning);
   font-weight: 600;
 }
 
 .rv-note {
   margin: 0.5rem 0;
-  color: var(--os-cl-muted);
+  color: var(--rv-muted);
 }
 
 .rv-list {
@@ -221,13 +787,60 @@ body {
 }
 
 .rv-pass {
-  color: var(--os-cl-fg);
+  color: var(--rv-text);
 }
 
 .rv-problem {
-  color: var(--os-cl-attention);
+  color: var(--rv-warning);
 }
 
+/* ---- Help */
+.app-keys {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+}
+
+.app-keys caption {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.app-keys th,
+.app-keys td {
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--rv-divider);
+}
+
+.app-keys td:first-child {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* ---- a narrow window, or text made large: one column, nothing scrolls sideways */
+@media (max-width: 60rem) {
+  .rv-setup-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 40rem) {
+  .app-header,
+  .app-tab-row,
+  .app-main,
+  .app-footer {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .app-keys td:first-child {
+    white-space: normal;
+  }
+}
+
+/* ---- Windows high contrast: the system's colours, with marks of their own for what is chosen */
 @media (forced-colors: active) {
   .rv-primary {
     border: 2px solid ButtonText;
@@ -235,5 +848,424 @@ body {
   [aria-disabled="true"] {
     opacity: 1;
     color: GrayText;
+  }
+  .app-header,
+  .app-tab-row,
+  .app-footer,
+  .rv-card,
+  .rv-step,
+  .rv-device {
+    border: 1px solid CanvasText;
+  }
+  .app-tab[aria-selected="true"] {
+    border-bottom-color: Highlight;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .rv-choice {
+    border: 1px solid ButtonText;
+  }
+  .rv-choice-input:checked + .rv-choice {
+    border: 3px solid Highlight;
+  }
+  .rv-choice-tick {
+    forced-color-adjust: none;
+    color: HighlightText;
+    background: Highlight;
+  }
+  .app-state,
+  .app-preview {
+    border: 1px solid CanvasText;
+  }
+  .rv-more summary::after {
+    border-color: CanvasText;
+  }
+}
+
+/* ---- while recording: the time large, the state in words, the controls beside it */
+.rv-live-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.rv-live-head h2 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.rv-live-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.15rem 0.75rem;
+  border-radius: 999px;
+  font-size: var(--os-small-size);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rv-accent);
+  background: var(--rv-tint);
+}
+
+.rv-live-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--rv-accent);
+}
+
+.rv-live[data-phase="paused"] .rv-live-chip,
+.rv-live[data-phase="stopping"] .rv-live-chip {
+  color: var(--rv-warning);
+  background: var(--os-warning-tint);
+}
+
+.rv-live[data-phase="paused"] .rv-live-dot,
+.rv-live[data-phase="stopping"] .rv-live-dot {
+  background: var(--rv-warning);
+}
+
+.rv-live[data-phase="finished"] .rv-live-chip {
+  color: var(--rv-success);
+  background: var(--rv-success-tint);
+}
+
+.rv-live[data-phase="finished"] .rv-live-dot {
+  background: var(--rv-success);
+}
+
+.rv-live-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin: 1rem 0;
+  padding: 1.1rem 1.25rem;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-divider);
+  border-radius: var(--os-radius-lg);
+}
+
+.rv-live-time {
+  min-width: 0;
+}
+
+.rv-clock {
+  margin: 0;
+  font-size: 3.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rv-now {
+  margin: 0.25rem 0 0;
+  color: var(--rv-muted);
+}
+
+.rv-live-controls {
+  margin: 0;
+}
+
+.rv-live-controls .os-cl-button {
+  min-height: 2.75rem;
+  padding: 0.5rem 1.1rem;
+}
+
+.rv-live-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+  gap: 1rem;
+}
+
+.rv-live-cards .rv-list:empty::before {
+  content: "None yet.";
+  color: var(--rv-muted);
+}
+
+.rv-quick {
+  padding: 1.1rem 1.25rem;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-divider);
+  border-left: 4px solid var(--rv-accent);
+  border-radius: var(--os-radius-lg);
+}
+
+@media (forced-colors: active) {
+  .rv-live-top,
+  .rv-quick {
+    border: 1px solid CanvasText;
+  }
+  .rv-live-chip {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ---- the Recordings tab: a search, an order, and a card for each recording */
+.app-panel > .rv-section.rv-recordings {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.rv-rec-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.rv-rec-head h2 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.rv-rec-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 1rem;
+  padding: 0.9rem 1rem 0.25rem;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-divider);
+  border-radius: var(--os-radius-lg);
+}
+
+.rv-rec-tools .os-cl-field:first-child {
+  flex: 1 1 16rem;
+}
+
+.rv-rec-tools .os-cl-field:first-child input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.rv-rec-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(19rem, 100%), 1fr));
+  gap: 1rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-rec-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "picture body" "actions actions";
+  gap: 0.6rem 0.9rem;
+  min-width: 0;
+  padding: 1rem;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-divider);
+  border-radius: var(--os-radius-lg);
+}
+
+.rv-rec-picture {
+  grid-area: picture;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--os-radius);
+  color: var(--rv-accent);
+  background: var(--rv-tint);
+}
+
+.rv-rec-picture .ui-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.rv-rec-body {
+  grid-area: body;
+  min-width: 0;
+}
+
+.rv-section .rv-rec-name {
+  margin: 0;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.rv-rec-details {
+  margin: 0.15rem 0 0.35rem;
+  color: var(--rv-muted);
+  font-size: 0.95rem;
+}
+
+.rv-rec-badge {
+  display: inline-block;
+  margin: 0;
+  padding: 0.05rem 0.6rem;
+  border-radius: 999px;
+  font-size: var(--os-small-size);
+  font-weight: 700;
+  color: var(--rv-muted);
+  background: var(--rv-subtle);
+  border: 1px solid var(--rv-divider);
+}
+
+.rv-rec-badge.is-edited {
+  color: var(--rv-success);
+  background: var(--rv-success-tint);
+  border-color: transparent;
+}
+
+.rv-rec-actions {
+  grid-area: actions;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.app-panel .os-cl-button.rv-icon-button {
+  justify-content: center;
+  width: 2.25rem;
+  padding: 0;
+}
+
+@media (forced-colors: active) {
+  .rv-rec-card,
+  .rv-rec-tools,
+  .rv-rec-badge {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ---- the editing screen's bar: Back, the name and whether it is saved, Save and Make a video; the rest in a More panel */
+.ev-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-divider);
+  border-radius: var(--os-radius-lg);
+}
+
+.ev-bar-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  min-width: 0;
+}
+
+.ev-bar-title {
+  min-width: 0;
+}
+
+.rv-section .ev-bar-title h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.ev-bar-title .rv-note {
+  margin: 0;
+  font-size: var(--os-small-size);
+}
+
+.ev-actions {
+  margin: 0;
+}
+
+.ev-more {
+  margin: 0 0 0.75rem;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-divider);
+  border-radius: var(--os-radius-lg);
+}
+
+.ev-more summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.5rem;
+  padding: 0.35rem 1rem;
+  font-weight: 650;
+  list-style: none;
+  cursor: pointer;
+}
+
+.ev-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.ev-more summary .ui-icon {
+  color: var(--rv-accent);
+}
+
+.ev-more summary::after {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin: 0 0 0.25rem auto;
+  border-right: 2px solid var(--rv-muted);
+  border-bottom: 2px solid var(--rv-muted);
+  transform: rotate(45deg);
+}
+
+.ev-more[open] summary::after {
+  margin: 0.25rem 0 0 auto;
+  transform: rotate(-135deg);
+}
+
+.ev-more summary:hover {
+  background: var(--rv-subtle);
+}
+
+.ev-more-body {
+  padding: 0 1rem 0.5rem;
+  border-top: 1px solid var(--rv-divider);
+}
+
+.ev .os-cl-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.ev .os-cl-button .ui-icon {
+  color: var(--rv-accent);
+}
+
+.ev .os-cl-button.rv-primary .ui-icon {
+  color: inherit;
+}
+
+@media (forced-colors: active) {
+  .ev-bar,
+  .ev-more {
+    border: 1px solid CanvasText;
+  }
+  .ev-more summary::after {
+    border-color: CanvasText;
+  }
+}
+
+/* The bar sticks to the top of a window big enough for it, so Back, Save and Make a video stay in sight while the timeline below is
+   scrolled (opening a recording puts the focus in the timeline, further down). The page leaves room for it when it scrolls to whatever
+   has the focus, so the bar never covers it. The timeline's own menus (z-index 20) still open over it. On a small window the bar can wrap
+   to several rows, so there it scrolls with the page. */
+@media (min-width: 60rem) and (min-height: 40rem) {
+  .ev-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 0.25rem 0.75rem rgb(15 23 42 / 0.08);
+  }
+  html:has(main.is-editing) {
+    scroll-padding-top: 6rem;
   }
 }

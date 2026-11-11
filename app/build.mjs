@@ -15,7 +15,9 @@ await build({
 const app = readFileSync("src/app.css", "utf-8");
 // The editing screens (the clip list, the timeline and the preview) bring their own styles, in their own namespaced names.
 const screens = ["clip-list", "timeline", "preview", "layout"].map((n) => readFileSync(`../capture-timeline/src/${n}.css`, "utf-8")).join("\n");
-writeFileSync("web/style.css", `${screens}\n\n/* ---- the app ---- */\n${app}`);
+// The suite's look (a copy of openstage-ui.css from the OpenStage Author repository, version 1) goes first, so the screens and the app can use its colours.
+const suite = readFileSync("src/openstage-ui.css", "utf-8");
+writeFileSync("web/style.css", `${suite}\n\n${screens}\n\n/* ---- the app ---- */\n${app}`);
 // The icon, from its source, for the page: the picture beside the heading and the tab icon.
 copyFileSync("branding/OpenStageRecorder.svg", "web/icon.svg");
 console.log("Built web/main.js, web/style.css and web/icon.svg");

@@ -11,6 +11,11 @@
 //
 // The screens have their own F6, which moves between the preview, the timeline and the clip list and says where it arrived, and their own line
 // of announcements, a polite live region. The app's own status line is not used as well, so nothing is read twice.
+//
+// The look (2026-11-10, the suite revamp, after the design specification's mockup S01): a bar with Back, the recording's name and whether
+// the edit is saved, Save and the main Make a video; the other ways to finish (a sound file, a picture), Suggest zooms and the two choices
+// about the video are in one More panel that opens and closes, so the bar is not two rows of wide buttons. The editing screens themselves
+// (capture-timeline) are shared with OpenStage Author and are not changed: only their colour names are pointed at the suite's (app.css).
 
 import { describeLength, describeSuggestion, describeTime, listCaption, modelLengthMs, serialize, suggestZooms, type ZoomSuggestion } from "../../capture-edit/src/index.ts";
 import { h, nextId } from "../../capture-timeline/src/dom.ts";
@@ -22,6 +27,7 @@ import { runOneShot } from "./capturecontroller.ts";
 import { applyExportLine, exportPlan, finishedWords, initialExport, type ExportKind, type ExportPlan, type ExportState } from "./captureexport.ts";
 import { recordingFolder } from "./recordingfolder.ts";
 import { gatherClicks, nothingToSuggestFrom, videoSizeOf } from "./zoomsuggest.ts";
+import { uiIcon } from "./uiicons.gen.ts";
 
 export interface EditViewOptions {
   backend: RecorderBackend;
@@ -83,14 +89,26 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
     "Your changes are saved as a list of what to keep and what to add. The recording itself, its picture and its sound, is never changed. Press F6 to move between the preview, the timeline and the clip list.",
   );
   const state = h("p", { id: id("state"), class: "rv-note" }, "Opening the recording.");
-  const back = h("button", { type: "button", class: "os-cl-button" }, "Back to recordings");
-  const save = h("button", { type: "button", class: "os-cl-button", "aria-describedby": id("state") }, "Save the edit");
-  const suggestBtn = h("button", { type: "button", class: "os-cl-button", hidden: true }, "Suggest zooms from my clicks");
-  const make = h("button", { type: "button", class: "os-cl-button rv-primary" }, "Make a video from this edit");
-  const makeSound = h("button", { type: "button", class: "os-cl-button" }, "Make a sound file (WAV) from this edit");
-  const makePicture = h("button", { type: "button", class: "os-cl-button" }, "Save the picture shown in the preview (PNG)");
+  const back = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "arrow-left"), "Back to recordings");
+  const save = h("button", { type: "button", class: "os-cl-button", "aria-describedby": id("state") }, uiIcon(document, "save"), "Save the edit");
+  const suggestBtn = h("button", { type: "button", class: "os-cl-button", hidden: true }, uiIcon(document, "zoom-in"), "Suggest zooms from my clicks");
+  const make = h("button", { type: "button", class: "os-cl-button rv-primary" }, uiIcon(document, "file-video-camera"), "Make a video from this edit");
+  const makeSound = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "file-volume"), "Make a sound file (WAV) from this edit");
+  const makePicture = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "image-down"), "Save the picture shown in the preview (PNG)");
   const cancelVideo = h("button", { type: "button", class: "os-cl-button", hidden: true }, "Cancel the video");
-  const actions = h("div", { class: "rv-actions" }, back, save, suggestBtn, make, makeSound, makePicture, cancelVideo);
+  // The other ways to finish, Suggest zooms and the choices about the video, in one panel that opens and closes (a native disclosure: Enter
+  // and Space open it, a screen reader hears whether it is open, and Escape closes it and goes back to its button).
+  const more = h("details", { class: "ev-more" });
+  const moreBody = h("div", { class: "ev-more-body" });
+  more.append(h("summary", {}, uiIcon(document, "ellipsis"), h("span", {}, "More ways to finish, and choices")), moreBody);
+  more.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !more.open) return;
+    e.preventDefault();
+    e.stopPropagation();
+    more.open = false;
+    more.querySelector<HTMLElement>("summary")?.focus();
+  });
+  const actions = h("div", { class: "rv-actions ev-actions" }, save, make, cancelVideo);
   const reduceBox = h("input", { type: "checkbox", id: id("reduce") });
   reduceBox.checked = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const highlightBox = h("input", { type: "checkbox", id: id("highlight") });
@@ -137,7 +155,11 @@ export function mountEditView(host: HTMLElement, opts: EditViewOptions): EditVie
   const balance = h("fieldset", { class: "rv-fieldset", hidden: true }, h("legend", {}, "Sound balance"), ...balanceBoxes.map((b) => b.field), balanceHint);
 
   const editorHost = h("div", { class: "ev-host" });
-  const root = h("section", { class: "rv-section ev", "aria-labelledby": id("title") }, heading, intro, actions, reduce, highlight, state, balance, suggestBox, videoBox, editorHost);
+  moreBody.append(h("div", { class: "rv-actions" }, makeSound, makePicture, suggestBtn), reduce, highlight);
+  const bar = h("div", { class: "ev-bar" },
+    h("div", { class: "ev-bar-start" }, back, h("div", { class: "ev-bar-title" }, heading, state)),
+    actions);
+  const root = h("section", { class: "rv-section ev", "aria-labelledby": id("title") }, bar, more, intro, balance, suggestBox, videoBox, editorHost);
   host.append(root);
 
   const folder = recordingFolder(b, opts.library, opts.name);

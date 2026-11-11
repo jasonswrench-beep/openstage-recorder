@@ -1,0 +1,76 @@
+/* OpenStage suite look, version 1 (2026-11-10).
+   The master copy is design/openstage-ui.css in the OpenStage Author repository. Every product keeps a copy with this same
+   version line: change the master first, then copy it, so the products never drift apart. What each colour is for, and the
+   contrast each pairing was checked at, is in design/DESIGN-GUIDE.md.
+
+   A product sets its own colour once, on :root, by pointing the --os-accent values at its own:
+     Author:   --os-accent: var(--os-author-action);   and the rest of the author values.
+     Recorder: --os-accent: var(--os-recorder-action); and the rest of the recorder values. */
+
+:root {
+  /* The navy bar along the top of every program. */
+  --os-shell: #0d1b30;
+  --os-shell-hover: #1c2d49;
+  --os-on-shell: #ffffff;
+  --os-on-shell-muted: #b9c4d4;
+
+  /* Surfaces: the grey around the work, the white of panels and dialogs, and a lighter grey for quiet groups. */
+  --os-page: #eef1f5;
+  --os-surface: #ffffff;
+  --os-subtle: #f7f9fc;
+
+  /* Words. Muted is only for extra detail, never for the only copy of something. */
+  --os-text: #192a43;
+  --os-muted: #5a6980;
+
+  /* Lines. A divider is decoration only; the edge of a control (a box, a field, a button's outline) must be seen, so it is darker. */
+  --os-divider: #dce3eb;
+  --os-control-edge: #7a8699;
+
+  /* Keyboard focus: two rings, so one of them shows on any background. The same as the course player. */
+  --os-focus: #0b3fb3;
+  --os-focus-halo: #ffffff;
+
+  /* States. Always with a word (and usually an icon): never colour alone. */
+  --os-success: #1d7454;
+  --os-success-tint: #e3f3ec;
+  --os-warning: #8b5918;
+  --os-warning-tint: #fbf0df;
+  --os-danger: #b44248;
+  --os-danger-tint: #fbe7e8;
+
+  /* OpenStage Author: lavender in the logo, a deeper violet for anything you press or read. */
+  --os-author-action: #6656b7;
+  --os-author-action-hover: #54459e;
+  --os-author-tint: #eeeafb;
+  --os-author-on-shell: #c9b6fa;
+  --os-author-logo: #aa88f4;
+
+  /* OpenStage Recorder: coral in the logo, a deeper rose for anything you press or read. */
+  --os-recorder-action: #a83653;
+  --os-recorder-action-hover: #8e2a45;
+  --os-recorder-tint: #fbebef;
+  --os-recorder-on-shell: #f7a9b6;
+  --os-recorder-logo: #f47f90;
+
+  /* Words: the type every Windows computer already has, so nothing is downloaded or bundled. */
+  --os-font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --os-text-size: 14px;
+  --os-small-size: 12px;
+  --os-heading-size: 15px;
+  --os-title-size: 18px;
+
+  /* Space, corners and sizes. */
+  --os-space-1: 4px;
+  --os-space-2: 8px;
+  --os-space-3: 12px;
+  --os-space-4: 16px;
+  --os-space-5: 24px;
+  --os-radius-sm: 6px;
+  --os-radius: 8px;
+  --os-radius-lg: 12px;
+  --os-control-height: 32px;
+  --os-shell-height: 52px;
+  --os-icon-size: 18px;
+  --os-shadow-pop: 0 8px 24px rgba(13, 27, 48, 0.18), 0 1px 3px rgba(13, 27, 48, 0.12);
+}

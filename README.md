@@ -21,6 +21,8 @@ It has no courses, slides, quizzes or publishing. It is its own product, made by
 | `app/` | The window: the Record screen (TypeScript), a thin Tauri shell (Rust) and the rules it keeps (`app/core`, Rust, tested without a window). Includes a pretend recorder so the screens can be tried and checked in a browser. Double-click `app\RUN CHECKS.bat` to run its type check, unit tests and browser check (the browser check needs Playwright, which is free but not part of this program; the script says so if it is missing) | The Rust rules and the web checks pass on Linux. On 2026-10-23 the owner built and ran it on Windows and made one real recording with it; the recorder's own checks passed for the picture and the microphone. Not yet tried: choosing one window or part of a screen, the webcam, a long recording, the keys with another program in front, a keyboard or screen reader pass |
 | `docs/recorder/` | This product: the plan, the manifest of what was copied and from where, what the app took from OpenStage Author, and decision records | New |
 
+**The look changed on 2026-11-10** to the one the OpenStage products now share: a navy bar, tabs for Record, Recordings, Settings and Help, the Record screen as numbered steps, a card for each recording, and a bar at the top of the editing screen. Nothing it does changed. It was checked in a browser with the pretend recorder, not on Windows; `docs/recorder/plan.md` ("The new look") says what moved where.
+
 The layout and the paths of the first four are the same as in OpenStage Author on purpose, so a fix made in one place can be carried to the other by comparing like with like.
 
 ## What is not built yet
