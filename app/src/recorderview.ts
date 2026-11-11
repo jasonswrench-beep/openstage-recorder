@@ -7,6 +7,11 @@
 //
 // This is a page, not a pop-up: nothing traps the keyboard. It is OpenStage Author's recorder dialog (editor/src/recorderdialog.ts there)
 // without the course, the steps and the interaction notes, and with a recordings folder of the author's choice instead of a course folder.
+//
+// The look (2026-11-10, the suite revamp, after the design specification's mockup R01): three numbered steps (what to record, as three cards
+// that are radio buttons; the voice, the computer's sound and a webcam, as three cards; the name and Start), and beside them where recordings
+// are kept, the choices most people leave alone (the mouse, windows to hide, sound balance) as sections that open and close, the recordings
+// made so far and whether this computer is ready. The recordings and the computer check have their own tabs (main.ts), given as `hosts`.
 
 import { h, nextId } from "../../capture-timeline/src/dom.ts";
 import { errorText, type RecorderBackend } from "./backend.ts";
@@ -19,6 +24,9 @@ import {
 import { recordingNameOf } from "./recordingfolder.ts";
 import { describeQuick, quickSettings, type QuickRecord, type QuickState } from "./quickrecord.ts";
 import { freshName } from "./settings.ts";
+import { uiIcon, type UiIconName } from "./uiicons.gen.ts";
+import { appStateWords, clockText } from "./shell.ts";
+import { countText as recordingsCountText, detailsText, matchesSearch, sortRecordings, summarize, type RecordingSummary, type SortOrder } from "./library.ts";
 
 export interface RecorderViewOptions {
   backend: RecorderBackend;
@@ -36,6 +44,10 @@ export interface RecorderViewOptions {
   announce?: (message: string) => void;
   /** Quick record: one press to record with the choices made here, and a finished video and its path afterwards. Without it, the button is not offered. */
   quick?: QuickRecord;
+  /** Where the recordings list, the settings (the folder and the computer check) and the status line go: the app's tabs. Without them, all of it goes on this screen. */
+  hosts?: { recordings: HTMLElement; settings: HTMLElement; status: HTMLElement };
+  /** Show another tab, from the cards beside the steps (and New recording on the Recordings tab). */
+  showTab?: (tab: "record" | "recordings" | "settings") => void;
 }
 
 export interface RecorderView {
@@ -80,9 +92,23 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   const name = h("input", { type: "text", id: id("name"), class: "os-cl-input", value: s.name, maxlength: "60" });
   const practice = h("input", { type: "checkbox", id: id("practice") });
   practice.checked = s.practice;
-  const target = h("select", { id: id("target"), class: "os-cl-input" },
-    h("option", { value: "screen" }, "A whole screen"), h("option", { value: "window" }, "One window (an app)"), h("option", { value: "region" }, "Part of a screen"));
-  target.value = s.target;
+  // What to record, as three cards: each is a radio button with its words in its label, so the arrow keys move between them and a screen reader
+  // hears "Entire screen, Everything on one screen, radio button, checked, 1 of 3". The tick and the outline show which is chosen, never colour alone.
+  const TARGETS: { value: Target; title: string; detail: string; icon: UiIconName }[] = [
+    { value: "screen", title: "Entire screen", detail: "Everything on one screen", icon: "monitor" },
+    { value: "window", title: "One window", detail: "A single app", icon: "app-window" },
+    { value: "region", title: "Part of a screen", detail: "An area you choose", icon: "square-dashed" },
+  ];
+  const targetRadios = TARGETS.map((t) => {
+    const input = h("input", { type: "radio", name: id("target"), id: id(`target-${t.value}`), value: t.value, class: "rv-choice-input" });
+    input.checked = s.target === t.value;
+    const chosen = uiIcon(document, "check");
+    chosen.classList.add("rv-choice-tick");
+    const label = h("label", { for: id(`target-${t.value}`), class: "rv-choice" }, uiIcon(document, t.icon), h("span", { class: "rv-choice-title" }, t.title), " ", h("span", { class: "rv-choice-detail" }, t.detail), chosen);
+    return { value: t.value, input, cell: h("div", { class: "rv-choice-cell" }, input, label) };
+  });
+  if (!targetRadios.some((r) => r.input.checked)) targetRadios[0]!.input.checked = true;
+  const targetValue = (): Target => targetRadios.find((r) => r.input.checked)?.value ?? "screen";
   const display = h("select", { id: id("display"), class: "os-cl-input" });
   const windowSel = h("select", { id: id("window"), class: "os-cl-input" }, h("option", { value: "" }, "No window chosen yet"));
   const findWindows = h("button", { type: "button", class: "os-cl-button" }, "Look for windows");
@@ -131,7 +157,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
 
   function readSettings(): RecordSettings {
     return {
-      name: name.value, practice: practice.checked, target: target.value as Target, display: Number(display.value) || 1,
+      name: name.value, practice: practice.checked, target: targetValue(), display: Number(display.value) || 1,
       window: windowSel.value, region: { left: left.input.value, top: top.input.value, width: width.input.value, height: height.input.value },
       microphone: microphone.value, output: output.value, camera: camera.value,
       micGainDb: micGain.value.trim() === "" ? Number.NaN : Number(micGain.value),
@@ -143,84 +169,186 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     };
   }
 
-  const screenGroup = h("div", {}, field(id("display"), "Which screen", display));
-  const windowGroup = h("div", {}, field(id("window"), "Which window", windowSel, [findWindows, document.createTextNode(" "), pickWindow]),
+  const screenGroup = h("div", { class: "rv-sub" }, field(id("display"), "Which screen", display));
+  const windowGroup = h("div", { class: "rv-sub" }, field(id("window"), "Which window", windowSel, [findWindows, document.createTextNode(" "), pickWindow]),
     h("p", { class: "rv-note" }, "Or press Pick a window by clicking it, then click the window you want. The click only chooses the window, and nothing in it is pressed. This window goes out of the way first, and comes back after. Press Escape to cancel."));
-  const regionGroup = h("div", {}, h("p", { class: "rv-note" }, "Choose which screen above, then the part of it, in pixels, counted from the top left corner. It must be at least 64 by 64."),
+  const regionGroup = h("div", { class: "rv-sub" }, h("p", { class: "rv-note" }, "Choose which screen above, then the part of it, in pixels, counted from the top left corner. It must be at least 64 by 64."),
     h("div", { class: "os-cl-fields" }, left.field, top.field, width.field, height.field));
-  const realGroup = h("div", {},
-    h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "What to record"), field(id("target"), "Record", target), screenGroup, windowGroup, regionGroup),
-    h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "The mouse"),
-      h("div", { class: "rv-check" }, noteMouse, " ", h("label", { for: id("notemouse") }, "Note where the mouse goes and where I click. This lets a video show a ring round the pointer, and lets the editor suggest zooms from your clicks.")),
-      h("p", { class: "rv-note" }, "The notes stay inside the recording, on this computer, and are never published. They also say which window was in front and the name of what you clicked, which can give away private things such as the title of a page. The keys you press are never noted. Leave this off when you do not need it.")),
-    h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "Windows to hide"),
-      field(id("hide"), "Hide windows with these words in their title or program name (separate several with semicolons, for example KeePass; Outlook)", hideBox),
-      h("p", { class: "rv-note" }, "Wherever such a window is on the screen, the video has a plain dark box instead, and nothing of the window is kept. This is for recording a screen or part of one, not one window. The whole window is covered even where another window is in front of it, and a window that has only just opened can show for a moment. The notes of the mouse still name the window that is in front, and the sound and the webcam are not changed. Nothing is hidden from anyone looking at your screen while you record.")),
-    h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "Sound, and a picture of you"),
-      field(id("microphone"), "Your voice", microphone), field(id("output"), "The computer's own sound", output), field(id("camera"), "A webcam", camera),
-      h("p", { class: "rv-note" }, "A webcam, and your voice, are recorded only if you choose them. The computer's own sound includes a screen reader's speech."),
-      field(id("micgain"), `Your voice in the video: louder or quieter, in decibels (${MIN_GAIN_DB} to ${MAX_GAIN_DB})`, micGain),
-      field(id("systemgain"), `The computer's sound in the video: louder or quieter, in decibels (${MIN_GAIN_DB} to ${MAX_GAIN_DB})`, systemGain),
-      h("p", { class: "rv-note" }, "0 leaves a sound as it is heard. A negative number makes it quieter: every 6 decibels is about half as loud, and 6 above is about twice as loud. If the recorder tells you, after a recording, that the computer's sound drowns your voice, put the number it gives in the computer's sound box for the next one. The separate sound files of the recording are never changed by this. When you edit the recording, these numbers are where each sound starts, and you can change them again there, under Sound balance.")));
+  /** A numbered step: a group named by its words (the number is only to look at). */
+  const step = (n: number, legend: string, ...kids: Node[]) =>
+    h("fieldset", { class: "rv-fieldset rv-step" }, h("legend", {}, h("span", { class: "rv-step-number", "aria-hidden": "true" }, String(n)), legend), ...kids);
+  /** A card for a sound or the webcam: its icon, and the list of what to use, whose label is the card's title. */
+  const device = (icon: UiIconName, fieldId: string, label: string, control: HTMLElement) =>
+    h("div", { class: "rv-device" }, h("div", { class: "rv-device-head" }, uiIcon(document, icon), h("label", { for: fieldId }, label)), control);
+  /** One of the choices most people leave alone: a section that opens and closes (a native disclosure, so Enter and Space open it and a screen reader hears whether it is open). */
+  const more = (icon: UiIconName, title: string, ...kids: Node[]) =>
+    h("details", { class: "rv-more" }, h("summary", {}, uiIcon(document, icon), h("span", { class: "rv-more-title" }, title)), h("div", { class: "rv-more-body" }, ...kids));
+  const whatStep = step(1, "What to record",
+    h("div", { class: "rv-choices", role: "radiogroup", "aria-label": "What to record" }, ...targetRadios.map((r) => r.cell)),
+    screenGroup, windowGroup, regionGroup);
+  const soundStep = step(2, "Sound, and a picture of you",
+    h("div", { class: "rv-devices" },
+      device("mic", id("microphone"), "Your voice", microphone),
+      device("volume-2", id("output"), "The computer's own sound", output),
+      device("webcam", id("camera"), "A webcam", camera)),
+    h("p", { class: "rv-note" }, "A webcam, and your voice, are recorded only if you choose them. The computer's own sound includes a screen reader's speech."));
+  const mouseMore = more("mouse-pointer-2", "The mouse",
+    h("div", { class: "rv-check" }, noteMouse, " ", h("label", { for: id("notemouse") }, "Note where the mouse goes and where I click. This lets a video show a ring round the pointer, and lets the editor suggest zooms from your clicks.")),
+    h("p", { class: "rv-note" }, "The notes stay inside the recording, on this computer, and are never published. They also say which window was in front and the name of what you clicked, which can give away private things such as the title of a page. The keys you press are never noted. Leave this off when you do not need it."));
+  const hideMore = more("eye-off", "Windows to hide",
+    field(id("hide"), "Hide windows with these words in their title or program name (separate several with semicolons, for example KeePass; Outlook)", hideBox),
+    h("p", { class: "rv-note" }, "Wherever such a window is on the screen, the video has a plain dark box instead, and nothing of the window is kept. This is for recording a screen or part of one, not one window. The whole window is covered even where another window is in front of it, and a window that has only just opened can show for a moment. The notes of the mouse still name the window that is in front, and the sound and the webcam are not changed. Nothing is hidden from anyone looking at your screen while you record."));
+  const balanceMore = more("sliders-horizontal", "Sound balance",
+    field(id("micgain"), `Your voice in the video: louder or quieter, in decibels (${MIN_GAIN_DB} to ${MAX_GAIN_DB})`, micGain),
+    field(id("systemgain"), `The computer's sound in the video: louder or quieter, in decibels (${MIN_GAIN_DB} to ${MAX_GAIN_DB})`, systemGain),
+    h("p", { class: "rv-note" }, "0 leaves a sound as it is heard. A negative number makes it quieter: every 6 decibels is about half as loud, and 6 above is about twice as loud. If the recorder tells you, after a recording, that the computer's sound drowns your voice, put the number it gives in the computer's sound box for the next one. The separate sound files of the recording are never changed by this. When you edit the recording, these numbers are where each sound starts, and you can change them again there, under Sound balance."));
+  // A section with something set in it is open, so nothing chosen is out of sight.
+  mouseMore.open = noteMouse.checked;
+  hideMore.open = hideBox.value.trim() !== "";
+  balanceMore.open = (Number(micGain.value) || 0) !== 0 || (Number(systemGain.value) || 0) !== 0;
+  const moreTitle = h("h3", { id: id("more-title") }, "More choices");
+  const moreCard = h("section", { class: "rv-card", "aria-labelledby": id("more-title") }, moreTitle,
+    h("p", { class: "rv-note" }, "Most recordings need none of these."), mouseMore, hideMore, balanceMore);
+  const realGroup = h("div", { class: "rv-real" }, whatStep, soundStep);
 
   const problem = h("p", { id: id("problem"), class: "rv-note" });
   const start = h("button", { type: "button", id: id("start"), class: "os-cl-button rv-primary", "aria-describedby": id("problem") }, "Start recording");
   const quickNote = h("p", { id: id("quick-note"), class: "rv-note" });
   const quickBtn = h("button", { type: "button", id: id("quick"), class: "os-cl-button", "aria-describedby": id("quick-note"), hidden: opts.quick === undefined }, "Quick record");
   quickNote.hidden = opts.quick === undefined;
+  start.prepend(uiIcon(document, "circle-dot"));
+  quickBtn.prepend(uiIcon(document, "zap"));
   const setupTitle = h("h2", { id: id("setup-title") }, "Record");
-  const setup = h("section", { class: "rv-section", "aria-labelledby": id("setup-title") },
-    setupTitle,
+  const startStep = step(3, "Name, and start",
     field(id("name"), "Name of the recording", name),
     h("div", { class: "rv-check" }, practice, " ", h("label", { for: id("practice") }, "Practice: try the controls with a made-up picture and sound. Nothing on your screen is recorded.")),
-    realGroup,
-    h("fieldset", { class: "rv-fieldset" }, h("legend", {}, "Starting"),
+    h("div", { class: "rv-start-options" },
       field(id("countdown"), `Countdown, in seconds (0 to ${MAX_COUNTDOWN})`, countdown),
       h("div", { class: "rv-check" }, sounds, " ", h("label", { for: id("sounds") }, "Play a short sound for each step (the countdown, start, pause, resume and stop). Recommended for anyone who cannot see the screen. The sounds are never recorded."))),
-    problem, h("div", { class: "rv-actions" }, start, quickBtn), quickNote);
+    problem, h("div", { class: "rv-actions rv-start-row" }, start, quickBtn), quickNote);
+  // ---- beside the steps: where recordings are kept, the choices most people leave alone, the recordings so far, and this computer
+  const keptWhere = h("p", { class: "rv-note", id: id("kept") });
+  const privacyCard = h("section", { class: "rv-card rv-privacy", "aria-labelledby": id("privacy-title") },
+    h("h3", { id: id("privacy-title") }, uiIcon(document, "shield-check"), h("span", {}, "Recordings stay on this computer")),
+    h("p", { class: "rv-note" }, "Nothing is sent anywhere, and there is no account. Your voice and a webcam are recorded only if you choose them."),
+    keptWhere);
+  const countText = h("p", { class: "rv-note", id: id("count") });
+  const openRecordings = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "film"), "Open your recordings");
+  const recordingsCard = h("section", { class: "rv-card", "aria-labelledby": id("rc-title") }, h("h3", { id: id("rc-title") }, "Your recordings"), countText, h("div", { class: "rv-actions" }, openRecordings));
+  const computerText = h("p", { class: "rv-note", id: id("computer") });
+  const openSettings = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "settings"), "Open Settings");
+  const computerCard = h("section", { class: "rv-card", "aria-labelledby": id("pc-title") }, h("h3", { id: id("pc-title") }, "This computer"), computerText, h("div", { class: "rv-actions" }, openSettings));
+  openRecordings.hidden = opts.showTab === undefined;
+  openSettings.hidden = opts.showTab === undefined;
+  openRecordings.addEventListener("click", () => opts.showTab?.("recordings"));
+  openSettings.addEventListener("click", () => opts.showTab?.("settings"));
+  const side = h("div", { class: "rv-side" }, privacyCard, moreCard, recordingsCard, computerCard);
+  const setup = h("section", { class: "rv-section rv-setup", "aria-labelledby": id("setup-title") },
+    h("div", { class: "rv-setup-head" }, setupTitle, h("p", { class: "rv-lead" }, "Choose what to record and whose sound, then start. Every choice is kept for next time.")),
+    h("div", { class: "rv-setup-grid" }, h("div", { class: "rv-steps" }, realGroup, startStep), side));
 
   // ---- the recording as it goes
   const liveTitle = h("h2", { id: id("live-title"), tabindex: "-1" }, "Recording");
-  const now = h("p", { id: id("now") });
+  const now = h("p", { id: id("now"), class: "rv-now" });
+  // The time, large, as a clock: only to look at. A screen reader has the sentence under it, and the status line says each change once,
+  // never the seconds as they pass.
+  const clock = h("p", { class: "rv-clock", "aria-hidden": "true" }, "00:00:00");
+  const liveWord = h("span", { class: "rv-live-word" });
+  const liveChip = h("p", { class: "rv-live-chip", "aria-hidden": "true" }, h("span", { class: "rv-live-dot" }), liveWord);
   // Said as soon as the recording heading is reached, so nobody mistakes the preview for the real thing.
   const pretendLive = h("p", { class: "rv-pretend" }, "This is a pretend recording. Nothing is being recorded, and nothing will be saved on your computer. To record for real, open the app with OPEN RECORDER.bat.");
   pretendLive.hidden = !b.preview;
-  const pause = h("button", { type: "button", class: "os-cl-button" }, "Pause");
-  const stop = h("button", { type: "button", class: "os-cl-button" }, "Stop");
-  const again = h("button", { type: "button", class: "os-cl-button" }, "Start again");
+  const pause = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "pause"), "Pause");
+  const stop = h("button", { type: "button", class: "os-cl-button rv-primary" }, uiIcon(document, "square"), "Stop");
+  const again = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "rotate-ccw"), "Start again");
   const markerLabel = h("input", { type: "text", id: id("marker"), class: "os-cl-input", maxlength: "120" });
-  const addMarker = h("button", { type: "button", class: "os-cl-button" }, "Add a marker");
+  const addMarker = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "bookmark-plus"), "Add a marker");
   const markers = h("ul", { class: "rv-list", "aria-label": "Markers" });
   const notes = h("ul", { class: "rv-list", "aria-label": "What the recorder said" });
   const where = h("p", { id: id("where") });
-  const show = h("button", { type: "button", class: "os-cl-button" }, "Show the recording in its folder");
-  const done = h("button", { type: "button", class: "os-cl-button" }, "Done");
-  const editNow = h("button", { type: "button", class: "os-cl-button rv-primary" }, "Edit the recording I just made");
+  const show = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "folder-open"), "Show the recording in its folder");
+  const done = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "circle-check"), "Done");
+  const editNow = h("button", { type: "button", class: "os-cl-button rv-primary" }, uiIcon(document, "scissors"), "Edit the recording I just made");
   const doneRow = h("div", { class: "rv-actions" }, editNow, show, done);
   // ---- a quick recording: what is happening to it, and the path of the finished video
   const quickTitle = h("h3", { id: id("quick-title") }, "Quick recording");
   const quickSay = h("p", { id: id("quick-message") });
   const quickPath = h("input", { type: "text", id: id("quick-path"), class: "os-cl-input rv-path", readonly: "", spellcheck: "false", autocomplete: "off" });
   const quickPathField = h("div", { class: "os-cl-field" }, h("label", { for: id("quick-path") }, "Path of the finished video"), h("div", { class: "rv-control" }, quickPath));
-  const copyPath = h("button", { type: "button", class: "os-cl-button rv-primary" }, "Copy the path");
-  const showVideo = h("button", { type: "button", class: "os-cl-button" }, "Show the video in its folder");
-  const quickBox = h("section", { class: "rv-section", "aria-labelledby": id("quick-title"), hidden: true }, quickTitle, quickSay, quickPathField, h("div", { class: "rv-actions" }, copyPath, showVideo));
-  const controls = h("div", { class: "rv-actions" }, pause, stop, again);
-  const markerRow = h("div", { class: "os-cl-field" }, h("label", { for: id("marker") }, "Words for a marker (optional)"), h("div", { class: "rv-control" }, markerLabel, " ", addMarker));
-  const live = h("section", { class: "rv-section", "aria-labelledby": id("live-title"), hidden: true }, liveTitle, pretendLive, now, quickBox, controls, markerRow,
-    h("h3", {}, "Markers"), markers, h("h3", {}, "What the recorder said"), notes, where, doneRow);
+  const copyPath = h("button", { type: "button", class: "os-cl-button rv-primary" }, uiIcon(document, "clipboard-copy"), "Copy the path");
+  const showVideo = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "folder-open"), "Show the video in its folder");
+  const quickBox = h("section", { class: "rv-section rv-quick", "aria-labelledby": id("quick-title"), hidden: true }, quickTitle, quickSay, quickPathField, h("div", { class: "rv-actions" }, copyPath, showVideo));
+  const controls = h("div", { class: "rv-actions rv-live-controls" }, pause, stop, again);
+  const markerRow = h("div", { class: "os-cl-field rv-marker-row" }, h("label", { for: id("marker") }, "Words for a marker (optional)"), h("div", { class: "rv-control" }, markerLabel, " ", addMarker));
+  const live = h("section", { class: "rv-section rv-live", "aria-labelledby": id("live-title"), hidden: true },
+    h("div", { class: "rv-live-head" }, liveTitle, liveChip),
+    pretendLive,
+    h("div", { class: "rv-live-top" }, h("div", { class: "rv-live-time" }, clock, now), controls),
+    quickBox, markerRow,
+    h("div", { class: "rv-live-cards" },
+      h("div", { class: "rv-card" }, h("h3", {}, uiIcon(document, "bookmark-plus"), h("span", {}, "Markers")), markers),
+      h("div", { class: "rv-card" }, h("h3", {}, uiIcon(document, "list-checks"), h("span", {}, "What the recorder said")), notes)),
+    where, doneRow);
 
   // ---- the recordings already made
   const folderText = h("p", { id: id("folder") });
-  const recordingsSel = h("select", { id: id("recordings"), class: "os-cl-input" });
-  const editBtn = h("button", { type: "button", class: "os-cl-button" }, "Edit this recording");
-  const revealBtn = h("button", { type: "button", class: "os-cl-button" }, "Show this recording in its folder");
+  // The recordings, as the design specification's mockup R03 has them: a card for each, with its length, its takes and when it was made, read
+  // from its own files (library.ts), an Edit button and a Show in its folder button, each named after the recording; a search and an order.
   const changeFolder = h("button", { type: "button", class: "os-cl-button" }, "Choose another recordings folder");
-  const noRecordings = h("p", { class: "rv-note" }, "Nothing has been recorded in this folder yet.");
-  const recordingsPick = h("div", { hidden: true }, field(id("recordings"), "Recording", recordingsSel), h("div", { class: "rv-actions" }, editBtn, revealBtn));
+  const recSearch = h("input", { type: "search", id: id("rec-search"), class: "os-cl-input", autocomplete: "off", spellcheck: "false", placeholder: "Words from its name" });
+  const recSort = h("select", { id: id("rec-sort"), class: "os-cl-input" },
+    h("option", { value: "newest" }, "Newest first"), h("option", { value: "oldest" }, "Oldest first"), h("option", { value: "name" }, "A to Z"));
+  const recCount = h("p", { id: id("rec-count"), class: "rv-note" });
+  const recList = h("ul", { class: "rv-rec-list", role: "list", "aria-labelledby": id("recordings-title") });
+  const newRecording = h("button", { type: "button", class: "os-cl-button rv-primary" }, uiIcon(document, "circle-dot"), "New recording");
+  newRecording.hidden = opts.showTab === undefined;
+  newRecording.addEventListener("click", () => { opts.showTab?.("record"); start.focus(); });
   const recordingsTitle = h("h2", { id: id("recordings-title") }, "Your recordings");
-  const recordingsBox = h("section", { class: "rv-section", "aria-labelledby": id("recordings-title") },
-    recordingsTitle, folderText, noRecordings, recordingsPick, h("div", { class: "rv-actions" }, changeFolder));
+  const recordingsBox = h("section", { class: "rv-section rv-recordings", "aria-labelledby": id("recordings-title") },
+    h("div", { class: "rv-rec-head" }, h("div", {}, recordingsTitle, h("p", { class: "rv-lead" }, "Everything is kept on this computer. Edit a recording to trim it, hide parts of it and make a video.")), newRecording),
+    h("div", { class: "rv-rec-tools" },
+      h("div", { class: "os-cl-field" }, h("label", { for: id("rec-search") }, "Find a recording"), recSearch),
+      h("div", { class: "os-cl-field" }, h("label", { for: id("rec-sort") }, "Order"), recSort)),
+    recCount, recList);
+  let summaries: RecordingSummary[] = [];
+  const editRecordingNamed = (recording: string): void => {
+    if (c.busy) { say(["A recording is going. Wait until it is finished, then edit."]); return; }
+    opts.editRecording(recording);
+  };
+  /** Draw the cards for the recordings read, in the order chosen and fitting the search. Focus stays on the button it was on. */
+  function drawRecordings(): void {
+    const focusKey = recList.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset["key"] ?? "" : "";
+    const now = new Date();
+    const shown = sortRecordings(summaries, recSort.value as SortOrder).filter((s) => matchesSearch(s, recSearch.value));
+    recCount.textContent = recordingsCountText(shown.length, summaries.length, recSearch.value);
+    recList.replaceChildren(...shown.map((s) => {
+      const nameId = `${id("rec")}-${encodeURIComponent(s.name).replace(/[^A-Za-z0-9-]/g, "_")}`;
+      const edit = h("button", { type: "button", class: "os-cl-button rv-primary", "aria-label": `Edit ${s.title}`, "data-key": `rec-edit:${s.name}` }, uiIcon(document, "scissors"), "Edit");
+      const reveal = h("button", { type: "button", class: "os-cl-button rv-icon-button", "aria-label": `Show ${s.title} in its folder`, title: "Show in its folder", "data-key": `rec-show:${s.name}` }, uiIcon(document, "folder-open"));
+      edit.addEventListener("click", () => editRecordingNamed(s.name));
+      reveal.addEventListener("click", () => reveal_(s.name));
+      return h("li", { class: "rv-rec-card", "aria-labelledby": nameId },
+        h("div", { class: "rv-rec-picture", "aria-hidden": "true" }, uiIcon(document, "film")),
+        h("div", { class: "rv-rec-body" },
+          h("h3", { class: "rv-rec-name", id: nameId }, s.title),
+          h("p", { class: "rv-rec-details" }, detailsText(s, now)),
+          h("p", { class: `rv-rec-badge${s.edited ? " is-edited" : ""}` }, s.edited ? "Edited" : "Not edited yet")),
+        h("div", { class: "rv-rec-actions" }, edit, reveal));
+    }));
+    if (focusKey !== "") [...recList.querySelectorAll<HTMLElement>("[data-key]")].find((el) => el.dataset["key"] === focusKey)?.focus();
+  }
+  recSearch.addEventListener("input", drawRecordings);
+  recSort.addEventListener("change", drawRecordings);
+  /** Read what each recording is from its own files. A file that cannot be read is said on its card; nothing is written. */
+  async function readSummary(recording: string): Promise<RecordingSummary> {
+    const read = (rel: string) => b.recordingRead(library, recording, rel).catch(() => undefined);
+    const takes = await b.recordingFolders(library, recording, "takes").catch(() => [] as string[]);
+    const [captureText, editText, ...takeTexts] = await Promise.all([read("capture.json"), read("edit.json"), ...takes.map((t) => read(`takes/${t}/take.json`))]);
+    return summarize(recording, captureText, takeTexts, editText);
+  }
+  changeFolder.prepend(uiIcon(document, "folder-input"));
+  const folderTitle = h("h2", { id: id("folder-title") }, "Where recordings are kept");
+  const folderBox = h("section", { class: "rv-section", "aria-labelledby": id("folder-title") }, folderTitle, folderText, h("div", { class: "rv-actions" }, changeFolder));
 
   // ---- the check
   const found = h("p", { id: id("found") });
@@ -233,12 +361,14 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   async function refreshRecordings(): Promise<void> {
     const names = await b.listRecordings(library).catch(() => [] as string[]);
     existing = names;
-    const keep = recordingsSel.value;
-    recordingsSel.replaceChildren(...names.map((n) => h("option", { value: n }, n.replace(/\.capture$/, ""))));
-    if (names.includes(keep)) recordingsSel.value = keep;
-    recordingsPick.hidden = names.length === 0;
-    noRecordings.hidden = names.length > 0;
+    summaries = await Promise.all(names.map(readSummary));
+    drawRecordings();
+    countText.textContent = names.length === 0 ? "Nothing has been recorded in this folder yet." : `${names.length} ${names.length === 1 ? "recording" : "recordings"} in this folder.`;
     showSetup();
+  }
+
+  function reveal_(recording: string): void {
+    void b.revealRecording(library, recording, "").catch((err: unknown) => say([`Could not show the folder. ${errorText(err)}`]));
   }
 
   function showFolder(): void {
@@ -247,6 +377,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
       library === "" ? "No recordings folder is chosen yet."
       : b.preview ? `This preview keeps only pretend recordings, inside this page, until you close it. The real app keeps recordings in: ${library}`
       : `Recordings are kept in: ${library}`;
+    keptWhere.textContent = library === "" ? "No recordings folder is chosen yet." : b.preview ? "This preview keeps pretend recordings only, inside this page." : `In ${library}`;
   }
 
   // ---- showing the state
@@ -266,9 +397,11 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   function showSetup(): void {
     const isPractice = practice.checked;
     realGroup.hidden = isPractice;
-    screenGroup.hidden = target.value !== "screen" && target.value !== "region";
-    windowGroup.hidden = target.value !== "window";
-    regionGroup.hidden = target.value !== "region";
+    moreCard.hidden = isPractice;
+    const chosen = targetValue();
+    screenGroup.hidden = chosen !== "screen" && chosen !== "region";
+    windowGroup.hidden = chosen !== "window";
+    regionGroup.hidden = chosen !== "region";
     const why = busyQuery ? "Looking at what this computer has." : (ready() ?? "");
     const again = existing.includes(recordingFolderName(name.value)) ? `A recording called ${name.value.trim()} already exists. Recording again adds another take to it. Change the name to start a new recording.` : "";
     problem.textContent = why !== "" ? why : again;
@@ -288,7 +421,12 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     live.hidden = idle;
     setup.hidden = !idle;
     now.textContent = describeSession(session);
-    pause.textContent = session.phase === "paused" ? "Resume" : "Pause";
+    const paused = session.phase === "paused";
+    pause.replaceChildren(uiIcon(document, paused ? "play" : "pause"), paused ? "Resume" : "Pause");
+    clock.textContent = clockText(session.phase === "finished" && session.result ? session.result.durationMs : session.elapsedMs);
+    clock.hidden = session.phase === "failed";
+    liveWord.textContent = appStateWords(session.phase, "idle");
+    live.dataset["phase"] = session.phase;
     controls.hidden = over;
     markerRow.hidden = over;
     doneRow.hidden = !over;
@@ -411,20 +549,11 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     showSetup();
     start.focus();
   });
-  editBtn.addEventListener("click", () => {
-    if (recordingsSel.value === "") return;
-    if (c.busy) { say(["A recording is going. Wait until it is finished, then edit."]); return; }
-    opts.editRecording(recordingsSel.value);
-  });
   editNow.addEventListener("click", () => {
     if (c.busy) return;
     opts.editRecording(recordingNameOf(c.session.folder), true);
   });
-  const reveal = (recording: string): void => {
-    void b.revealRecording(library, recording, "").catch((err: unknown) => say([`Could not show the folder. ${errorText(err)}`]));
-  };
-  revealBtn.addEventListener("click", () => { if (recordingsSel.value !== "") reveal(recordingsSel.value); });
-  show.addEventListener("click", () => reveal(recordingNameOf(c.session.folder)));
+  show.addEventListener("click", () => reveal_(recordingNameOf(c.session.folder)));
   changeFolder.addEventListener("click", async () => {
     if (c.busy) { say(["A recording is going. Wait until it is finished, then choose another folder."]); return; }
     const chosen = await opts.chooseLibrary();
@@ -433,7 +562,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     say([`Recordings are now kept in ${chosen}.`]);
     changeFolder.focus();
   });
-  for (const el of [name, practice, target, display, windowSel, microphone, output, camera, micGain, systemGain, countdown, sounds, noteMouse, hideBox, left.input, top.input, width.input, height.input]) {
+  for (const el of [name, practice, ...targetRadios.map((r) => r.input), display, windowSel, microphone, output, camera, micGain, systemGain, countdown, sounds, noteMouse, hideBox, left.input, top.input, width.input, height.input]) {
     el.addEventListener("input", showSetup);
     el.addEventListener("change", showSetup);
   }
@@ -515,8 +644,17 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   }
   check.addEventListener("click", () => { if (check.getAttribute("aria-disabled") !== "true") void runCheck(); });
 
-  root.append(status, live, setup, recordingsBox, checkBox);
-  host.replaceChildren(root);
+  if (opts.hosts) {
+    // The app's tabs: this screen is Record; the recordings and the settings have tabs of their own; the status line is above them all.
+    root.append(live, setup);
+    host.replaceChildren(root);
+    opts.hosts.status.replaceChildren(status);
+    opts.hosts.recordings.replaceChildren(recordingsBox);
+    opts.hosts.settings.replaceChildren(folderBox, checkBox);
+  } else {
+    root.append(status, live, setup, recordingsBox, folderBox, checkBox);
+    host.replaceChildren(root);
+  }
   try {
     fillChoices();
   } catch (err) {
@@ -527,6 +665,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   if (opts.quick !== undefined) showQuick(opts.quick.state);
   showSetup();
   found.textContent = "Looking for the recording program...";
+  computerText.textContent = "Looking for the recording program...";
   check.setAttribute("aria-disabled", "true");
   void refreshRecordings();
 
@@ -534,6 +673,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     const located = await b.captureCheck().catch((err: unknown) => ({ ok: false as const, message: `Could not look for the recording program. ${errorText(err)}` }));
     usable = located.ok;
     found.textContent = located.ok ? `The recording program was found: ${located.path}` : located.message;
+    computerText.textContent = located.ok ? "The recording program is here. Settings has a check that the screen, the sound and the folder all work." : located.message;
     if (located.ok && !checking) check.removeAttribute("aria-disabled");
     if (located.ok && !c.busy) {
       const job = await runOneShot(b, ["probe"], (line) => { sources = sources.concat(parseProbe(line)); });

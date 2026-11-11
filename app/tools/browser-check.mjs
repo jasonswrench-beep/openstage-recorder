@@ -119,17 +119,46 @@ async function startPractice(page, t, { name = "Keyboard demo" } = {}) {
   await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
 }
 
+/** Open one of the Record screen's More choices sections (the mouse, windows to hide, sound balance), if it is closed. */
+const moreSection = (page, title) => page.locator("details.rv-more").filter({ has: page.locator("summary", { hasText: title }) });
+async function openMore(page, title) {
+  const section = moreSection(page, title);
+  if (!(await section.evaluate((d) => d.open))) await section.locator("summary").click();
+}
+
+/** Open the editing screen's More panel (the sound file, the picture, Suggest zooms, the choices about the video), if it is closed. */
+async function openFinish(page) {
+  const more = page.locator("details.ev-more");
+  if (!(await more.evaluate((d) => d.open))) await more.locator("summary").click();
+}
+
 // ---- the page and its names ----
 
 await check("the page has a heading, a main region, and a section for each job, each named", async (page) => {
   assertEqual(await page.locator("h1").count(), 1, "one main heading");
   assertEqual(await page.locator("header").count(), 1, "one header");
   assertEqual(await page.locator("main").count(), 1, "one main region");
-  const headings = await page.locator("h2:visible").allTextContents();
-  assertEqual(headings, ["Record", "Your recordings", "Is this computer ready to record?"], "the sections, in order");
-  for (const name of ["Record", "Your recordings", "Is this computer ready to record?"]) {
+  const tabs = await page.getByRole("tab").allTextContents();
+  assertEqual(tabs, ["Record", "Recordings", "Settings", "Help"], "the tabs, in order");
+  assertEqual(await page.getByRole("tab", { name: "Record", exact: true }).getAttribute("aria-selected"), "true", "Record is the tab shown first");
+  assertEqual(await page.locator("h2:visible").allTextContents(), ["Record"], "the Record screen has its heading");
+  assertEqual(await page.getByRole("region", { name: "Record", exact: true }).count(), 1, "the Record section is a named region");
+  await page.getByRole("tab", { name: "Recordings" }).click();
+  assertEqual(await page.locator("h2:visible").allTextContents(), ["Your recordings"], "the Recordings tab");
+  await page.getByRole("tab", { name: "Settings" }).click();
+  assertEqual(await page.locator("h2:visible").allTextContents(), ["Where recordings are kept", "Is this computer ready to record?"], "the Settings tab");
+  for (const name of ["Where recordings are kept", "Is this computer ready to record?"]) {
     assertEqual(await page.getByRole("region", { name, exact: true }).count(), 1, `the ${name} section is a named region`);
   }
+  await page.getByRole("tab", { name: "Help" }).click();
+  assertEqual(await page.getByRole("table", { name: "While recording, from any program" }).locator("tbody tr").count(), 3, "Help lists the three keys that work while recording");
+  await page.getByRole("tab", { name: "Help" }).focus();
+  await page.keyboard.press("Home");
+  assertEqual(await page.getByRole("tab", { name: "Record", exact: true }).evaluate((el) => document.activeElement === el && el.getAttribute("aria-selected") === "true"), true, "Home goes back to Record and shows it");
+  await page.keyboard.press("ArrowLeft");
+  assertEqual(await page.getByRole("tab", { name: "Help" }).getAttribute("aria-selected"), "true", "Left from the first tab goes round to Help");
+  await page.keyboard.press("ArrowRight");
+  assertEqual(await page.getByRole("tab", { name: "Record", exact: true }).getAttribute("aria-selected"), "true", "and Right comes back");
   assertMatch(await page.locator(".app-preview").textContent(), /pretend recorder/, "the preview says it is a pretend recorder");
   const icon = page.locator("header img.app-icon");
   assertEqual(await icon.getAttribute("alt"), "", "the icon is decoration and has no words");
@@ -204,7 +233,7 @@ await check("a practice recording is started, paused, marked, resumed and stoppe
   await page.getByRole("button", { name: "Done" }).focus();
   await t.key("Enter");
   assertEqual(await t.focusLabel(), "Start recording", "Done gives the focus back to Start");
-  const listed = await page.getByLabel("Recording", { exact: true }).locator("option").allTextContents();
+  const listed = await page.locator(".rv-rec-name").allTextContents();
   assertEqual(listed, ["Keyboard demo"], "the recording is in the list");
   assertEqual(await page.getByLabel("Name of the recording").evaluate((el) => /^Recording \d{4}-\d\d-\d\d \d{4}$/.test(el.value)), true, "the next recording has a fresh name");
 });
@@ -241,6 +270,7 @@ await check("starting again sets a take aside, keeps it, and says so", async (pa
 // ---- how loud each sound is in the video ----
 
 await check("the loudness of the computer's sound can be set in decibels and goes to the recorder, and a wrong number is said in words", async (page, t) => {
+  await openMore(page, "Sound balance");
   const box = page.getByLabel(/^The computer's sound in the video/);
   assertEqual(await box.inputValue(), "0", "it starts as heard");
   assertMatch(await page.getByText(/^0 leaves a sound as it is heard/).textContent(), /never changed by this\. When you edit the recording, these numbers are where each sound starts, and you can change them again there, under Sound balance\.$/, "what the boxes mean is written beside them, and where to change them again");
@@ -300,7 +330,7 @@ await check("Start says why it cannot start, and pressing it says so instead of 
 });
 
 await check("recording one window needs the list of windows first, and choosing one makes Start available", async (page, t) => {
-  await page.getByRole("combobox", { name: "Record", exact: true }).selectOption("window");
+  await page.getByRole("radio", { name: /^One window/ }).check();
   assertMatch(await page.locator('[id$="-problem"]').textContent(), /Choose the window to record/, "the reason");
   await page.getByRole("button", { name: "Look for windows" }).focus();
   await t.key("Enter");
@@ -314,7 +344,7 @@ await check("recording one window needs the list of windows first, and choosing 
 });
 
 await check("recording part of a screen takes four whole numbers, and a wrong one is said in words", async (page) => {
-  await page.getByRole("combobox", { name: "Record", exact: true }).selectOption("region");
+  await page.getByRole("radio", { name: /^Part of a screen/ }).check();
   assertEqual(await page.getByLabel("Width in pixels").isVisible(), true, "the four boxes are shown");
   await page.getByLabel("Width in pixels").fill("10");
   assertMatch(await page.locator('[id$="-problem"]').textContent(), /at least 64 pixels wide/, "too small");
@@ -342,9 +372,46 @@ await check("a recording of the same name warns that it will add a take, and the
   assertMatch(await page.locator('[id$="-folder"]').textContent(), /^This preview keeps only pretend recordings, inside this page, until you close it\. The real app keeps recordings in: C:\\Users\\You\\Videos\\OpenStage Recorder$/, "the preview says what is kept and where the real app would keep it");
 });
 
+// ---- the Recordings tab ----
+
+await check("the Recordings tab has a card for each recording with its length and whether it is edited, a search, an order, and New recording", async (page, t) => {
+  await page.getByRole("tab", { name: "Recordings" }).click();
+  assertEqual(await page.locator('[id$="-rec-count"]').textContent(), "Nothing has been recorded in this folder yet.", "an empty folder says so");
+  await page.getByRole("button", { name: "New recording" }).click();
+  assertEqual(await page.getByRole("tab", { name: "Record", exact: true }).getAttribute("aria-selected"), "true", "New recording goes to the Record tab");
+  assertEqual(await t.focusLabel(), "Start recording", "with the focus on Start");
+  for (const name of ["Week 3 walkthrough", "Alpha demo"]) {
+    await page.getByLabel("Name of the recording").fill(name);
+    await page.getByLabel(/^Countdown/).fill("0");
+    await page.getByLabel(/^Practice/).check();
+    await page.getByRole("button", { name: "Start recording" }).click();
+    await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+    await page.waitForTimeout(150);
+    await page.getByRole("button", { name: "Stop" }).click();
+    await page.getByRole("heading", { name: "Finished" }).waitFor();
+    await page.getByRole("button", { name: "Done" }).click();
+  }
+  await page.getByRole("tab", { name: "Recordings" }).click();
+  await page.locator(".rv-rec-card").nth(1).waitFor();
+  assertEqual(await page.locator('[id$="-rec-count"]').textContent(), "2 recordings.", "the count");
+  const card = page.getByRole("listitem", { name: "Alpha demo" });
+  assertMatch(await card.locator(".rv-rec-details").textContent(), /^\d+ seconds?$/, "the card says how long it is");
+  assertEqual(await card.locator(".rv-rec-badge").textContent(), "Not edited yet", "and that it has no edit yet");
+  assertEqual(await card.getByRole("button", { name: "Show Alpha demo in its folder" }).getAttribute("title"), "Show in its folder", "the folder button has a name and a tooltip");
+  await page.getByLabel("Order", { exact: true }).selectOption("name");
+  assertEqual(await page.locator(".rv-rec-name").allTextContents(), ["Alpha demo", "Week 3 walkthrough"], "A to Z");
+  await page.getByLabel("Find a recording").fill("week");
+  assertEqual(await page.locator(".rv-rec-name").allTextContents(), ["Week 3 walkthrough"], "the search keeps what fits");
+  assertEqual(await page.locator('[id$="-rec-count"]').textContent(), "1 of 2 recordings fits the search.", "and says how many fit");
+  await page.getByLabel("Find a recording").fill("");
+  await card.getByRole("button", { name: "Edit Alpha demo" }).click();
+  await page.getByRole("heading", { level: 2, name: "Edit the recording: Alpha demo" }).waitFor();
+});
+
 // ---- the check ----
 
 await check("checking this computer lists what it found and says in a sentence how it went", async (page, t) => {
+  await page.getByRole("tab", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Check this computer" }).focus();
   await t.key("Enter");
   await t.waitSaid(/This computer is ready to record\. All 9 checks passed\./);
@@ -355,7 +422,10 @@ await check("checking this computer lists what it found and says in a sentence h
 
 await check("a recording program that is not installed is said everywhere it matters, and nothing pretends to work", async (page, t) => {
   assertMatch(await page.locator('[id$="-found"]').textContent(), /The recording program was not found/, "the message under the check");
+  assertMatch(await page.locator('[id$="-computer"]').textContent(), /The recording program was not found/, "the card beside the steps says so too");
+  await page.getByRole("tab", { name: "Settings" }).click();
   assertEqual(await page.getByRole("button", { name: "Check this computer" }).getAttribute("aria-disabled"), "true", "the check is unavailable");
+  await page.getByRole("tab", { name: "Record", exact: true }).click();
   assertMatch(await page.locator('[id$="-problem"]').textContent(), /nothing can be recorded, not even a practice/, "the reason Start cannot start");
   await page.getByRole("button", { name: "Start recording" }).focus();
   await t.key("Enter");
@@ -416,6 +486,7 @@ async function makeRecording(page, t, { name = "Edit demo", webcam = false, real
   await page.getByLabel(/^Countdown/).fill("0");
   if (webcam || real) {
     await page.getByLabel(/^Practice/).uncheck();
+    if (micGain !== undefined || systemGain !== undefined) await openMore(page, "Sound balance");
     if (micGain !== undefined) await page.getByLabel(/^Your voice in the video/).fill(String(micGain));
     if (systemGain !== undefined) await page.getByLabel(/^The computer's sound in the video/).fill(String(systemGain));
   }
@@ -435,7 +506,8 @@ async function makeRecording(page, t, { name = "Edit demo", webcam = false, real
 }
 
 const openEdit = async (page, t) => {
-  await page.getByRole("button", { name: "Edit this recording", exact: true }).focus();
+  await page.getByRole("tab", { name: "Recordings" }).click();
+  await page.locator(".rv-rec-card").first().getByRole("button", { name: /^Edit / }).focus();
   await t.key("Enter");
   await page.getByRole("heading", { level: 2, name: /^Edit the recording: / }).waitFor();
   await page.waitForFunction(() => /^Opened the recording/.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
@@ -477,8 +549,8 @@ await check("Edit opens the editing screen for a recording, says what it opened,
   await page.getByRole("button", { name: "Back to recordings" }).focus();
   await t.key("Enter");
   assertEqual(await page.locator(".os-ed").count(), 0, "the editing screens are gone");
-  assertEqual(await page.getByRole("heading", { level: 2, name: "Record", exact: true }).isVisible(), true, "the Record screen is back");
-  assertEqual(await t.focusLabel(), "Edit this recording", "the focus is back on the button that was used");
+  assertEqual(await page.getByRole("heading", { level: 2, name: "Your recordings", exact: true }).isVisible(), true, "the Recordings tab it was opened from is back");
+  assertMatch(await t.focusLabel(), /^Edit /, "the focus is back on the button that was used");
   assertEqual(await page.title(), "OpenStage Recorder", "the title is back");
 });
 
@@ -577,7 +649,7 @@ await check("changes are said to be unsaved, Ctrl+S saves and says so, and leavi
   answer = true;
   await page.getByRole("button", { name: "Back to recordings" }).click();
   await page.locator(".os-ed").waitFor({ state: "detached" });
-  assertEqual(await t.focusLabel(), "Edit this recording", "the focus is back on the button that was used");
+  assertMatch(await t.focusLabel(), /^Edit /, "the focus is back on the button that was used");
 });
 
 await check("a recording with a newer take asks which edit to open, and keeping the older edit lets the new one be saved", async (page, t) => {
@@ -588,7 +660,8 @@ await check("a recording with a newer take asks which edit to open, and keeping 
   await editSaid(page);
   await page.getByRole("button", { name: "Back to recordings" }).click();
   await page.evaluate(() => window.__openstageStandIn.files.set("Which demo.capture/takes/take-002/take.json", JSON.stringify({ id: 2, state: "complete", durationMs: 5000, media: [{ file: "screen.mp4", kind: "screen" }, { file: "mic.wav", kind: "microphone" }] })));
-  await page.getByRole("button", { name: "Edit this recording", exact: true }).focus();
+  await page.getByRole("tab", { name: "Recordings" }).click();
+  await page.locator(".rv-rec-card").first().getByRole("button", { name: /^Edit / }).focus();
   await t.key("Enter");
   await page.getByRole("heading", { name: "Which edit do you want?" }).waitFor();
   assertEqual(await t.focusLabel(), "Open my saved edit", "the focus is on the first answer");
@@ -712,6 +785,7 @@ await check("Make a sound file saves the edit first, shows progress, says what w
   await makeRecording(page, t);
   await openEdit(page, t);
   assertEqual(await saved(page, "Edit demo.capture/edit.json"), undefined, "nothing has been saved yet, so the recorder would have nothing to read");
+  await openFinish(page);
   await page.getByRole("button", { name: "Make a sound file (WAV) from this edit" }).focus();
   await t.key("Enter");
   await page.getByRole("button", { name: "Show the sound file in its folder" }).waitFor();
@@ -737,6 +811,7 @@ await check("a sound file can be cancelled, a second request while one is made i
   await makeRecording(page, t);
   await openEdit(page, t);
   await page.evaluate(() => { window.__openstageStandIn.holdRender = true; });
+  await openFinish(page);
   await page.getByRole("button", { name: "Make a sound file (WAV) from this edit" }).click();
   await page.getByRole("button", { name: "Cancel the sound file" }).waitFor();
   for (const name of ["Make a sound file (WAV) from this edit", "Make a video from this edit"]) {
@@ -762,6 +837,7 @@ await check("Save the picture shown in the preview saves the edit first, asks fo
   await box.fill("7");
   await box.press("Enter");
   assertEqual(await saved(page, "Edit demo.capture/edit.json"), undefined, "nothing has been saved yet");
+  await openFinish(page);
   await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).focus();
   await t.key("Enter");
   await page.getByRole("button", { name: "Show the picture in its folder" }).waitFor();
@@ -783,6 +859,7 @@ await check("Save the picture shown in the preview saves the edit first, asks fo
   // a second moment makes a second picture beside the first, and the video button still makes a video
   await box.fill("2.5");
   await box.press("Enter");
+  await openFinish(page);
   await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).click();
   await page.waitForFunction(() => /seconds as a PNG/.test(document.querySelector('[id$="-say"]')?.textContent ?? "") && /at 2\.5 seconds/.test(document.querySelector('[id$="-say"]')?.textContent ?? ""));
   assertEqual((await page.evaluate(() => window.__openstageStandIn.started.at(-1))).includes("2500"), true, "the new moment is asked for");
@@ -794,6 +871,7 @@ await check("a picture request while a file is being made is refused in the word
   await page.evaluate(() => { window.__openstageStandIn.holdRender = true; });
   await page.getByRole("button", { name: "Make a video from this edit" }).click();
   await page.getByRole("button", { name: "Cancel the video" }).waitFor();
+  await openFinish(page);
   assertEqual(await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).getAttribute("aria-disabled"), "true", "the picture button is marked as not available while a video is made");
   await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).focus();
   await t.key("Enter");
@@ -806,6 +884,7 @@ await check("a picture request while a file is being made is refused in the word
 await check("the reduce-motion box is ticked for someone whose computer asks for less motion, and it reaches the video maker", async (page, t) => {
   await makeRecording(page, t);
   await openEdit(page, t);
+  await openFinish(page);
   const box = page.getByLabel(/^Use cuts instead of animated zooms/);
   assertEqual(await box.isChecked(), true, "ticked from the computer's own setting");
   await page.getByRole("button", { name: "Make a video from this edit" }).click();
@@ -816,6 +895,7 @@ await check("the reduce-motion box is ticked for someone whose computer asks for
 await check("the pointer box is off until the author ticks it, and then it reaches a video and a picture but not a sound file", async (page, t) => {
   await makeRecording(page, t);
   await openEdit(page, t);
+  await openFinish(page);
   const box = page.getByLabel(/^Show where the mouse pointer is in the video and in pictures/);
   assertEqual(await box.isChecked(), false, "off to begin with");
   assertMatch((await page.locator("label", { hasText: /^Show where the mouse pointer is/ }).textContent()) ?? "", /Only a recording made with the mouse noted can show it\./, "the box says what it needs");
@@ -828,9 +908,11 @@ await check("the pointer box is off until the author ticks it, and then it reach
   await page.getByRole("button", { name: "Make a video from this edit" }).click();
   await page.waitForFunction(() => window.__openstageStandIn.started.length >= 2 && window.__openstageStandIn.started.at(-1).includes("--highlight-cursor"));
   await page.getByRole("button", { name: "Show the video in its folder" }).waitFor();
+  await openFinish(page);
   await page.getByRole("button", { name: "Save the picture shown in the preview (PNG)" }).click();
   await page.waitForFunction(() => /^The picture was made\./.test(document.querySelector('[id$="-say"]')?.textContent ?? ""));
   assertEqual((await page.evaluate(() => window.__openstageStandIn.started.at(-1))).includes("--highlight-cursor"), true, "a picture is asked to show it too");
+  await openFinish(page);
   await page.getByRole("button", { name: "Make a sound file (WAV) from this edit" }).click();
   await page.waitForFunction(() => /^The sound file was made\./.test(document.querySelector('[id$="-say"]')?.textContent ?? ""));
   assertEqual((await page.evaluate(() => window.__openstageStandIn.started.at(-1))).includes("--highlight-cursor"), false, "a sound file is never asked to, even with the box ticked");
@@ -1005,13 +1087,16 @@ async function recordClicksAndEdit(page, { whole = false, note = true } = {}) {
   await page.getByLabel("Name of the recording").fill("Clicks demo");
   await page.getByLabel(/^Countdown/).fill("0");
   if (!whole) {
-    await page.locator('select[id$="-target"]').selectOption("region");
+    await page.locator('input[id$="-target-region"]').check();
     await page.getByLabel("Pixels from the left of the screen").fill("100");
     await page.getByLabel("Pixels from the top of the screen").fill("200");
     await page.getByLabel("Width in pixels").fill("1280");
     await page.getByLabel("Height in pixels").fill("720");
   }
-  if (note) await page.getByLabel(/^Note where the mouse goes and where I click/).check();
+  if (note) {
+    await openMore(page, "The mouse");
+    await page.getByLabel(/^Note where the mouse goes and where I click/).check();
+  }
   await page.getByRole("button", { name: "Start recording" }).click();
   await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
   await recordedFor(page, 18);
@@ -1025,6 +1110,8 @@ async function recordClicksAndEdit(page, { whole = false, note = true } = {}) {
 const suggestSaid = async (page) => (await page.locator('[id$="-suggest-message"]').textContent()) ?? "";
 
 await check("the mouse box is off until it is ticked, then the recorder is asked to note the mouse but never the keys, the choice is kept for next time, and Quick record says so", async (page, t) => {
+  assertEqual(await moreSection(page, "The mouse").evaluate((d) => d.open), false, "its section is closed while it is off");
+  await openMore(page, "The mouse");
   const box = page.getByLabel(/^Note where the mouse goes and where I click/);
   assertEqual(await box.isChecked(), false, "off to start with");
   assertEqual((await page.locator('[id$="-quick-note"]').textContent()).includes("mouse is noted"), false, "Quick record does not mention it while it is off");
@@ -1040,6 +1127,7 @@ await check("the mouse box is off until it is ticked, then the recorder is asked
   await page.reload();
   await page.getByRole("heading", { level: 1, name: "OpenStage Recorder" }).waitFor();
   assertEqual(await page.getByLabel(/^Note where the mouse goes and where I click/).isChecked(), true, "and it is still ticked next time");
+  assertEqual(await moreSection(page, "The mouse").evaluate((d) => d.open), true, "with its section open, so the choice is in sight");
 });
 
 await check("without the box ticked the recorder is told to note nothing", async (page) => {
@@ -1053,6 +1141,7 @@ await check("without the box ticked the recorder is told to note nothing", async
 
 await check("Suggest zooms from my clicks lists a zoom for each moment of clicking, adds the ones chosen as ordinary zooms, and they are saved", async (page, t) => {
   await recordClicksAndEdit(page);
+  await openFinish(page);
   const suggest = page.getByRole("button", { name: "Suggest zooms from my clicks" });
   await suggest.focus();
   await t.key("Enter");
@@ -1090,6 +1179,7 @@ await check("Suggest zooms from my clicks lists a zoom for each moment of clicki
 
 await check("Add all puts every suggestion in and saves them, and asking again finds nothing new", async (page, t) => {
   await recordClicksAndEdit(page);
+  await openFinish(page);
   await page.getByRole("button", { name: "Suggest zooms from my clicks" }).click();
   await page.getByRole("button", { name: "Add all 3" }).click();
   assertMatch(await suggestSaid(page), /^Added 3 of 3 zooms\. No suggestions are left\.$/, "all three");
@@ -1097,6 +1187,7 @@ await check("Add all puts every suggestion in and saves them, and asking again f
   await page.waitForTimeout(150);
   const edit = JSON.parse(await saved(page, "Clicks demo.capture/edit.json"));
   assertEqual(edit.tracks.flatMap((track) => track.items ?? []).filter((item) => item.kind === "zoom").length, 3, "three zooms in the saved edit");
+  await openFinish(page);
   await page.getByRole("button", { name: "Suggest zooms from my clicks" }).click();
   await page.waitForFunction(() => /No zoom is suggested/.test(document.querySelector('[id$="-suggest-message"]')?.textContent ?? ""));
   assertMatch(await suggestSaid(page), /^No zoom is suggested: the clicks are too few, too far apart, or already covered by a zoom\./, "asking again finds nothing new, since the zooms are in");
@@ -1104,6 +1195,7 @@ await check("Add all puts every suggestion in and saves them, and asking again f
 
 await check("a recording that did not note the mouse says how to, in the suggestions box, and the focus goes there", async (page, t) => {
   await recordClicksAndEdit(page, { note: false });
+  await openFinish(page);
   await page.getByRole("button", { name: "Suggest zooms from my clicks" }).click();
   await page.waitForFunction(() => /did not note where the mouse went/.test(document.querySelector('[id$="-suggest-message"]')?.textContent ?? ""));
   assertMatch(await suggestSaid(page), /Tick "Note where the mouse goes and where I click" on the Record screen before the next recording\.$/, "how to");
@@ -1113,6 +1205,7 @@ await check("a recording that did not note the mouse says how to, in the suggest
 
 await check("a whole screen whose picture size cannot be read says so instead of guessing where the clicks were", async (page, t) => {
   await recordClicksAndEdit(page, { whole: true });
+  await openFinish(page);
   await page.getByRole("button", { name: "Suggest zooms from my clicks" }).click();
   await page.waitForFunction(() => /could not be read/.test(document.querySelector('[id$="-suggest-message"]')?.textContent ?? ""));
   assertMatch(await suggestSaid(page), /^The size of the picture of take 1 could not be read, so no zooms are suggested from its clicks\.$/, "said in words");
@@ -1121,6 +1214,7 @@ await check("a whole screen whose picture size cannot be read says so instead of
 // ---- Windows to hide ----
 
 await check("the windows to hide are typed with semicolons between them, each reaches the recorder on its own, the check the recorder makes is said, and the words are kept for next time", async (page, t) => {
+  await openMore(page, "Windows to hide");
   const box = page.getByLabel(/^Hide windows with these words/);
   assertEqual(await box.inputValue(), "", "nothing is hidden to start with");
   await page.getByLabel(/^Countdown/).fill("0");
@@ -1147,8 +1241,9 @@ await check("nothing is hidden when the box is empty, and a recording of one win
   await page.getByRole("button", { name: "Stop" }).click();
   await page.getByRole("heading", { name: "Finished" }).waitFor();
   await page.getByRole("button", { name: "Done" }).click();
+  await openMore(page, "Windows to hide");
   await page.getByLabel(/^Hide windows with these words/).fill("KeePass");
-  await page.locator('select[id$="-target"]').selectOption("window");
+  await page.locator('input[id$="-target-window"]').check();
   await page.getByRole("button", { name: "Look for windows" }).click();
   await page.waitForFunction(() => /Found \d+ windows/.test(document.querySelector('[role="status"]')?.innerText ?? ""));
   await page.locator('select[id$="-window"]').selectOption({ index: 1 });
@@ -1159,7 +1254,7 @@ await check("nothing is hidden when the box is empty, and a recording of one win
 // ---- Picking a window by clicking it ----
 
 await check("Pick a window by clicking it steps the window aside, takes the window that was clicked, selects it, and makes Start available", async (page, t) => {
-  await page.locator('select[id$="-target"]').selectOption("window");
+  await page.locator('input[id$="-target-window"]').check();
   await page.getByLabel(/^Countdown/).fill("0");
   assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-disabled"), "true", "Start needs a window first");
   const pick = page.getByRole("button", { name: "Pick a window by clicking it" });
@@ -1176,7 +1271,7 @@ await check("Pick a window by clicking it steps the window aside, takes the wind
 });
 
 await check("when no window is clicked, or Escape is pressed, it says so, brings the window back, and chooses nothing", async (page, t) => {
-  await page.locator('select[id$="-target"]').selectOption("window");
+  await page.locator('input[id$="-target-window"]').check();
   for (const [how, words] of [["none", /No window was clicked within 30 seconds, so none was chosen\./], ["cancel", /Escape was pressed, so no window was chosen\./]]) {
     await page.evaluate((v) => { window.__openstageStandIn.pick = v; }, how);
     await page.getByRole("button", { name: "Pick a window by clicking it" }).click();
@@ -1188,7 +1283,7 @@ await check("when no window is clicked, or Escape is pressed, it says so, brings
 });
 
 await check("Pick a window by clicking it says why it cannot work without the recording program, and does not put the window away for nothing", async (page, t) => {
-  await page.locator('select[id$="-target"]').selectOption("window");
+  await page.locator('input[id$="-target-window"]').check();
   await page.getByRole("button", { name: "Pick a window by clicking it" }).click();
   assertMatch(await t.said(), /The recording program was not found/, "said");
   assertEqual(await page.evaluate(() => window.__openstageStandIn.windowCalls), [], "the window was not put away for nothing");
@@ -1239,6 +1334,22 @@ await check("no animation or motion is used", async (page) => {
   const moving = await page.evaluate(() => [...document.querySelectorAll("*")].filter((el) => getComputedStyle(el).animationName !== "none" || parseFloat(getComputedStyle(el).transitionDuration) > 0).length);
   assertEqual(moving, 0, "elements with an animation or a transition");
 }, { reducedMotion: "reduce" });
+
+await check("the editing screen keeps Back, Save and Make a video in sight, and the rest in a More panel that Enter opens and Escape closes", async (page, t) => {
+  await makeRecording(page, t, { name: "More demo" });
+  await openEdit(page, t);
+  for (const name of ["Back to recordings", "Save the edit", "Make a video from this edit"]) assertEqual(await page.getByRole("button", { name }).isVisible(), true, `${name} is in sight`);
+  assertEqual(await page.locator("details.ev-more").evaluate((d) => d.open), false, "the More panel starts closed");
+  assertEqual(await page.getByRole("button", { name: "Make a sound file (WAV) from this edit" }).isVisible(), false, "with the sound file in it");
+  await page.locator("details.ev-more summary").focus();
+  await t.key("Enter");
+  assertEqual(await page.getByRole("button", { name: "Make a sound file (WAV) from this edit" }).isVisible(), true, "Enter opens it");
+  await page.getByRole("button", { name: "Make a sound file (WAV) from this edit" }).focus();
+  await t.key("Escape");
+  assertEqual(await page.locator("details.ev-more").evaluate((d) => d.open), false, "Escape closes it");
+  assertEqual(await page.evaluate(() => document.activeElement?.tagName), "SUMMARY", "and the focus goes back to its button");
+  assertEqual(await page.locator(".os-ed").count(), 1, "and the editing screen is still open");
+});
 
 await browser.close();
 server.kill();
