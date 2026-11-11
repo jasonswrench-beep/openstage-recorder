@@ -127,11 +127,14 @@ export function attachPictureEditing(options: PictureEditingOptions): PictureEdi
     put(frame, rect, item);
   }
 
+  // The layer follows the picture: when the picture changes size, and when the space around it does, which can move the picture
+  // without changing its size (it is centred in that space).
   const resize = new ResizeObserver(() => {
     shown = "";
     update();
   });
   resize.observe(stage);
+  resize.observe(figure);
 
   // ---- moving and resizing with the pointer ----
 
