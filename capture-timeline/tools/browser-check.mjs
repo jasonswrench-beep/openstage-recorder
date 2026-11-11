@@ -1285,6 +1285,43 @@ await check("the tool bar and the zoom slider fit in the timeline's box and the 
   if (box.lanesTop >= box.cellBottom) throw new Error("the tracks are pushed out of sight by the controls");
 }, { search: "?list=closed", viewport: { width: 1280, height: 900 } });
 
+await check("the picture never reaches over the timeline: at any window size, with a long message and with the panel open, the tool bar is on top and can be clicked", async (page) => {
+  const long = "A long message, as the editor may give, so that the line above the picture takes more than one row. ".repeat(4);
+  for (const panel of [false, true]) {
+    if (panel) {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.getByRole("button", { name: "Properties and clip list" }).click();
+    }
+    for (const [width, height] of [[1000, 600], [1100, 700], [1280, 720], [1366, 768], [1440, 900], [1920, 1080]]) {
+      await page.setViewportSize({ width, height });
+      await page.evaluate((t) => { for (const s of document.querySelectorAll(".os-ed .os-cl-status")) s.textContent = t; }, long);
+      await page.waitForTimeout(150);
+      const found = await page.evaluate(() => {
+        const timeline = document.querySelector(".os-ed-timeline");
+        const top = timeline.getBoundingClientRect().top;
+        const preview = document.querySelector(".os-ed-preview");
+        const clip = getComputedStyle(preview).overflow;
+        // What is drawn at the middle of each tool bar button that can be seen: it must be that button (or something in it).
+        const covered = [...document.querySelectorAll(".os-tl-bar button")].filter((b) => {
+          const r = b.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0 || r.bottom < 0 || r.top > innerHeight) return false;
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return hit !== null && !b.contains(hit);
+        }).map((b) => b.textContent.trim());
+        // The drawing layer over the picture sits on the picture.
+        const stage = document.querySelector(".os-ed .os-pv-stage")?.getBoundingClientRect();
+        const layer = document.querySelector(".os-ed .os-pv-draw")?.getBoundingClientRect();
+        const off = stage && layer ? Math.max(Math.abs(stage.top - layer.top), Math.abs(stage.left - layer.left), Math.abs(stage.width - layer.width), Math.abs(stage.height - layer.height)) : 0;
+        return { top, clip, covered, off, z: getComputedStyle(timeline).zIndex };
+      });
+      const where = `${width} by ${height}${panel ? ", panel open" : ""}`;
+      if (found.covered.length > 0) throw new Error(`${where}: something is drawn over ${found.covered.join(", ")}`);
+      if (found.clip !== "clip" || found.z !== "1") throw new Error(`${where}: the picture is not kept in its row (${found.clip}, timeline z ${found.z})`);
+      if (found.off > 1) throw new Error(`${where}: the layer for drawing a zoom is ${Math.round(found.off)} pixels off the picture`);
+    }
+  }
+}, { search: "?list=closed", viewport: { width: 1280, height: 900 } });
+
 
 // ---- callouts, the overlay form, and working on the picture ----
 

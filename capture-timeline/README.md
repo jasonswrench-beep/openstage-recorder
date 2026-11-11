@@ -168,6 +168,10 @@ I made these so the work could go on. Each is one small change to reverse; tell 
 55. **Suggested zooms are a list the author adds from, and a suggestion has no description.** The rules (moments of clicking, 1 second before to 1.5 seconds after, 1.5 to 3 times closer, at most 10) are in `capture-edit/src/suggest.ts`; the host program reads the clicks and the picture's size and shows the list. Nothing is added unasked, and each added zoom still asks for what it shows, because a guessed description would let an unfinished zoom look finished.
 54. **A piece of an overlay or zoom shorter than 0.1 second is dropped** when a stretch is removed, and the sentence says how many. The alternative is to refuse the whole removal; it would make a cut through a short overlay impossible without first deleting the overlay.
 
+**The picture and the timeline** (2026-11-11)
+
+56. **The picture's row never reaches over the timeline.** The picture and its controls are clipped to their own row (with half a rem left for a focus ring), the timeline is drawn above them, and the layer for drawing a zoom follows the space around the picture as well as the picture, since the picture is centred in that space and can move without changing size. It was seen once in a picture of the Recorder taken while the page had opened scrolled down, and could not be made to happen again at 216 window sizes with short and long messages and the panel open; the browser check now tries six sizes, a long message and the panel, and fails if anything is drawn over a tool bar button.
+
 ## For developers
 
 ```
