@@ -84,6 +84,15 @@ export interface RecorderBackend {
   /** Bring the window back in front, ready for the keyboard. */
   windowRestore(): Promise<void>;
 
+  // ---- Check for updates (the Help tab): the only time the program goes online, and only when the button is pressed
+
+  /** The release this copy was built as (`0.1.0-alpha.4`), or "" when it was not made by the installer script. */
+  recorderRelease(): Promise<string>;
+  /** Ask whether a newer version is published: the shell's answer, as JSON (updates.ts reads it). Nothing is downloaded or installed. */
+  checkForUpdates(): Promise<string>;
+  /** Open a page of this program's releases in the person's own browser. Any other address is refused. */
+  openReleasePage(url: string): Promise<void>;
+
   // ---- the window
 
   confirm(message: string): Promise<boolean>;
@@ -142,6 +151,9 @@ const tauriBackend: RecorderBackend = {
   traySet: (tooltip) => invoke<void>("tray_set_tooltip", { tooltip }),
   windowMinimize: () => invoke<void>("window_minimize"),
   windowRestore: () => invoke<void>("window_restore"),
+  recorderRelease: () => invoke<string>("recorder_release"),
+  checkForUpdates: () => invoke<string>("check_for_updates"),
+  openReleasePage: (url) => invoke<void>("open_release_page", { url }),
   confirm: (message) => confirmDialog(message, { title: "OpenStage Recorder", kind: "warning" }),
   setTitle: (title) => getCurrentWindow().setTitle(title),
   guardClose(question) {

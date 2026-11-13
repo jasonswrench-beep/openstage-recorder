@@ -167,6 +167,29 @@ await check("the page has a heading, a main region, and a section for each job, 
   assertEqual(await page.locator("html").getAttribute("lang"), "en", "the page language");
 });
 
+await check("Check for updates on the Help tab says what it found in words, and opens only the release page, only when asked", async (page, t) => {
+  await page.getByRole("tab", { name: "Help" }).click();
+  assertEqual(await page.getByRole("region", { name: "Updates" }).count(), 1, "the Updates section is a named region");
+  assertMatch(await page.locator("#update-copy").textContent(), /^This copy is OpenStage Recorder 0\.1\.0 alpha 4\.$/, "which release this copy is");
+  assertEqual(await page.getByRole("button", { name: /Open the/ }).count(), 0, "no page is offered before checking");
+  assertEqual(await t.standIn(() => window.__openstageStandIn.openedPages.length), 0, "nothing is opened by itself");
+  await page.getByRole("button", { name: "Check for updates" }).click();
+  await page.getByRole("button", { name: "Open the new version's page" }).waitFor();
+  assertMatch(await page.getByRole("status").filter({ hasText: "newer version" }).textContent(), /A newer version is published: 0\.1\.0 alpha 99/, "the answer is said in the status line");
+  assertEqual(await t.standIn(() => window.__openstageStandIn.openedPages.length), 0, "checking opens nothing");
+  await page.getByRole("button", { name: "Open the new version's page" }).click();
+  assertEqual(await t.standIn(() => window.__openstageStandIn.openedPages), ["https://github.com/jasonswrench-beep/openstage-recorder/releases/tag/v0.1.0-alpha.99"], "the release's page, once, when asked");
+  // An answer whose link is not one of this program's release pages offers no page at all.
+  await t.standIn(() => { window.__openstageStandIn.updateAnswer = JSON.stringify({ state: "newer", message: "Get it here.", url: "https://example.org/setup.exe" }); });
+  await page.getByRole("button", { name: "Check for updates" }).click();
+  await page.getByRole("status").filter({ hasText: "Get it here." }).waitFor();
+  assertEqual(await page.getByRole("button", { name: /Open the/ }).count(), 0, "no button for a page that is not a release page");
+  await t.standIn(() => { window.__openstageStandIn.updateAnswer = JSON.stringify({ state: "current", message: "This copy is up to date." }); });
+  await page.getByRole("button", { name: "Check for updates" }).click();
+  await page.getByRole("status").filter({ hasText: "This copy is up to date." }).waitFor();
+  assertEqual(await page.getByRole("button", { name: /Open the/ }).count(), 0, "up to date: no page is offered");
+});
+
 await check("every box, choice and button has a name a screen reader can use", async (page) => {
   const unnamed = await page.evaluate(() => {
     const named = (el) => {
@@ -338,7 +361,7 @@ await check("recording one window needs the list of windows first, and choosing 
   assertEqual(await t.focusLabel(), "Which window", "the focus moves to the list of windows");
   assertEqual(await page.getByLabel("Which window").evaluate((el) => el.options[0].textContent), "Choose a window", "and its first choice says what to do");
   const options = await page.getByLabel("Which window").locator("option").allTextContents();
-  assertEqual(options.slice(1), ["1. notepad.exe: Notes (800 by 600)", "2. WINWORD.EXE: Lesson plan - Word (1920 by 1032)", "3. chrome.exe: Week 3 - Google Chrome (1920 by 1032)"], "the windows are listed in words");
+  assertEqual(options.slice(1), ["1. notepad.exe: Notes (800 by 600)", "2. editor.exe: Lesson plan - Editor (1920 by 1032)", "3. browser.exe: Week 3 - Browser (1920 by 1032)"], "the windows are listed in words");
   await page.getByLabel("Which window").selectOption({ index: 2 });
   assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-disabled"), null, "Start is available");
 });
@@ -1260,9 +1283,9 @@ await check("Pick a window by clicking it steps the window aside, takes the wind
   const pick = page.getByRole("button", { name: "Pick a window by clicking it" });
   await pick.focus();
   await t.key("Enter");
-  await t.waitSaid(/Chosen: 2\. WINWORD\.EXE: Lesson plan - Word \(1920 by 1032\)\./);
+  await t.waitSaid(/Chosen: 2\. editor\.exe: Lesson plan - Editor \(1920 by 1032\)\./);
   assertEqual(await page.evaluate(() => window.__openstageStandIn.windowCalls), ["minimize", "restore"], "the window stepped aside and came back");
-  assertEqual(await page.locator('select[id$="-window"]').inputValue(), "Lesson plan - Word", "the window clicked is the one chosen");
+  assertEqual(await page.locator('select[id$="-window"]').inputValue(), "Lesson plan - Editor", "the window clicked is the one chosen");
   assertEqual(await t.focusLabel(), "Which window", "the focus is on the choice, where it now says which window");
   assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-disabled"), null, "Start is available");
   assertEqual(await pick.getAttribute("aria-disabled"), null, "the button is ready to be used again");

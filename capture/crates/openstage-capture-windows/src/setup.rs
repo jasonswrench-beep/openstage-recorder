@@ -411,7 +411,7 @@ mod tests {
     }
 
     fn run(screen: Screen, video: Video, devices: Vec<AudioDevice>, facts: Facts) -> (bool, Vec<Check>) {
-        run_with_cameras(screen, video, devices, Cameras(Ok(vec!["NexiGo Iris 4K Webcam"])), facts)
+        run_with_cameras(screen, video, devices, Cameras(Ok(vec!["USB Camera"])), facts)
     }
 
     fn run_with_cameras(
@@ -467,7 +467,7 @@ mod tests {
             ]
         );
         assert!(
-            find(&checks, "camera").message.contains("One camera was found: 1. NexiGo Iris 4K Webcam.")
+            find(&checks, "camera").message.contains("One camera was found: 1. USB Camera.")
                 && find(&checks, "camera").message.contains("only when you ask for it")
         );
         assert!(find(&checks, "camera-access").message.contains("lets desktop programs use the camera"));

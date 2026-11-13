@@ -208,8 +208,8 @@ mod tests {
     fn list() -> Vec<WindowInfo> {
         number_windows(vec![
             window(0, "notepad.exe", "Untitled - Notepad"),
-            window(0, "chrome.exe", "Lesson plan - Google Docs - Chrome"),
-            window(0, "chrome.exe", "Inbox - Mail - Chrome"),
+            window(0, "browser.exe", "Lesson plan - Browser"),
+            window(0, "browser.exe", "Inbox - Mail - Browser"),
             window(0, "explorer.exe", "Documents"),
         ])
     }
@@ -236,11 +236,11 @@ mod tests {
         let windows = list();
         let none = choose_window(&windows, "spreadsheet").unwrap_err();
         assert!(none.contains("No open window has \"spreadsheet\"") && none.contains("1. notepad.exe"), "{none}");
-        let many = choose_window(&windows, "chrome").unwrap_err();
+        let many = choose_window(&windows, "browser").unwrap_err();
         assert!(
-            many.contains("More than one window has \"chrome\"")
-                && many.contains("2. chrome.exe: Lesson plan")
-                && many.contains("3. chrome.exe: Inbox")
+            many.contains("More than one window has \"browser\"")
+                && many.contains("2. browser.exe: Lesson plan")
+                && many.contains("3. browser.exe: Inbox")
                 && !many.contains("notepad"),
             "{many}"
         );

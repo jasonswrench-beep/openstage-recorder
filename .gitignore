@@ -7,7 +7,7 @@ node_modules/
 # Downloaded model weights, if any are ever used. Never commit these.
 models/
 
-# Personal Claude Code instructions, not shared with the project
+# Personal AI-assistant instructions, not shared with the project
 CLAUDE.local.md
 
 # OS cruft

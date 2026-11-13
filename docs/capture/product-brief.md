@@ -24,7 +24,7 @@
 | Engine language | Rust |
 | Process model | Separate process with **no interface of its own**. OpenStage's UI and global hotkeys drive it; JSON on stdout; the same launch pattern OpenStage already uses for `publish.ts`, `narrate.py`, and `validate.py`, extended so a live recording can be controlled (9.1) |
 | Interface | Native HTML controls inside OpenStage. No separate GUI toolkit |
-| Platforms | **Windows 11 and later only for Release 1.** macOS and JAWS testing only if a Mac user and a JAWS license become available later; Linux is not planned |
+| Platforms | **Windows 11 and later only for Release 1.** macOS and paid screen reader testing only if a Mac user and a licence for one become available later; Linux is not planned |
 | Editing | **A mid-level video editor** (owner: basic video editing, text overlays, and zooming into parts), with a **multi-track timeline, in Release 1**. Images, audio, and short video clips from outside the recording are accepted (owner: option B). Not a full or professional editor; section 5 lists what is in and out |
 | Publishing | **One publisher only: OpenStage's.** Any capture path hands assets to it; OpenStage Capture never ships its own exporter. Release 1 targets **SCORM 1.2 only**. Today the publisher produces a folder of plain web files and a SCORM 1.2 zip; SCORM 2004 and xAPI are on OpenStage's roadmap as later *(confirmed)* |
 | Narration | Text-first. Audio generation is **download on first use, never bundled** in the installer. Nothing breaks if it is never downloaded |
@@ -136,7 +136,7 @@ Accessibility has two halves, and [ATAG 2.0](https://www.w3.org/TR/ATAG/) (W3C A
 The recorder and editor are OpenStage HTML, so they inherit OpenStage's accessibility rules and patterns: native controls, a polite live region announcing each action, dialogs that close with Escape and return focus, keyboard-driven canvas, and tables with captions and headers. **Those patterns are written down but have not yet been tested with a real screen reader** (see 6.3). Recording adds requirements of its own:
 
 - **Recorder panel** uses native buttons with accessible names and states; no drag-only or hover-only operations; no keyboard traps.
-- **Global hotkeys** to start/pause/stop, registered by OpenStage, configurable, and working while another application has focus. They must **not collide with screen-reader modifier keys** (Insert and Caps Lock on NVDA, JAWS, and Narrator). OpenStage Author does not do this yet: its window permissions allow only dialogs, opening links, and setting or closing the window (`capabilities/default.json`), so a global-shortcut capability would have to be added *(confirmed)*.
+- **Global hotkeys** to start/pause/stop, registered by OpenStage, configurable, and working while another application has focus. They must **not collide with screen-reader modifier keys** (Insert and Caps Lock on NVDA, a paid Windows screen reader, and Narrator). OpenStage Author does not do this yet: its window permissions allow only dialogs, opening links, and setting or closing the window (`capabilities/default.json`), so a global-shortcut capability would have to be added *(confirmed)*.
 - **Feedback when OpenStage isn't focused.** Once recording starts, the user is in another application. OpenStage's live region may not be announced then (unverified), so the capture process plays distinct audio cues for start, pause, resume, stop, and error, and OpenStage shows the same state when it regains focus. Validate with NVDA and Narrator.
 - **Recorder UI excluded from the capture** (for example, via Windows window display-affinity settings; verify with WebView2 windows) so controls never appear in the video.
 - **Timeline without a mouse.** The multi-track timeline is the hardest custom widget in the product and the riskiest commitment under ATAG Part A, **but OpenStage Author has already built the pattern to extend.** Its Timeline panel draws each object as a row with a bar. Each row has two grips that are real ARIA sliders (Left/Right Arrow move a tenth of a second, Shift a second, Page Up/Down five, Home/End to the ends), announced in words. Bars can also be dragged, Escape undoes a drag, and a Timing list with fields makes exactly the same changes, so nothing is mouse-only. The panel's arithmetic lives in a separately tested model (`timelinemodel.ts`) and the panel only draws it (`timelinepanel.ts`) *(confirmed)*. The multi-track timeline should extend that same pattern: tracks and clips as rows, the same keyboard grammar, and a fields-based list making the same changes. Like the rest of the editor it has **not yet been checked with a real screen reader** (6.3). The visual timeline does not ship until its keyboard model is complete and screen-reader-verified.
@@ -163,8 +163,8 @@ The recorder and editor are OpenStage HTML, so they inherit OpenStage's accessib
 
 ### 6.3 Accessibility in the process
 
-- **First deliverable: a baseline screen-reader pass on OpenStage's existing editor patterns** (the ones the recorder will reuse) with NVDA and Narrator on Windows. JAWS and VoiceOver are out of scope for now (no JAWS license or Mac tester yet), and the accessibility statement will say so. So far only scripted keyboard and structure checks have been run.
-- Accessibility acceptance criteria on every user story; no feature merges without keyboard and screen-reader behavior defined. OpenStage's release gate already requires keyboard-only operation of the whole editor and published course, and NVDA and VoiceOver verification *(confirmed, CLAUDE.md)*; the ATAG Part A pass "including NVDA" is still unchecked on its roadmap. Keep the test evidence, because it is the raw material for a real ACR later. VoiceOver verification waits until a Mac tester exists.
+- **First deliverable: a baseline screen-reader pass on OpenStage's existing editor patterns** (the ones the recorder will reuse) with NVDA and Narrator on Windows. A paid Windows screen reader and the Mac's screen reader are out of scope for now (no paid screen reader licence or Mac tester yet), and the accessibility statement will say so. So far only scripted keyboard and structure checks have been run.
+- Accessibility acceptance criteria on every user story; no feature merges without keyboard and screen-reader behavior defined. OpenStage's release gate already requires keyboard-only operation of the whole editor and published course, and verification with NVDA and the Mac's screen reader *(confirmed, CLAUDE.md)*; the ATAG Part A pass "including NVDA" is still unchecked on its roadmap. Keep the test evidence, because it is the raw material for a real ACR later. Verification with the Mac's screen reader waits until a Mac tester exists.
 - **Automated:** axe-core (or equivalent) on every generated HTML package in CI.
 - **Manual:** scripted passes with real assistive technology on the core flows (record → trim → caption → insert into course) before each release.
 - **User testing** with people who use assistive technology, from the first usable build.
@@ -243,14 +243,14 @@ The owner would rather have everything major ready to ship at once, so this brie
 Release 1 does not ship until these OpenStage Author items are done. They are OpenStage work, not Capture work, and their schedule is OpenStage's to set.
 
 1. **Responsive output in the published player** *(owner decision: fix first)*. Today the stage is a fixed size scaled to fit the window; text cannot re-wrap at narrow widths or large text sizes, which fails WCAG 2.2 AA 1.4.10 (Reflow). The roadmap lists "Responsive output" under Later and the format spec calls it "the open responsive-output decision", so it must move up the roadmap. It will touch the format (a schema version bump with a migration), the shared renderer, and the editor's stage. This is the largest prerequisite and a real design question for a freeform canvas. One possible starting point, for OpenStage to weigh: every object already has a required reading order (`tabOrder`), which might drive a stacked layout at narrow widths. That is a design question for OpenStage, not decided here.
-2. **SCORM 1.2 verified in a real LMS** (Brightspace and Moodle, then Canvas). This is already open on OpenStage's own roadmap and release gate.
+2. **SCORM 1.2 verified in a real LMS** (the institution's LMS and the second LMS, then the third LMS). This is already open on OpenStage's own roadmap and release gate.
 3. **The streaming launch path** in OpenStage's Rust shell (section 9.1). Built as part of this project and agreed with the owner first.
 4. **A baseline screen-reader pass** on the editor patterns Capture reuses (6.3).
 5. **Player support for audio description** in OpenStage's course player: the pop-up, playing the video with the description voiced in time, and pausing for extended description. Today the player uses the browser's own controls for video.
 6. **A text-entry input** in OpenStage (a free-text field that saves into a variable), for typing steps in Practice mode. OpenStage has no free-text input today *(confirmed)*.
 7. **Scoring from steps** in OpenStage, so Practice and Assessment steps can contribute to the score and SCORM reporting. Today only multiple-choice quiz questions feed the score *(confirmed)*.
 
-Not prerequisites: timing that follows a video (a roadmap request only, open item 8), and macOS, Linux, JAWS, or VoiceOver work.
+Not prerequisites: timing that follows a video (a roadmap request only, open item 8), and macOS, Linux, a paid Windows screen reader, or the Mac's screen reader work.
 
 **Checkpoint.** Responsive output could turn out to be much larger than expected. If it does, the owner can revisit the decision and ship Release 1 with the gap stated plainly in the accessibility statement. That would be the owner's call, made with the facts at that point. The same applies to prerequisites 5 to 7: if more than one proves large, the owner can revisit what Release 1 includes.
 
@@ -283,7 +283,7 @@ Not prerequisites: timing that follows a video (a roadmap request only, open ite
 **Output and publishing**
 - Export **MP4** (H.264 video, AAC audio) through Windows's built-in encoders
 - Insert as a video asset or slide-per-step content in an OpenStage course
-- **Publishing: SCORM 1.2 only**, through the single publisher. Today OpenStage's publisher produces a folder of plain web files that runs in any browser, and a SCORM 1.2 zip *(confirmed)*. OpenStage's own release gate is that the package launches in Moodle, Canvas, and Brightspace without error, that passing and failing attempts report the correct score, and that a learner who leaves returns to their exact position *(confirmed, CLAUDE.md)*. A recording-bearing course meeting that gate is the must-pass acceptance test, because a course that fails to report completion correctly is worse than no course *(relayed)*. The owner has Brightspace and Moodle and is getting Canvas access (item 9). OpenStage's SCORM 1.2 output has so far been checked only against a strict stand-in LMS, never a real one, so this test also checks the existing publisher *(confirmed)*
+- **Publishing: SCORM 1.2 only**, through the single publisher. Today OpenStage's publisher produces a folder of plain web files that runs in any browser, and a SCORM 1.2 zip *(confirmed)*. OpenStage's own release gate is that the package launches in the three LMSs (the institution's, a second and a third) without error, that passing and failing attempts report the correct score, and that a learner who leaves returns to their exact position *(confirmed, CLAUDE.md)*. A recording-bearing course meeting that gate is the must-pass acceptance test, because a course that fails to report completion correctly is worse than no course *(relayed)*. The owner has the institution's LMS and the second LMS and is getting the third LMS access (item 9). OpenStage's SCORM 1.2 output has so far been checked only against a strict stand-in LMS, never a real one, so this test also checks the existing publisher *(confirmed)*
 
 **Quality and honesty**
 - Project format v0 (documented) with caption, transcript, alt-text, and language fields from day one
@@ -305,7 +305,7 @@ Responsive output (prerequisite 1) can proceed in parallel with steps 1 to 5, bu
 
 ### After Release 1 *(not scheduled)*
 
-- **macOS** (when a Mac user is available) and **Linux**; **JAWS** and **VoiceOver** testing
+- **macOS** (when a Mac user is available) and **Linux**; **a paid Windows screen reader** and **the Mac's screen reader** testing
 - SCORM 2004 (it separates completion status from success status; do it once 1.2 is proven in a real LMS), xAPI and cmi5 (they need a learning record store we do not control, so shipping them early would be a checkbox, not a capability)
 - WebM output, sign-language track, accessible PDF/HTML step guides, templates and themes, noise removal, localization, plugin API
 
@@ -382,7 +382,7 @@ If a capture folder were ever placed inside a project, the publisher would need 
 - A first-time user records a short tutorial and drops it, captioned, into a course in under 10 minutes.
 - **A user can complete record → trim → caption → insert with the keyboard alone, and separately with a screen reader alone (NVDA and Narrator), with no critical blockers found in manual testing on Windows.**
 - **A recording interrupted by a killed process recovers all but the last few seconds.**
-- **A recording-bearing course published as SCORM 1.2 reports completion correctly in a real LMS,** tested in Brightspace and Moodle, and in Canvas once access arrives (OpenStage's release gate names all three).
+- **A recording-bearing course published as SCORM 1.2 reports completion correctly in a real LMS,** tested in the institution's LMS and the second LMS, and in the third LMS once access arrives (OpenStage's release gate names all three).
 - **A published course package contains no raw recordings, keystroke logs, or window logs** unless the author explicitly chose to include them.
 - **A course with a Capture video, saved, closed, reopened, and republished, is byte-identical** (OpenStage's own release gate), because the MP4 is rendered once and stored as an asset.
 - **With the narration weights absent, projects still open, render, and publish; only audio generation is unavailable.**
@@ -405,20 +405,20 @@ If a capture folder were ever placed inside a project, the publisher would need 
 | Audio description needs new features in OpenStage's course player (pop-up, described playback, pausing for extended description) | More OpenStage work in front of Release 1 | Scope it early alongside responsive output; the owner can revisit the decision if it proves large |
 | Practice and Assessment modes need new OpenStage features (a text-entry input, scoring from steps) *(confirmed)* | More OpenStage format and player work in front of Release 1 | Scope them early with the other prerequisites; the checkpoint in section 8 applies |
 | **One big first release** | A longer wait before anything ships; more to test at once; schedule risk | Build in the suggested order (section 8); freeze the Release 1 list; apply the speech-to-text fallback rule |
-| **OpenStage's SCORM 1.2 has never run in a real LMS** *(confirmed)* | Release 1's headline test could fail for reasons outside this module | Test OpenStage's current output in Brightspace and Moodle first (Canvas when access arrives), before building on it |
+| **OpenStage's SCORM 1.2 has never run in a real LMS** *(confirmed)* | Release 1's headline test could fail for reasons outside this module | Test OpenStage's current output in the institution's LMS and the second LMS first (the third LMS when access arrives), before building on it |
 | Raw recordings or interaction logs shipped inside published packages | Learners receive keystrokes, window titles, and raw footage | Exclude by default; explicit opt-in; checked in the acceptance tests (section 10) |
 | Timeline scope collides with OpenStage's basic slide-timing spec *(confirmed)* | Pressure to change OpenStage's format | Keep the media timeline in OpenStage Capture's project format; render to assets (9.3) |
 | A GPL FFmpeg build enters via imported build configuration | Silently relicenses the combined work | CI guard on FFmpeg build flags before any integration (section 7) |
 | The host name "OpenStage" is also an existing phone product line | Search noise; possible trademark friction | Trademark and search check before the name goes public (section 13) |
 | Cancel kills the process tree mid-recording | Lost or corrupt recordings | Crash-safe recording (a fragmented MP4 that Windows closes about once a second; a real test lost 1.1 seconds), append-only events, `recover` command |
 | The microphone hears the speakers, so the mixed sound has an echo | A whole lesson recorded with an echo that is hard to remove afterwards | Keep the microphone and the computer's sound as separate tracks as well as the mix; a setup check that detects it and suggests headphones; try Windows' own echo reduction for the microphone later and measure whether it helps on real hardware (seen on the owner's computer, speakers on, 2026-10-13) |
-| Global hotkeys collide with screen-reader keys | Authors can't start or stop recording | Configurable hotkeys; test against NVDA, JAWS, Narrator defaults |
+| Global hotkeys collide with screen-reader keys | Authors can't start or stop recording | Configurable hotkeys; test against NVDA, a paid Windows screen reader, Narrator defaults |
 | Live-region announcements may not fire while another app has focus | Screen-reader users don't know recording state | Audio cues from the capture process; verify with real AT |
 | Player fails reflow (1.4.10); responsive output is a Release 1 prerequisite *(owner decision)* | Release 1 cannot ship before OpenStage has responsive output, and it may be much larger than expected | Track it on OpenStage's roadmap; keep the checkpoint in section 8 so the owner can revisit the decision; list the gap in the accessibility statement until it is fixed |
 | GPL components in the narration environment | Redistribution obligations if mirrored or bundled | Keep upstream-sourced and user-installed, or replace; decide before any installer (section 7) |
 | Downloaded narration weights tampered with or corrupted | Unverified blob runs inference | SHA-256 verification before load |
 | Managed institutional machines block downloads | Narration unavailable to a core audience | Documented manual placement path; text-first narration keeps everything else working |
-| Windows-only hardware | macOS, Linux, VoiceOver, and JAWS unverified | Windows only for Release 1; make no claims for platforms or screen readers that were not tested |
+| Windows-only hardware | macOS, Linux, the Mac's screen reader, and a paid Windows screen reader unverified | Windows only for Release 1; make no claims for platforms or screen readers that were not tested |
 | Windows's built-in encoders are the only MP4 route | Output depends on Windows media components (some Windows editions may lack them) | Check supported Windows editions early; other encoders can be added later under the license rules |
 | Codec patent exposure (H.264/AAC in MP4) | Legal | Use Windows's built-in encoder; legal check before shipping |
 | Speech-to-text may not pass the license and quality audit | Human-recorded audio can't be auto-captioned | Script-first captions always work; the fallback rule in section 8 moves speech recognition out of Release 1 rather than delaying it |
@@ -428,7 +428,7 @@ If a capture folder were ever placed inside a project, the publisher would need 
 
 ## 12. Open questions
 
-*Resolved: all three differences from CLAUDE.md are accepted as exceptions (Windows first, a mid-level video editor, a Rust capture program); media from outside the recording is accepted (option B); the editor is mid-level (basic editing, text overlays, zoom); reflow (fix responsive output first, as a Release 1 prerequisite); the owner will add the timing-follows-video request to OpenStage's roadmap; name (OpenStage Capture); the timeline is in Release 1; one big first release; Release 1 scope confirmed; no code from other recorder projects; GPL helper tools: option 1; MP4 output; no compliance deadline; no contribution rules; Brightspace and Moodle as real-LMS test targets, with Canvas access on the way; no VPAT yet (accessibility statement instead); and every fact previously listed to confirm in OpenStage's files (below).*
+*Resolved: all three differences from CLAUDE.md are accepted as exceptions (Windows first, a mid-level video editor, a Rust capture program); media from outside the recording is accepted (option B); the editor is mid-level (basic editing, text overlays, zoom); reflow (fix responsive output first, as a Release 1 prerequisite); the owner will add the timing-follows-video request to OpenStage's roadmap; name (OpenStage Capture); the timeline is in Release 1; one big first release; Release 1 scope confirmed; no code from other recorder projects; GPL helper tools: option 1; MP4 output; no compliance deadline; no contribution rules; the institution's LMS and the second LMS as real-LMS test targets, with the third LMS access on the way; no VPAT yet (accessibility statement instead); and every fact previously listed to confirm in OpenStage's files (below).*
 
 ### Confirmed from the OpenStage Author repository
 
@@ -443,7 +443,7 @@ Read by the author of this brief from `jasonswrench-beep/openstage-author` (read
 - **Helper launching.** Direct, one job at a time, hard-kill cancel; no Tauri sidecar. Details and consequences in 9.1.
 - **Screen recording is already on the roadmap.** "Screen recording," "Software simulation authoring," and "Step capture" are listed under Later (ROADMAP.md:55), with "Whisper for imported media" and "Responsive output".
 - **A keyboard-operable Timeline already exists** for object timing (ROADMAP.md:40, `docs/editor.md`, `timelinemodel.ts`, `timelinepanel.ts`); see 6.1.
-- **Release gate** (CLAUDE.md): the SCORM package launches in Moodle, Canvas, and Brightspace without error; passing and failing attempts report the correct score; completion and success are separate states; a learner who leaves returns to their exact position; the whole editor and course are keyboard operable; both are usable with NVDA and VoiceOver; generated captions match the script and are correctly timed; a saved, closed, reopened, and republished project is byte-identical. Roadmap items still unchecked: tests in Moodle, Canvas, and Brightspace; the ATAG Part A pass including NVDA; the installer.
+- **Release gate** (CLAUDE.md): the SCORM package launches in the three LMSs (the institution's, a second and a third) without error; passing and failing attempts report the correct score; completion and success are separate states; a learner who leaves returns to their exact position; the whole editor and course are keyboard operable; both are usable with NVDA and the Mac's screen reader; generated captions match the script and are correctly timed; a saved, closed, reopened, and republished project is byte-identical. Roadmap items still unchecked: tests in the three LMSs (the institution's, a second and a third); the ATAG Part A pass including NVDA; the installer.
 - **Narration engine.** Found through `OPENSTAGE_KOKORO_PYTHON`; with none, the editor says so and transcripts and captions still work. `NOTICE` lists Kokoro-82M (Apache-2.0); the GPL components are not mentioned anywhere in the repository (section 7).
 - **Project rules that shape this module** (CLAUDE.md): narration is text and audio is a cache; media are referenced assets, not embedded; the editor and player share one renderer; local models sit behind three plugin contracts; and three scope statements that this brief departs from (item 7).
 
@@ -454,23 +454,23 @@ Read by the author of this brief from `jasonswrench-beep/openstage-author` (read
 3. **Legal check on MP4 patents** before anything ships. H.264 and AAC involve patent licensing; Windows's built-in encoder handles this on the platform side, but get it confirmed.
 4. **Trademark and search check on the names** ("OpenStage" and "OpenStage Capture") before they go public (section 13).
 5. ~~The reflow gap in OpenStage's player: ship with it, or pull the fix forward?~~ **Decided (owner):** fix responsive output first. It is now a Release 1 prerequisite (section 8), with a checkpoint if it proves much larger than expected. Moving "Responsive output" from Later into OpenStage's active roadmap is an OpenStage edit for you or your OpenStage session.
-6. ~~A real LMS to test with.~~ **Done:** the owner has access to Brightspace and Moodle, so OpenStage's SCORM 1.2 output and Release 1 can be tested in both. Use a test or sandbox course, not a live course with real learners.
+6. ~~A real LMS to test with.~~ **Done:** the owner has access to the institution's LMS and the second LMS, so OpenStage's SCORM 1.2 output and Release 1 can be tested in both. Use a test or sandbox course, not a live course with real learners.
 7. ~~Where this module departs from OpenStage Author's own rules.~~ **Resolved (owner):** all three are accepted as exceptions for the Capture module.
    - **Cross-platform from the start:** Windows only for now.
    - **"Not a video editor":** the Capture module includes a mid-level video editor (section 5).
    - **"TypeScript throughout":** the capture program is Rust, because screen capture needs native Windows code. The repository already uses Rust (the shell) and Python (the tools).
    - Each is a one-line edit to CLAUDE.md in the OpenStage repository, which only you or your OpenStage session should make (this session has read-only access). Suggested wording: *"Not a full or professional video editor. The Capture module includes a mid-level editor for recordings: trimming, splitting, text overlays, and zoom."* / *"Cross-platform from the start, except the Capture module, which is Windows first."* / *"TypeScript throughout, except the Capture program, which is Rust because screen capture needs native code."*
 8. ~~Ask for timing that follows a video.~~ **Done:** the owner will add it to OpenStage's roadmap as a request. It is not a Release 1 requirement; Capture works without it (effects rendered in, with text equivalents).
-9. ~~Canvas.~~ **In progress:** the owner is getting access to Canvas. OpenStage's release gate names Moodle, Canvas, and Brightspace, so Canvas joins Brightspace and Moodle as a test target once access arrives. Until then, the accessibility statement and release notes say Canvas was not tested.
+9. ~~The third LMS.~~ **In progress:** the owner is getting access to the third LMS. OpenStage's release gate names the three LMSs (the institution's, a second and a third), so the third LMS joins the institution's LMS and the second LMS as a test target once access arrives. Until then, the accessibility statement and release notes say the third LMS was not tested.
 10. ~~Media from outside the recording.~~ **Decided (owner): option B.** The editor also accepts images, audio, and short video clips, drawn from the course's asset library, with the validator's rules applying to each (section 5).
 
 ### Revisit when…
 
 | If this happens | Then |
 |---|---|
-| A Mac user becomes available | Add macOS capture and VoiceOver testing |
-| A JAWS license becomes available | Add JAWS testing |
-| Canvas access arrives | Add Canvas to the SCORM test pass (OpenStage's release gate names it) |
+| A Mac user becomes available | Add macOS capture and testing with the Mac's screen reader |
+| A licence for a paid Windows screen reader becomes available | Add testing with a paid Windows screen reader |
+| The third LMS access arrives | Add the third LMS to the SCORM test pass (OpenStage's release gate names it) |
 | Responsive output proves much larger than expected | The owner revisits the decision (checkpoint in section 8) |
 | The tool is adopted by a department, campus, or system, or takes grant or institutional funding | Expect requests for an accessibility conformance report and possibly deadlines; build on the test evidence already collected |
 | Outside contributors want to help | Set contribution rules (section 7) before accepting their code |
@@ -496,7 +496,7 @@ Read by the author of this brief from `jasonswrench-beep/openstage-author` (read
 4. **Plan responsive output** in OpenStage Author (prerequisite 1, section 8): move it from Later into the active roadmap and scope it (format change, shared renderer, editor stage), with the checkpoint in mind. The owner and the OpenStage session lead this.
 5. **Add the roadmap request** for timing that follows a video (item 8).
 6. **Put the rule checks in place** from the first line of code: license checking and the FFmpeg build-flag guard (section 7).
-7. **Test OpenStage's current SCORM 1.2 output in Brightspace and Moodle** (available now), then in Canvas when access arrives, using test courses rather than live ones. Release 1's must-pass test depends on it, and it has only been checked against a stand-in so far.
+7. **Test OpenStage's current SCORM 1.2 output in the institution's LMS and the second LMS** (available now), then in the third LMS when access arrives, using test courses rather than live ones. Release 1's must-pass test depends on it, and it has only been checked against a stand-in so far.
 8. **Design the streaming launch path** in OpenStage's Rust shell (section 9.1), agreed with the owner first.
 9. **Write the process protocol** as a one-page spec: JSON-lines events, stdin control, graceful stop vs. kill, crash-safe recording, `recover`.
 10. **Windows capture spike:** screen + mic + system audio + cursor events + UI Automation element info, written to a capture project folder; then kill the process mid-recording and recover.
@@ -519,10 +519,10 @@ Read by the author of this brief from `jasonswrench-beep/openstage-author` (read
 | **Track / clip** | A track is one layer (for example the screen video, or the narration). A clip is one piece on a track. |
 | **Project format** | The way a recording and all its edits are saved in files, so other tools can read them. |
 | **Publisher** | The part of OpenStage that turns a finished course into a package a learning system can run. |
-| **LMS** | Learning management system: the website where learners take courses (for example Brightspace or Moodle). |
+| **LMS** | Learning management system: the website where learners take courses (for example the institution's LMS or the second LMS). |
 | **SCORM 1.2** | The long-standing standard a course uses to report to an LMS that a learner finished. Widest compatibility. |
 | **xAPI** | A newer reporting standard that also needs a separate "learning record store" to be useful. |
-| **Screen reader** | Software that reads the screen aloud for blind and low-vision users (NVDA, JAWS, Narrator, VoiceOver). |
+| **Screen reader** | Software that reads the screen aloud for blind and low-vision users (NVDA, a paid Windows screen reader, Narrator, the Mac's screen reader). |
 | **WCAG 2.2 AA** | The international yardstick for accessible web content. This is the target for courses and recordings. |
 | **ATAG 2.0** | The matching yardstick for tools that create content. Part A: the tool itself is accessible. Part B: the tool helps authors make accessible content. |
 | **Accessibility statement** | An honest public description of what is targeted, what has been tested, and what is known to be incomplete. |

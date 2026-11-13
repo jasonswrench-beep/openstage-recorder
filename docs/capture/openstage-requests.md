@@ -101,7 +101,7 @@ All of these are in `editor/src-tauri/`.
 
 **Done when.** A hotkey registered from the page fires while another program has focus, can be changed by the author, and is unregistered when OpenStage closes. The settings screen can warn when a chosen combination uses a screen reader's modifier key (Insert or Caps Lock).
 
-**Accessibility.** Defaults must not collide with NVDA, JAWS, or Narrator keys or with Windows. The proposed defaults are Ctrl+Shift+F9 (start), F10 (pause or resume), F11 (stop), and F12 (start again), to be collision-tested.
+**Accessibility.** Defaults must not collide with NVDA, a paid Windows screen reader, or Narrator keys or with Windows. The proposed defaults are Ctrl+Shift+F9 (start), F10 (pause or resume), F11 (stop), and F12 (start again), to be collision-tested.
 
 ### OS-6. Previewing large local video in the editor
 **Kind:** Needed | **Size:** M | **Needed by:** C3, C4, F2
@@ -198,7 +198,7 @@ Every change here follows the project's own rules: update `docs/format-spec.md` 
 
 **What.** Let objects and slides that Capture generates carry a `provenance` entry naming the capture project and step, the way imported objects carry `sourceDeck`, `slideIndex`, and `shapeId` (for example `sourceCapture` and `stepId`). Editing such an object must not drop its provenance.
 
-**Why.** Capture can regenerate step slides if the recording changes. Provenance lets a re-sync keep the author's edits, the same reasoning OpenStage uses for imported PowerPoint slides.
+**Why.** Capture can regenerate step slides if the recording changes. Provenance lets a re-sync keep the author's edits, the same reasoning OpenStage uses for imported .pptx slides.
 
 **Done when.** The format accepts the new provenance fields, the editor preserves them on edit, and the spec and migration are updated.
 
@@ -218,7 +218,7 @@ Every change here follows the project's own rules: update `docs/format-spec.md` 
 ### OS-16. Real LMS verification
 **Kind:** Blocks Release 1 | **Size:** M
 
-**What.** Run OpenStage's SCORM 1.2 output in Brightspace and Moodle (available to the owner now) and in Canvas (access on the way), using test courses. Check launch without error, correct scores for passing and failing attempts, completion and success as separate states, and returning a learner to their exact place.
+**What.** Run OpenStage's SCORM 1.2 output in the institution's LMS and the second LMS (available to the owner now) and in the third LMS (access on the way), using test courses. Check launch without error, correct scores for passing and failing attempts, completion and success as separate states, and returning a learner to their exact place.
 
 **Why.** It is the unchecked item on `ROADMAP.md` (Phase 1) and the first item in `CLAUDE.md`'s release gate. SCORM 1.2 has only been checked against a stand-in. Capture's must-pass test builds on it, so any problem should be found before recordings are added.
 

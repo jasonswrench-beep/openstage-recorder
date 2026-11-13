@@ -15,7 +15,7 @@
       "../../capture/THIRD-PARTY.md": "THIRD-PARTY.md"
     },
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "webviewInstallMode": { "type": "embedBootstrapper" },
       "nsis": {
         "installMode": "currentUser",
         "installerIcon": "icons/icon.ico",

@@ -87,6 +87,13 @@ The button says "Cover", but adding one announces `Added the redaction "Redactio
 
 The note about the short sounds says "Turn them off with --cues off, or change the volume with --cue-volume", the volume note says "use --cue-volume", and the webcam note ends "Leave out --camera to record no webcam". The Recorder's `plainWords` in `app/src/capturesession.ts` puts these in the window's words. There may be others; any finding that ends by naming an option has the same problem.
 
+### 11. From the security review of 2026-11-13: the encoder's throwaway file, and other companies' names in the tests
+
+Changed in the Recorder's copy of `capture/` and `docs/capture/` for 0.1.0 alpha 4. OpenStage Author has the same code, so the same change belongs there.
+
+- **The throwaway file.** `ScreenMedia::warm_encoder` (`capture/crates/openstage-capture-windows/src/record.rs`) makes `openstage-capture-warmup-<process number>.mp4` to wake the video encoder. OpenStage Author already writes a blank picture into it and puts it in its own working folder (`OPENSTAGE_WORK_DIR`). The Recorder's copy also removes it in a `Drop` guard (`RemoveOnDrop`), so a panic removes it too, and the new `remove_leftover_warmups()` removes any left by a recording program that was ended, from the temporary folder and the working folder, whenever the recording program starts (`main` in `capture/crates/openstage-capture-cli/src/main.rs`). A file whose recording program is still running is left alone; `process_running` in `win_windows.rs` asks Windows. Tests: `the_throwaway_file_gets_a_blank_picture_of_the_same_size_never_the_screen`, `the_throwaway_file_is_removed_even_when_making_it_panics`, `leftover_throwaway_files_of_ended_recorders_are_removed_and_nothing_else_is` and `a_running_process_is_told_from_one_that_has_ended`.
+- **Names in the tests and documents.** A webcam brand became "USB Camera", a virtual camera's maker was dropped ("Virtual Camera"), a browser's window is `browser.exe` "... - Browser", and a word processor's window is `editor.exe` "... - Editor", in `webcam.rs`, `window.rs`, `pick_window.rs`, `report.rs`, `setup.rs`, `take.rs` and `docs/capture/` (the format, the protocol and the roadmap's records, which no longer name the owner's own webcam model or browser). The other five documents in `docs/capture/` took OpenStage Author's own rewording of 2026-11-13.
+
 ## Changes in the Recorder's copy of the shared folders that OpenStage Author may want
 
 These are listed, with the reason for each, in `docs/recorder/EXTRACTED-FROM-OPENSTAGE.md` under "Changes made inside the copied folders". All are additions, and with nothing asked for the screens behave as they did.

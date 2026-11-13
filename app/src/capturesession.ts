@@ -164,7 +164,7 @@ export function parseProbe(line: string): Source[] {
 
 export interface WindowChoice {
   number: number;
-  /** The whole line: "2. WINWORD.EXE: Lesson - Word (1920 by 1032)". */
+  /** The whole line: "2. editor.exe: Lesson - Editor (1920 by 1032)". */
   label: string;
   /** The words the recorder is asked to match: the window's title. */
   title: string;

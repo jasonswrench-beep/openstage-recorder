@@ -1,7 +1,7 @@
 # Tasks for the OpenStage session: OS-1, OS-2, OS-3, OS-16, OS-17
 
 **Written:** 2026-10-13, against the OpenStage Author repository at commit `23d53e5` (line numbers below are from that commit; search for the quoted text if they have moved).
-**For:** a Claude Code session working in the OpenStage Author repository. It has the repository. It does **not** have the conversation that produced this file, so everything it needs is here.
+**For:** an AI assistant session working in the OpenStage Author repository. It has the repository. It does **not** have the conversation that produced this file, so everything it needs is here.
 **From:** the owner (Jason) and the author of OpenStage Capture.
 **Parent document:** [openstage-requests.md](openstage-requests.md) lists all 17 things Capture needs from OpenStage. This file takes the five that are documents and testing, not code, and spells each one out step by step. The other twelve (OS-4 to OS-15) are not asked for here and should not be started from this file.
 
@@ -79,7 +79,7 @@ Replace with exactly:
 
 Make these four edits to `ROADMAP.md`.
 
-**Edit 1. Move "Responsive output" out of "Later" into an active phase.** The owner decided: fix responsive output first, before Capture ships. It is a published-output accessibility gap (WCAG 2.2 1.4.10, Reflow), so **this file recommends Phase 1** ("Format and player"). That is a judgment call; see "Decisions to ask the owner" at the end. Add this line to Phase 1, directly after the line `- [ ] Tested in Moodle, Canvas and Brightspace, including resume` (line 14):
+**Edit 1. Move "Responsive output" out of "Later" into an active phase.** The owner decided: fix responsive output first, before Capture ships. It is a published-output accessibility gap (WCAG 2.2 1.4.10, Reflow), so **this file recommends Phase 1** ("Format and player"). That is a judgment call; see "Decisions to ask the owner" at the end. Add this line to Phase 1, directly after the line `- [ ] Tested in the three LMSs (the institution's, a second and a third), including resume` (line 14):
 ```
 - [ ] Responsive output: the published course reflows at 320 CSS pixels wide and at 400 percent zoom without scrolling in two directions (WCAG 2.2, 1.4.10 Reflow). Today the player scales the whole stage to fit and never reflows, so this is a known failure. The owner decided it is fixed before the Capture module ships.
 ```
@@ -165,17 +165,17 @@ Replace with:
 
 ## OS-16. Test the SCORM 1.2 output in real LMSs
 
-**Why.** `ROADMAP.md` line 14 (`- [ ] Tested in Moodle, Canvas and Brightspace, including resume`) is unchecked, and the first four items in the release gate in `CLAUDE.md` depend on it. Today SCORM 1.2 has been checked only against a stand-in LMS. Capture's most important test (a learner leaves and returns to the exact place) builds on this, so any problem should be found before recordings are added.
+**Why.** `ROADMAP.md` line 14 (`- [ ] Tested in the three LMSs (the institution's, a second and a third), including resume`) is unchecked, and the first four items in the release gate in `CLAUDE.md` depend on it. Today SCORM 1.2 has been checked only against a stand-in LMS. Capture's most important test (a learner leaves and returns to the exact place) builds on this, so any problem should be found before recordings are added.
 
-**What already exists.** `examples/lms-test-lesson.osproj/` is a 24-slide test lesson with a full written test plan, `LMS-TEST-PLAN.md`, containing 12 numbered tests, an answer key, and "What to send back". `PUBLISH LMS TEST LESSON.bat` rebuilds the package as `dist\lms-test-lesson-scorm12.zip`. The plan says most of it "has now been tried once in a real Brightspace", but **no results are recorded anywhere in the repository.** Ask the owner for any notes or screenshots from that first run.
+**What already exists.** `examples/lms-test-lesson.osproj/` is a 24-slide test lesson with a full written test plan, `LMS-TEST-PLAN.md`, containing 12 numbered tests, an answer key, and "What to send back". `PUBLISH LMS TEST LESSON.bat` rebuilds the package as `dist\lms-test-lesson-scorm12.zip`. The plan says most of it "has now been tried once in a real LMS", but **no results are recorded anywhere in the repository.** Ask the owner for any notes or screenshots from that first run.
 
-**Who can do what.** The owner has Brightspace and Moodle now. Canvas access is coming; the owner will say when. You cannot run an LMS. You prepare the results file, guide the owner one test at a time in plain language, record what they report exactly, and fix real faults.
+**Who can do what.** The owner has the institution's LMS and the second LMS now. The third LMS access is coming; the owner will say when. You cannot run an LMS. You prepare the results file, guide the owner one test at a time in plain language, record what they report exactly, and fix real faults.
 
 **Steps.**
 
 1. Ask the owner to double-click `PUBLISH LMS TEST LESSON.bat` and confirm that `dist\lms-test-lesson-scorm12.zip` was made. (It needs Node.js and Python; the script says what to install if they are missing. Narration is made with Kokoro if found; the lesson still publishes without audio.)
 2. Create the results file `examples/lms-test-lesson.osproj/LMS-RESULTS.md` using the template at the end of this section. Do not fill in any result yourself.
-3. For **each LMS** (Brightspace, Moodle, Canvas), the owner uploads the zip as a SCORM 1.2 package and uses a **test student, not instructor preview** (most LMSs record nothing in preview). Do not guess menu names for Moodle or Canvas: ask the owner for a screenshot if they cannot find the upload option, and write down what worked.
+3. For **each LMS** (the institution's LMS, the second LMS, the third LMS), the owner uploads the zip as a SCORM 1.2 package and uses a **test student, not instructor preview** (most LMSs record nothing in preview). Do not guess menu names for the second LMS or the third LMS: ask the owner for a screenshot if they cannot find the upload option, and write down what worked.
 4. **Required tests** for each LMS, from `LMS-TEST-PLAN.md`. They match the four SCORM items in the release gate:
    - **Test 1**, launch and look: opens with no error.
    - **Test 2**, a failing attempt: expect failed, score 60.
@@ -184,7 +184,7 @@ Replace with:
 5. **Also worth doing** if the owner has time: Test 6 (keyboard only, and whether Tab can leave the LMS frame and return), Test 7 (NVDA, if available), Test 8 (the embedded YouTube video), Test 10 (downloads), and Tests 11 and 12 (timing and animation). Tests 5 and 9 are lower priority.
 6. For every test, record **exactly what the LMS shows**: the words it uses for status, the score, and anything that looked wrong, with a screenshot if possible. Record failures as results; they are the point.
 7. If a test shows a real fault in OpenStage, fix it following the project rules (spec in the same commit, a regression test that fails without the fix), and re-run that test.
-8. **Roadmap.** Change line 14 only as results come in. While any LMS is untested or failing, write it as `[~]` with a short note naming each LMS and its state, for example `[~] Tested in Moodle, Canvas and Brightspace, including resume (Brightspace: passed tests 1 to 4; Moodle: not yet; Canvas: not yet)`. Tick `[x]` only when all three have passed tests 1 to 4. Never tick it on the strength of the stand-in LMS.
+8. **Roadmap.** Change line 14 only as results come in. While any LMS is untested or failing, write it as `[~]` with a short note naming each LMS and its state, for example `[~] Tested in the three LMSs (the institution's, a second and a third), including resume (the institution's LMS: passed tests 1 to 4; the second LMS: not yet; the third LMS: not yet)`. Tick `[x]` only when all three have passed tests 1 to 4. Never tick it on the strength of the stand-in LMS.
 
 **One thing to raise with the owner.** The release gate says "Course completion and assessment success are tracked as separate states". `LMS-TEST-PLAN.md` itself notes that SCORM 1.2 has only one status, so a learner who finishes but fails is reported as failed, never as completed. Those two statements pull against each other. Do not decide it alone: ask the owner how the gate should read for SCORM 1.2 (for example, "completion and success are both correct as far as SCORM 1.2 can express them, and are fully separate in SCORM 2004 later"), and change the gate wording only with their approval. This matters to Capture because its first release publishes through SCORM 1.2 only.
 
@@ -195,7 +195,7 @@ Replace with:
 Package tested: dist\lms-test-lesson-scorm12.zip, built from commit ______ on ______.
 Plan: LMS-TEST-PLAN.md. Use a test student, not instructor preview.
 
-## Brightspace
+## The institution's LMS
 LMS version: ______   Date: ______   Tester: ______
 
 | Test | Result (passed / failed / not run) | What the LMS showed (status words, score) | Problems, screenshots |
@@ -210,10 +210,10 @@ LMS version: ______   Date: ______   Tester: ______
 | 10 Downloads | | | |
 | 11 and 12 Timing and animation | | | |
 
-## Moodle
+## The second LMS
 (same table)
 
-## Canvas
+## The third LMS
 (same table)
 
 ## Summary
@@ -227,7 +227,7 @@ Faults found and where they were fixed: ______
 
 ## OS-17. A baseline screen reader pass on the editor
 
-**Why.** Capture's recorder panel, clip list, and multi-track timeline are built by reusing OpenStage's editor patterns, above all the **Timeline panel** with its slider grips. `ROADMAP.md` line 43 (`- [ ] ATAG Part A pass on everything above, including NVDA`) is unchecked and `docs/editor.md` says "Screen reader testing with NVDA is still to be done." Building new panels on untested patterns risks rebuilding them later. The release gate also requires "the entire editor operable by keyboard alone" and "usable with NVDA and VoiceOver". This pass covers Windows (NVDA and Narrator) only; VoiceOver is out of scope until there is a Mac build.
+**Why.** Capture's recorder panel, clip list, and multi-track timeline are built by reusing OpenStage's editor patterns, above all the **Timeline panel** with its slider grips. `ROADMAP.md` line 43 (`- [ ] ATAG Part A pass on everything above, including NVDA`) is unchecked and `docs/editor.md` says "Screen reader testing with NVDA is still to be done." Building new panels on untested patterns risks rebuilding them later. The release gate also requires "the entire editor operable by keyboard alone" and "usable with NVDA and the Mac's screen reader". This pass covers Windows (NVDA and Narrator) only; the Mac's screen reader is out of scope until there is a Mac build.
 
 **Who can do what.** You cannot run a screen reader. You write the test script and results file, the owner (or someone who uses a screen reader every day, which will find far more than a first-time tester; ask the owner who) runs it, and you record the findings and fix or list the problems. Software: NVDA (free, from nvaccess.org) and Narrator (built into Windows; Windows key + Ctrl + Enter turns it on). Run the editor with `OPEN EDITOR.bat`; on Windows the editor is a WebView2 (Chromium) window.
 
@@ -273,7 +273,7 @@ When you finish, give the owner a short plain-language summary and, if the Captu
 1. **Where does "Responsive output" go in the roadmap?** This file recommends Phase 1 (it is a published-output accessibility gap). Another phase may fit better. If unsure, ask.
 2. **How should the release gate read for SCORM 1.2?** "Completion and success are separate states" cannot be fully true in SCORM 1.2, which has one status. See OS-16.
 3. **Who runs the screen reader pass (OS-17)?** An experienced daily screen reader user will find far more than a first-time tester.
-4. **Are there notes or screenshots from the first Brightspace run?** They should be added to `LMS-RESULTS.md` rather than lost.
+4. **Are there notes or screenshots from the first run in the institution's LMS?** They should be added to `LMS-RESULTS.md` rather than lost.
 
 ## What this file does not ask for
 

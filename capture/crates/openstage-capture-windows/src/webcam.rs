@@ -62,7 +62,7 @@ fn media_error(what: impl std::fmt::Display) -> SessionError {
 pub struct CameraInfo {
     /// Its place in the list, from 1.
     pub number: u32,
-    /// What Windows calls it, such as "NexiGo Iris 4K Webcam".
+    /// What Windows calls it, such as "USB Camera".
     pub name: String,
     /// Windows' own name for it (needed to open it; not shown to the author).
     pub id: String,
@@ -1223,21 +1223,21 @@ mod tests {
 
     fn cameras() -> Vec<CameraInfo> {
         number_cameras(vec![
-            CameraInfo { number: 0, name: "NexiGo Iris 4K Webcam".into(), id: "a".into() },
+            CameraInfo { number: 0, name: "USB Camera".into(), id: "a".into() },
             CameraInfo { number: 0, name: "Integrated Camera".into(), id: "b".into() },
-            CameraInfo { number: 0, name: "OBS Virtual Camera".into(), id: "c".into() },
+            CameraInfo { number: 0, name: "Virtual Camera".into(), id: "c".into() },
         ])
     }
 
     #[test]
     fn cameras_are_numbered_and_described_in_words() {
         let list = cameras();
-        assert_eq!(list[2].describe(), "3. OBS Virtual Camera");
+        assert_eq!(list[2].describe(), "3. Virtual Camera");
         assert_eq!(
             describe_cameras(&list),
-            "3 cameras were found: 1. NexiGo Iris 4K Webcam; 2. Integrated Camera; 3. OBS Virtual Camera."
+            "3 cameras were found: 1. USB Camera; 2. Integrated Camera; 3. Virtual Camera."
         );
-        assert_eq!(describe_cameras(&list[..1]), "One camera was found: 1. NexiGo Iris 4K Webcam.");
+        assert_eq!(describe_cameras(&list[..1]), "One camera was found: 1. USB Camera.");
         assert!(describe_cameras(&[]).starts_with("No camera was found."));
     }
 
@@ -1245,16 +1245,16 @@ mod tests {
     fn a_camera_is_chosen_by_number_or_by_part_of_its_name() {
         let list = cameras();
         assert_eq!(choose_camera(&list, "2").unwrap().name, "Integrated Camera");
-        assert_eq!(choose_camera(&list, "nexigo").unwrap().number, 1);
+        assert_eq!(choose_camera(&list, "usb").unwrap().number, 1);
         assert_eq!(choose_camera(&list, "default").unwrap().number, 1);
         assert_eq!(choose_camera(&list, " Default ").unwrap().number, 1);
         let e = choose_camera(&list, "9").unwrap_err();
         assert!(e.contains("There is no camera number 9. Choose a number from 1 to 3"), "{e}");
-        let e = choose_camera(&list, "usb").unwrap_err();
-        assert!(e.contains("No camera has \"usb\" in its name") && e.contains("3 cameras were found"), "{e}");
+        let e = choose_camera(&list, "phone").unwrap_err();
+        assert!(e.contains("No camera has \"phone\" in its name") && e.contains("3 cameras were found"), "{e}");
         let e = choose_camera(&list, "camera").unwrap_err();
         assert!(
-            e.contains("More than one camera") && e.contains("2. Integrated Camera") && e.contains("3. OBS"),
+            e.contains("More than one camera") && e.contains("2. Integrated Camera") && e.contains("3. Virtual Camera"),
             "{e}"
         );
         assert!(choose_camera(&list, "").unwrap_err().contains("Say which camera"));

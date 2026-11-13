@@ -73,8 +73,8 @@ test("a screen recording asks for the screen, the sound, no webcam and nothing n
 });
 
 test("a window, or a part of a screen, is asked for the way the recorder takes it", () => {
-  const w = recordArgs(settings({ target: "window", window: "  Lesson plan - Word " }), "f");
-  assert.deepEqual(w.slice(w.indexOf("--window"), w.indexOf("--window") + 2), ["--window", "Lesson plan - Word"]);
+  const w = recordArgs(settings({ target: "window", window: "  Lesson plan - Editor " }), "f");
+  assert.deepEqual(w.slice(w.indexOf("--window"), w.indexOf("--window") + 2), ["--window", "Lesson plan - Editor"]);
   assert.ok(!w.includes("--region"));
   const r = recordArgs(settings({ target: "region", display: 2, region: { left: "100", top: "020", width: "1280", height: "720" } }), "f");
   assert.deepEqual(r.slice(r.indexOf("--display"), r.indexOf("--display") + 2), ["--display", "2"]);
@@ -118,9 +118,9 @@ const REAL_PROBE = line({
     { id: "display:1", available: true, note: "Display 1, 1920 by 1080, main display. Record it with: record --source screen --display 1. Sound is chosen separately, with --microphone and --output." },
     { id: "display:2", available: true, note: "Display 2, 1920 by 1080, at position 7, -1080. Record it with: record --source screen --display 2. Sound is chosen separately." },
     { id: "microphone:1", available: true, note: "Microphone 1: Microphone (NVIDIA Broadcast). Record it with: record --source screen --microphone 1." },
-    { id: "microphone:5", available: true, note: "Microphone 5: Microphone (NexiGo Iris 4K Webcam Audio), the default. Record it with: record --source screen --microphone 5." },
+    { id: "microphone:5", available: true, note: "Microphone 5: Microphone (USB Camera Audio), the default. Record it with: record --source screen --microphone 5." },
     { id: "output:4", available: true, note: "Sound output (records the sound it plays) 4: Headphones (Shure MV7), the default. Record it with: record --source screen --output 4." },
-    { id: "camera:1", available: true, note: "Camera 1: NexiGo Iris 4K Webcam. Record it with: record --source screen --camera 1. It goes into webcam.mp4, beside the screen video." },
+    { id: "camera:1", available: true, note: "Camera 1: USB Camera. Record it with: record --source screen --camera 1. It goes into webcam.mp4, beside the screen video." },
     { id: "camera:2", available: false, note: "Camera 2: Broken. Record it with: record --source screen --camera 2." },
   ],
 });
@@ -131,9 +131,9 @@ test("the screens, microphones, sound outputs and cameras are read from the prob
   assert.equal(s[0]!.label, "Display 1, 1920 by 1080, main display");
   assert.equal(s[1]!.label, "Display 2, 1920 by 1080, at position 7, -1080");
   assert.deepEqual([s[2]!.label, s[2]!.isDefault], ["Microphone (NVIDIA Broadcast)", false]);
-  assert.deepEqual([s[3]!.label, s[3]!.isDefault], ["Microphone (NexiGo Iris 4K Webcam Audio)", true]);
+  assert.deepEqual([s[3]!.label, s[3]!.isDefault], ["Microphone (USB Camera Audio)", true]);
   assert.deepEqual([s[4]!.label, s[4]!.isDefault], ["Headphones (Shure MV7)", true]);
-  assert.equal(s[5]!.label, "NexiGo Iris 4K Webcam");
+  assert.equal(s[5]!.label, "USB Camera");
 });
 
 test("a line that is not a probe lists nothing", () => {
@@ -143,9 +143,9 @@ test("a line that is not a probe lists nothing", () => {
 });
 
 test("a window is read from its finding, with the words that name it", () => {
-  const w = parseWindow(line({ event: "check", check: "window", ok: true, message: "2. WINWORD.EXE: Lesson plan  -  Last saved by user - Word (1920 by 1032)" }));
-  assert.deepEqual(w, { number: 2, label: "2. WINWORD.EXE: Lesson plan  -  Last saved by user - Word (1920 by 1032)", title: "Lesson plan  -  Last saved by user - Word" });
-  assert.equal(parseWindow(line({ event: "check", check: "window", ok: true, message: "5. chrome.exe: Notes: week 3 \ud83c\udf81 - Google Chrome (1920 by 1032)" }))?.title, "Notes: week 3 \ud83c\udf81 - Google Chrome");
+  const w = parseWindow(line({ event: "check", check: "window", ok: true, message: "2. editor.exe: Lesson plan  -  Last saved by user - Editor (1920 by 1032)" }));
+  assert.deepEqual(w, { number: 2, label: "2. editor.exe: Lesson plan  -  Last saved by user - Editor (1920 by 1032)", title: "Lesson plan  -  Last saved by user - Editor" });
+  assert.equal(parseWindow(line({ event: "check", check: "window", ok: true, message: "5. browser.exe: Notes: week 3 \ud83c\udf81 - Browser (1920 by 1032)" }))?.title, "Notes: week 3 \ud83c\udf81 - Browser");
   assert.equal(parseWindow(line({ event: "check", check: "windows", ok: true, message: "11 windows can be recorded." })), null, "the count is not a window");
   assert.equal(parseWindow(line({ event: "check", check: "window", ok: true, message: "no number here" })), null);
   assert.equal(parseWindow(line({ event: "check", check: "window", ok: true, message: "3. x.exe:  (10 by 10)" })), null, "a window with no title cannot be asked for by title");
@@ -419,7 +419,7 @@ test("a very quiet computer sound note uses this app's words for what to do, and
 
 test("the notes about the short sounds and the webcam do not name command line options", () => {
   const cues = "The recorder will make a short sound for the countdown, the start, a pause, a resume, the stop and an error, at volume 70 of 100. None of them is recorded. Turn them off with --cues off, or change the volume with --cue-volume.";
-  const camera = "Recording the webcam 1. NexiGo Iris 4K Webcam into webcam.mp4, beside the screen video. If the camera stops, the recording carries on without it and you are told. Leave out --camera to record no webcam.";
+  const camera = "Recording the webcam 1. USB Camera into webcam.mp4, beside the screen video. If the camera stops, the recording carries on without it and you are told. Leave out --camera to record no webcam.";
   const volume = "The sounds are played at volume 70 of 100. To change it use --cue-volume with a number from 1 to 100; --cues off turns them off.";
   const { session } = play([
     line({ event: "check", check: "cues", ok: true, message: cues }),

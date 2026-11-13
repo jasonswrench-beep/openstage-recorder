@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the Recorder window may do: show dialogs, show a folder in the file manager, set its title, and close itself.",
+  "description": "What the Recorder window may do: show dialogs, set its title, and close itself. Showing a folder and opening a release page are done by the app's own commands, which check what they open, so the page has no opener permission of its own.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:default", "opener:default", "core:window:allow-set-title", "core:window:allow-close", "core:window:allow-destroy"]
+  "permissions": ["core:default", "dialog:default", "core:window:allow-set-title", "core:window:allow-close", "core:window:allow-destroy"]
 }

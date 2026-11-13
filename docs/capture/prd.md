@@ -81,7 +81,7 @@ OpenStage Capture is a module of OpenStage Author. It lets an author record thei
 **Done when**
 - Start, pause and resume, and stop each have a hotkey that works while another program has focus. Pause and resume share one key, which announces the new state.
 - Hotkeys are configurable. The settings screen warns if a choice uses a screen reader's modifier key (Insert or Caps Lock).
-- **Default hotkeys** *(confirmed: the owner delegated the choice)*: Ctrl+Shift+F9 to start, Ctrl+Shift+F10 to pause or resume, Ctrl+Shift+F11 to stop, and Ctrl+Shift+F12 to start again (A10). During the capture spike they are tested against the default keys of NVDA, JAWS, and Narrator, Windows itself, and common programs, and changed if any collide.
+- **Default hotkeys** *(confirmed: the owner delegated the choice)*: Ctrl+Shift+F9 to start, Ctrl+Shift+F10 to pause or resume, Ctrl+Shift+F11 to stop, and Ctrl+Shift+F12 to start again (A10). During the capture spike they are tested against the default keys of NVDA, a paid Windows screen reader, and Narrator, Windows itself, and common programs, and changed if any collide.
 - An optional countdown runs before recording starts: 3 seconds by default, adjustable, and it can be turned off *(confirmed)*.
 - Stop finishes cleanly: every file is finalized and I am told where the recording was saved.
 - The same four actions are also buttons in the recorder panel.
@@ -497,7 +497,7 @@ OpenStage Capture is a module of OpenStage Author. It lets an author record thei
 - A course containing Capture output publishes through OpenStage's existing publish step to both outputs: a folder of web files and a SCORM 1.2 zip. Capture has no exporter of its own.
 - Preview and published output look and behave the same (one renderer).
 - No raw capture data is in either output (B2).
-- **Must pass:** the package launches in Brightspace and Moodle (and in Canvas once access exists) without error, reports completion and score correctly for passing and failing attempts, and returns a learner who leaves to their exact place.
+- **Must pass:** the package launches in the institution's LMS and the second LMS (and in the third LMS once access exists) without error, reports completion and score correctly for passing and failing attempts, and returns a learner who leaves to their exact place.
 
 **Depends on** the real-LMS verification of OpenStage's existing SCORM 1.2 output (section 6).
 
@@ -561,14 +561,14 @@ OpenStage Capture is a module of OpenStage Author. It lets an author record thei
 **Done when**
 - A plain-language statement says what is targeted (WCAG 2.2 AA for output; ATAG 2.0 Part A, plus Part B for this module, for the editor), what was actually tested (NVDA and Narrator on Windows; which LMSs), what is known to be incomplete, and how to report a problem.
 - It is updated at every release. It claims nothing that was not tested.
-- It names the reflow gap until OpenStage's responsive output ships, and VoiceOver and JAWS as untested.
+- It names the reflow gap until OpenStage's responsive output ships, and the Mac's screen reader and a paid Windows screen reader as untested.
 
 #### H2. Release gate
 **As the** owner, **I want** one checklist that decides whether Release 1 ships, **so that** nothing slips through.
 
 **Done when** all of the following hold, with Capture content in the course:
-- The SCORM package launches without error in Brightspace and Moodle (and Canvas once available); passing and failing attempts report the right score; completion and success are separate; a learner who leaves returns to their exact place.
-- The whole editor and the whole published course work by keyboard alone, and with NVDA and Narrator. (VoiceOver is not yet tested, and the statement says so.)
+- The SCORM package launches without error in the institution's LMS and the second LMS (and the third LMS once available); passing and failing attempts report the right score; completion and success are separate; a learner who leaves returns to their exact place.
+- The whole editor and the whole published course work by keyboard alone, and with NVDA and Narrator. (the Mac's screen reader is not yet tested, and the statement says so.)
 - Generated captions match the narration script exactly and are correctly timed.
 - A saved, closed, reopened, and republished course is byte-identical.
 - A recording stopped by killing the program is recovered.
@@ -591,7 +591,7 @@ Release 1 does not ship until these are done. Items 1, 2, 4, 6, 7, and 8 are Ope
 | # | Prerequisite | Why |
 |---|---|---|
 | 1 | **Responsive output in the published player** (reflow, WCAG 1.4.10) | Owner decision: fix first. With a checkpoint if it proves much larger than expected (brief, section 8). |
-| 2 | **OpenStage's SCORM 1.2 verified in a real LMS** (Brightspace and Moodle, then Canvas) | It has only run against a stand-in. F3 and H2 depend on it. |
+| 2 | **OpenStage's SCORM 1.2 verified in a real LMS** (the institution's LMS and the second LMS, then the third LMS) | It has only run against a stand-in. F3 and H2 depend on it. |
 | 3 | **The streaming launch path** (G2) | Recording cannot run on the current one-job-at-a-time launcher. |
 | 4 | **A baseline screen reader pass** on the OpenStage patterns Capture reuses | No real screen reader testing exists yet. |
 | 5 | **CLAUDE.md updated** for the three accepted exceptions (Windows first, mid-level video editor, Rust capture program) | Keeps the project's own rules and the work in agreement. |
@@ -601,7 +601,7 @@ Release 1 does not ship until these are done. Items 1, 2, 4, 6, 7, and 8 are Ope
 
 **Checkpoint.** Items 1, 6, 7, and 8 are all sizable OpenStage additions. If more than one proves large, the owner can revisit what Release 1 includes (for example, shipping Demo and click-only Practice first). That would be the owner's call, made with the facts at that point.
 
-**Not prerequisites:** timing that follows a video (a roadmap request), and macOS, Linux, JAWS, or VoiceOver work.
+**Not prerequisites:** timing that follows a video (a roadmap request), and macOS, Linux, a paid Windows screen reader, or the Mac's screen reader work.
 
 ## 7. Non-functional requirements
 
@@ -617,7 +617,7 @@ Release 1 does not ship until these are done. Items 1, 2, 4, 6, 7, and 8 are Ope
 
 ## 8. Out of scope (after Release 1, not scheduled)
 
-macOS and Linux; JAWS and VoiceOver testing; SCORM 2004; xAPI and cmi5; WebM output; a sign-language video track; accessible PDF or HTML step guides; templates and themes; noise removal; localization; a plugin API; color correction, green screen, multi-camera editing, a large effects catalog, and motion graphics.
+macOS and Linux; testing with a paid Windows screen reader and the Mac's screen reader; SCORM 2004; xAPI and cmi5; WebM output; a sign-language video track; accessible PDF or HTML step guides; templates and themes; noise removal; localization; a plugin API; color correction, green screen, multi-camera editing, a large effects catalog, and motion graphics.
 
 ## 9. Details: confirmed and still proposed
 
