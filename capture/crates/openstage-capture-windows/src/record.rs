@@ -24,7 +24,7 @@ use crate::{CaptureWork, Frame, FrameSource, Outline, Platform, SinkSpec, VideoP
 use openstage_capture::{MediaFactory, SessionConfig, SessionError, TakeMedia};
 use openstage_capture_project::{CameraInfo as CameraRecord, InteractionInfo, LogEvent, MediaFile, RegionInfo};
 use std::cell::RefCell;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -543,14 +543,27 @@ impl ScreenMedia {
     }
 
     /// Make and throw away a small video file, so the encoder is awake when the real one is made. Any
-    /// trouble is ignored: this only saves time, and the real file reports its own problems.
+    /// trouble is ignored: this only saves time, and the real file reports its own problems. The picture in it is blank, not the
+    /// screen, so nothing of the screen is left behind if the recorder is stopped before the file is removed; it is removed even
+    /// if making it panics, and [`remove_leftover_warmups`] removes one left by a recorder that was ended. It is made in the
+    /// editor's own working folder when the editor names one (OPENSTAGE_WORK_DIR), which the editor clears.
     fn warm_encoder(&self, prepared: &Prepared) {
         let started = Instant::now();
-        let path = std::env::temp_dir().join(format!("openstage-capture-warmup-{}.mp4", std::process::id()));
+        let path = warmup_folder().join(format!("{WARMUP_PREFIX}{}.mp4", std::process::id()));
+        let _remove = RemoveOnDrop(path.clone());
+        let first = &prepared.first;
+        let blank = Frame {
+            width: first.width,
+            height: first.height,
+            t_ms: 0,
+            captured_100ns: None,
+            arrived_100ns: None,
+            bgra: vec![0u8; first.bgra.len()],
+        };
         let spec = SinkSpec {
             path: path.clone(),
-            width: prepared.first.width,
-            height: prepared.first.height,
+            width: blank.width,
+            height: blank.height,
             fps: self.fps,
             bitrate_kbps: self.bitrate_kbps,
             fragmented: true,
@@ -563,7 +576,7 @@ impl ScreenMedia {
         match self.video.create_sink(&spec) {
             Ok(mut sink) => {
                 let step = Pacer::new(self.fps);
-                let _ = sink.write(&prepared.first, 0, step.duration_100ns(0));
+                let _ = sink.write(&blank, 0, step.duration_100ns(0));
                 if spec.audio.is_some() {
                     let _ = sink.write_audio(&vec![0i16; (SAMPLE_RATE as usize / 50) * CHANNELS as usize], 0);
                 }
@@ -571,9 +584,72 @@ impl ScreenMedia {
             }
             Err(e) => eprintln!("warming up the video encoder did not work (this is not a problem by itself): {e}"),
         }
-        let _ = std::fs::remove_file(&path);
         eprintln!("video encoder warmed up in {} ms", started.elapsed().as_millis());
     }
+}
+
+/// The start of the name of the throwaway file that wakes the video encoder; the recorder's process number and ".mp4" follow.
+const WARMUP_PREFIX: &str = "openstage-capture-warmup-";
+
+/// Where the warm-up file is made: the editor's working folder when it names one (OPENSTAGE_WORK_DIR), otherwise the
+/// system's temporary folder.
+fn warmup_folder() -> PathBuf {
+    std::env::var_os("OPENSTAGE_WORK_DIR").map(PathBuf::from).filter(|p| p.is_dir()).unwrap_or_else(std::env::temp_dir)
+}
+
+/// Removes a file when it goes out of scope, so the warm-up file goes even if making it panics.
+struct RemoveOnDrop(PathBuf);
+
+impl Drop for RemoveOnDrop {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+/// Removes the warm-up files that recorders left behind because they were ended before they could remove them (a crash,
+/// or the process being stopped), from the temporary folder and the editor's working folder. A file whose recorder is
+/// still running is left alone. Run when the recorder starts. Returns how many were removed.
+pub fn remove_leftover_warmups() -> usize {
+    let mut folders = vec![std::env::temp_dir()];
+    let work = warmup_folder();
+    if !folders.contains(&work) {
+        folders.push(work);
+    }
+    folders.iter().map(|f| remove_warmups_in(f, std::process::id(), &process_running)).sum()
+}
+
+/// [`remove_leftover_warmups`] for one folder, with the process check given, so tests need no real processes. A file named for
+/// this process is always old (this process has not made its own yet), so it goes too.
+fn remove_warmups_in(folder: &Path, own: u32, running: &dyn Fn(u32) -> bool) -> usize {
+    let Ok(entries) = std::fs::read_dir(folder) else { return 0 };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(number) =
+            name.to_str().and_then(|n| n.strip_prefix(WARMUP_PREFIX)).and_then(|n| n.strip_suffix(".mp4"))
+        else {
+            continue;
+        };
+        let Ok(process) = number.parse::<u32>() else { continue };
+        if (process == own || !running(process))
+            && entry.file_type().is_ok_and(|t| t.is_file())
+            && std::fs::remove_file(entry.path()).is_ok()
+        {
+            removed += 1;
+        }
+    }
+    removed
+}
+
+/// Whether a process with this number is running. When that cannot be told, it is taken as running, so its file is kept.
+#[cfg(windows)]
+fn process_running(process: u32) -> bool {
+    crate::win_windows::process_running(process)
+}
+
+#[cfg(not(windows))]
+fn process_running(_process: u32) -> bool {
+    true
 }
 
 /// One take being recorded.
@@ -1828,6 +1904,77 @@ mod tests {
         let out = run_session(&cfg, &media, &mut input, &mut VecSink::default(), &ManualClock::new()).unwrap();
         assert!(out.ok, "the real recording went ahead");
         assert_eq!(files.0.borrow().len(), 1);
+    }
+
+    #[test]
+    fn the_throwaway_file_gets_a_blank_picture_of_the_same_size_never_the_screen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cfg = config(&dir);
+        cfg.countdown_ms = 1000;
+        let (media, files) = factory(good_screen());
+        let mut input = ScriptedInput::new(vec![(2000, Input::Command(Command::Stop))]);
+        assert!(run_session(&cfg, &media, &mut input, &mut VecSink::default(), &ManualClock::new()).unwrap().ok);
+        let files = files.0.borrow();
+        let (warm, real) = (files[0].borrow(), files[1].borrow());
+        assert_eq!(warm.size, real.size, "the same size as the screen, so the encoder is woken for the real size");
+        assert_eq!(warm.pictures.len(), 1);
+        assert_eq!(warm.pictures[0], (8, 4, [0, 0, 0, 0]), "blank");
+        assert_ne!(real.pictures[0].2, [0, 0, 0, 0], "the real file has the screen (the test is not vacuous)");
+    }
+
+    #[test]
+    fn the_throwaway_file_is_removed_even_when_making_it_panics() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(format!("{WARMUP_PREFIX}4242.mp4"));
+        std::fs::write(&path, b"partly written").unwrap();
+        let held = path.clone();
+        let outcome = std::panic::catch_unwind(move || {
+            let _remove = RemoveOnDrop(held);
+            panic!("the encoder fell over");
+        });
+        assert!(outcome.is_err());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn leftover_throwaway_files_of_ended_recorders_are_removed_and_nothing_else_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let make = |name: &str| std::fs::write(dir.path().join(name), b"x").unwrap();
+        make(&format!("{WARMUP_PREFIX}111.mp4")); // its recorder has ended
+        make(&format!("{WARMUP_PREFIX}222.mp4")); // its recorder is still running
+        make(&format!("{WARMUP_PREFIX}333.mp4")); // this process's number: an old file from before
+        for other in [
+            "notes.mp4",
+            "openstage-capture-warmup-abc.mp4",
+            "openstage-capture-warmup-111.mp4.part",
+            "openstage-capture-warmup-111.txt",
+            "screen.mp4",
+        ] {
+            make(other);
+        }
+        std::fs::create_dir(dir.path().join(format!("{WARMUP_PREFIX}444.mp4"))).unwrap(); // a folder, never removed
+        let removed = remove_warmups_in(dir.path(), 333, &|p| p == 222);
+        assert_eq!(removed, 2);
+        let mut left: Vec<String> =
+            std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+        left.sort();
+        assert_eq!(
+            left,
+            [
+                "notes.mp4",
+                "openstage-capture-warmup-111.mp4.part",
+                "openstage-capture-warmup-111.txt",
+                "openstage-capture-warmup-222.mp4",
+                "openstage-capture-warmup-444.mp4",
+                "openstage-capture-warmup-abc.mp4",
+                "screen.mp4"
+            ]
+        );
+        assert_eq!(
+            remove_warmups_in(&dir.path().join("not there"), 333, &|_| false),
+            0,
+            "a missing folder is no trouble"
+        );
     }
 
     // ---- watching how regularly the program looks ----

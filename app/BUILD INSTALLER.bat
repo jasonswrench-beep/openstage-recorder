@@ -22,6 +22,17 @@ if errorlevel 1 goto no_rust
 
 set "CAPTURE_EXE=%~dp0..\capture\target\release\openstage-capture.exe"
 
+rem The folders this computer builds in (your user folder, Rust's folders and this repository) are not written into the programs: each
+rem is replaced by a short stand-in name, and the debug file is named without its folder (docs\recorder\INSTALLER-AND-SIGNING.md).
+rem CARGO_ENCODED_RUSTFLAGS keeps a space in a folder's name whole; its parts are separated by the character made here.
+for /f %%S in ('powershell -NoProfile -Command "[char]31"') do set "OR_US=%%S"
+set "OR_CARGO=%USERPROFILE%\.cargo"
+if defined CARGO_HOME set "OR_CARGO=%CARGO_HOME%"
+set "OR_RUSTUP=%USERPROFILE%\.rustup"
+if defined RUSTUP_HOME set "OR_RUSTUP=%RUSTUP_HOME%"
+for %%R in ("%~dp0..") do set "OR_REPO=%%~fR"
+set "OR_FOLDERS=--remap-path-prefix=%USERPROFILE%=/home%OR_US%--remap-path-prefix=%OR_CARGO%=/cargo%OR_US%--remap-path-prefix=%OR_RUSTUP%=/rustup%OR_US%--remap-path-prefix=%OR_REPO%=/openstage-recorder%OR_US%-Clink-arg=/PDBALTPATH:%%_PDB%%"
+
 if exist "%~dp0node_modules" if exist "%~dp0src-tauri\target" if exist "%~dp0..\capture\target" goto tools_ready
 echo The first build downloads libraries, once: JavaScript packages from
 echo npmjs.com and Rust libraries from crates.io. Nothing of yours is sent.
@@ -37,6 +48,8 @@ echo Step 1 of 3: building the recording program.
 echo.
 if exist "%~dp0..\capture\build-log.txt" del "%~dp0..\capture\build-log.txt"
 pushd "%~dp0..\capture"
+rem The setting below replaces capture\.cargo\config.toml's flags, so its one flag (+crt-static) is given here too.
+set "CARGO_ENCODED_RUSTFLAGS=-C%OR_US%target-feature=+crt-static%OR_US%%OR_FOLDERS%"
 call "%~dp0..\capture\cargo-run.bat" "%~dp0..\capture\build-log.txt" build --release -p openstage-capture-cli
 set "REC_RESULT=%errorlevel%"
 popd
@@ -56,6 +69,7 @@ if errorlevel 1 goto failed
 echo.
 echo Step 3 of 3: making the installer. This is the slowest step.
 echo.
+set "CARGO_ENCODED_RUSTFLAGS=%OR_FOLDERS%"
 call npx tauri build --config src-tauri\tauri.installer.conf.json
 if errorlevel 1 goto failed
 

@@ -122,7 +122,7 @@ pub use pick::{region_numbers, run_pick_region, run_pick_region_with, PickRegion
 pub use pick_window::{run_pick_window, run_pick_window_with, PickWindowOptions, WindowPick, DEFAULT_WAIT as PICK_WINDOW_WAIT};
 pub use hide::{cover, matches_any, parse_words, HideProvider, HideRect, HidingSource, HIDE_COLOUR, MAX_WORDS, MAX_WORD_LEN};
 pub use queue::{FramePool, FrameQueue};
-pub use record::{ScreenMedia, DECLARED_LOSS_MS, SCREEN_FILE};
+pub use record::{remove_leftover_warmups, ScreenMedia, DECLARED_LOSS_MS, SCREEN_FILE};
 pub use region::{crop, crop_into, CroppedSource, Region, MIN_SIDE as REGION_MIN_SIDE};
 pub use region_editor::{Handle as RegionHandle, PickOutcome, RegionEditor};
 pub use region_paint::{picker_overlay, recording_frame, Canvas};

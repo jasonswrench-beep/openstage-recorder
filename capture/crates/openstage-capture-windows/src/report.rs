@@ -848,7 +848,7 @@ mod tests {
 
     fn webcam_hour() -> WebcamReport {
         WebcamReport {
-            camera: "NexiGo Iris 4K Webcam".into(),
+            camera: "USB Camera".into(),
             width: 1280,
             height: 720,
             fps: 30,
@@ -880,7 +880,7 @@ mod tests {
         let checks = summarize(&r);
         let c = find(&checks, "run-webcam");
         assert!(c.ok, "{}", c.message);
-        assert!(c.message.contains("The webcam (NexiGo Iris 4K Webcam) was recorded at 1280 by 720, 30 pictures a second: 108001 pictures for 1:00:00 of recording."), "{}", c.message);
+        assert!(c.message.contains("The webcam (USB Camera) was recorded at 1280 by 720, 30 pictures a second: 108001 pictures for 1:00:00 of recording."), "{}", c.message);
         assert!(
             c.message.contains(
                 "The camera sent 107950 pictures, about 30 a second; the longest wait between two was 140 ms."

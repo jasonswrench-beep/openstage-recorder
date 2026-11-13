@@ -161,7 +161,7 @@ mod tests {
     fn screen(answer: Result<WindowPick, ScreenError>) -> Screen {
         Screen {
             answer: RefCell::new(Some(answer)),
-            open: vec![window(1, 11, "Notes"), window(2, 22, "Lesson plan - Word"), window(3, 33, "Week 3")],
+            open: vec![window(1, 11, "Notes"), window(2, 22, "Lesson plan - Editor"), window(3, 33, "Week 3")],
             waited: RefCell::new(Vec::new()),
         }
     }
@@ -187,13 +187,13 @@ mod tests {
     #[test]
     fn a_clicked_window_is_said_as_the_list_says_it_with_the_number_the_list_gives_it() {
         // The click found the window by its handle only; the list says it is number 2.
-        let s = screen(Ok(WindowPick::Window(window(0, 22, "Lesson plan - Word"))));
+        let s = screen(Ok(WindowPick::Window(window(0, 22, "Lesson plan - Editor"))));
         let (chosen, said) = run(&s);
         assert!(chosen);
         assert_eq!((said[1].check.as_str(), said[1].ok), ("window", true));
-        assert_eq!(said[1].message, "2. notepad.exe: Lesson plan - Word (800 by 600)");
+        assert_eq!(said[1].message, "2. notepad.exe: Lesson plan - Editor (800 by 600)");
         assert_eq!(said[2].check, "window-chosen");
-        assert!(said[2].message.contains("To record it, use --window \"Lesson plan - Word\"."));
+        assert!(said[2].message.contains("To record it, use --window \"Lesson plan - Editor\"."));
     }
 
     #[test]

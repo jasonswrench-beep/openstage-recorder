@@ -80,7 +80,7 @@ async function main(): Promise<void> {
     h("span", {}, uiIcon(document, "shield-check"), "Recordings stay on this computer. No account."),
     h("span", {}, uiIcon(document, "keyboard"), "Ctrl+Shift+F11 stops a recording from any program"));
   app.replaceChildren(header, tabRow, main, footer);
-  panels.get("help")!.replaceChildren(helpScreen());
+  panels.get("help")!.replaceChildren(helpScreen(backend));
   document.documentElement.lang = "en";
   void backend.setTitle("OpenStage Recorder");
 

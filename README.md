@@ -27,7 +27,7 @@ The layout and the paths of the first four are the same as in OpenStage Author o
 
 ## What is not built yet
 
-The installer is not signed (`docs/recorder/INSTALLER-AND-SIGNING.md`). It has been built the way the workflow builds it (3.4 MB) and the app inside it was started once from a folder, but it has not been installed or used by anyone but its maker. What the first release holds, and what it does not: `docs/recorder/RELEASE-NOTES.md`. `docs/recorder/plan.md` says what each is and the order.
+Releases are signed by the publisher, Jason Wrench, and are pre-releases: nobody but its maker has used it yet. What each release changed, and what has not been tried: `docs/recorder/RELEASE-NOTES.md`. How the installer is built and signed: `docs/recorder/INSTALLER-AND-SIGNING.md`. `docs/recorder/plan.md` says what each is and the order.
 
 ## Quick record
 
@@ -39,7 +39,7 @@ On Windows, double-click one of these, in the `app` folder. Both ask before they
 
 - `OPEN RECORDER PREVIEW.bat` shows the Record screen in your web browser with a pretend recorder. Nothing real is recorded. Use it to try the screen with a keyboard or a screen reader.
 - `OPEN RECORDER.bat` builds the app and the recording program the first time, then opens the real thing. It was run once, on 2026-10-23, and built and opened the app.
-- `BUILD INSTALLER.bat` builds one installer file, named like `OpenStage Recorder_0.1.0_x64-setup.exe`, in `app\installer`, which installs the app for your own user with no administrator password. **Never run yet.** It is not signed, so Windows will show a blue "Windows protected your PC" box the first time. A build at GitHub also makes a portable folder you can unzip and double-click with nothing to install, and both can be downloaded from the Actions page (steps in `docs/recorder/INSTALLER-AND-SIGNING.md`). `docs/recorder/INSTALLER-AND-SIGNING.md` has what to check and what signing would change.
+- `BUILD INSTALLER.bat` builds one installer file, named like `OpenStage Recorder_0.1.0_x64-setup.exe`, in `app\installer`, which installs the app for your own user with no administrator password. A copy you build yourself is not signed, so Windows will show a blue "Windows protected your PC" box the first time; the signed release is on the Releases page. A build at GitHub also makes an unsigned portable folder you can unzip and double-click with nothing to install, and both can be downloaded from the Actions page (steps in `docs/recorder/INSTALLER-AND-SIGNING.md`, with what to check).
 
 ## Checking it
 
@@ -54,7 +54,11 @@ The same checks as in OpenStage, run from this folder:
 
 ## Code signing policy
 
-Not yet in force. No release of OpenStage Recorder is signed, and the project has not yet been approved for free code signing by the SignPath Foundation. The policy it will follow is in [docs/recorder/CODE-SIGNING-POLICY.md](docs/recorder/CODE-SIGNING-POLICY.md).
+In force since 0.1.0 alpha 3. Every release is signed by the publisher, Jason Wrench, and every signature is timestamped. The policy, the team roles and the privacy policy are in [docs/recorder/CODE-SIGNING-POLICY.md](docs/recorder/CODE-SIGNING-POLICY.md).
+
+## Check for updates
+
+The Help tab has a **Check for updates** button. Only when it is pressed, the program asks GitHub's list of this project's releases whether a newer version is published, and says so; nothing is downloaded or installed, and nothing about you or your recordings is sent. It can be turned off on a computer. See [docs/recorder/UPDATE-CHECK.md](docs/recorder/UPDATE-CHECK.md).
 
 ## Licence
 

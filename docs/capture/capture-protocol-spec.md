@@ -107,7 +107,7 @@ Waits for the author to click a window, so the window to record can be chosen wi
 
 ### `cameras`
 
-Lists the cameras this computer has (story A2), numbered from 1 in the order Windows lists them, to choose one with `record --camera`. Each is written out as `number. name`. Option: `--plain`. It sends one `check` named `cameras`: `ok` is true with a sentence that lists them (`3 cameras were found: 1. NexiGo Iris 4K Webcam; 2. ...`), or false with a sentence that says none was found and what to check (that it is plugged in, listed in Windows' Settings and not in use by another program), or that Windows would not list them. Exit code 0 when there is at least one, 1 when there is none or Windows would not list them, 2 when this is not Windows.
+Lists the cameras this computer has (story A2), numbered from 1 in the order Windows lists them, to choose one with `record --camera`. Each is written out as `number. name`. Option: `--plain`. It sends one `check` named `cameras`: `ok` is true with a sentence that lists them (`3 cameras were found: 1. USB Camera; 2. ...`), or false with a sentence that says none was found and what to check (that it is plugged in, listed in Windows' Settings and not in use by another program), or that Windows would not list them. Exit code 0 when there is at least one, 1 when there is none or Windows would not list them, 2 when this is not Windows.
 
 ### `interactions`
 

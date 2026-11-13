@@ -15,10 +15,11 @@ use std::ffi::c_void;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use windows::core::{BOOL, PWSTR};
-use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, RECT};
+use windows::Win32::Foundation::{CloseHandle, ERROR_INVALID_PARAMETER, HWND, LPARAM, RECT, STILL_ACTIVE};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::System::Threading::{
-    GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    GetCurrentProcessId, GetExitCodeProcess, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+    PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindow, GetWindowLongW, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
@@ -217,6 +218,22 @@ pub(crate) unsafe fn program_name(process_id: u32) -> String {
     }
 }
 
+/// Whether a process with this number is running. Only a number Windows says belongs to no process, or a process that has
+/// ended, counts as not running; a process Windows will not let this program look at counts as running.
+pub(crate) fn process_running(process_id: u32) -> bool {
+    unsafe {
+        match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id) {
+            Ok(process) => {
+                let mut code = 0u32;
+                let told = GetExitCodeProcess(process, &mut code).is_ok();
+                let _ = CloseHandle(process);
+                !told || code == STILL_ACTIVE.0 as u32
+            }
+            Err(e) => e.code() != ERROR_INVALID_PARAMETER.to_hresult(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,6 +242,17 @@ mod tests {
         CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_MINIMIZE,
         SW_SHOWNOACTIVATE, WINDOW_EX_STYLE, WS_OVERLAPPEDWINDOW, WS_VISIBLE,
     };
+
+    #[test]
+    fn a_running_process_is_told_from_one_that_has_ended() {
+        assert!(process_running(std::process::id()), "this test itself is running");
+        let mut child =
+            std::process::Command::new("cmd.exe").args(["/c", "exit", "0"]).spawn().expect("a short program starts");
+        let number = child.id();
+        child.wait().expect("it ends");
+        // The child's handle is still held here, so the number is not reused yet: Windows reports the process as ended.
+        assert!(!process_running(number), "an ended process");
+    }
 
     /// A real window, made with Windows' own plain "STATIC" kind, shown without taking the focus.
     unsafe fn window(title: &str, x: i32, y: i32) -> HWND {

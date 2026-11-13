@@ -65,7 +65,7 @@ pub struct InteractionInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CameraInfo {
-    /// The camera's name as Windows gives it, such as "NexiGo Iris 4K Webcam".
+    /// The camera's name as Windows gives it, such as "USB Camera".
     pub name: String,
 }
 
@@ -334,7 +334,7 @@ mod tests {
                 container: "fragmented-mp4".into(),
                 mix: None,
                 region: None,
-                camera: Some(CameraInfo { name: "NexiGo Iris 4K Webcam".into() }),
+                camera: Some(CameraInfo { name: "USB Camera".into() }),
                 interactions: None,
             },
         ];
@@ -342,7 +342,7 @@ mod tests {
         assert_eq!(read_take(dir.path(), 1).unwrap().media, media);
         let text = std::fs::read_to_string(take_dir(dir.path(), 1).join("take.json")).unwrap();
         assert!(
-            text.contains(r#""camera":{"name":"NexiGo Iris 4K Webcam"}"#) || text.contains("\"camera\": {"),
+            text.contains(r#""camera":{"name":"USB Camera"}"#) || text.contains("\"camera\": {"),
             "{text}"
         );
         assert_eq!(text.matches("\"camera\"").count(), 1, "only the webcam's entry says which camera");

@@ -7,8 +7,11 @@
 //!
 //! The recording program, `openstage-capture`, is a separate program. Nothing here records anything. Each line it prints reaches the page
 //! untouched as a `stream-line` event, and the end of a run as a `stream-exit` event.
+//!
+//! The only time the program goes online is Check for updates on the Help tab, when it is pressed: one request, made here (`updates.rs` in
+//! app/core), never by the page, whose content security policy allows only this channel.
 
-use openstage_recorder_core::{files, hotkeys, program, stream, tray};
+use openstage_recorder_core::{files, hotkeys, program, recorder_args, stream, tray, updates};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tauri::menu::{Menu, MenuItem};
@@ -94,12 +97,14 @@ fn capture_check() -> Result<String, String> {
     program::capture_program().map(|p| p.to_string_lossy().into_owned())
 }
 
-/// Start the recorder. Each line it prints reaches the page as a `stream-line` event, and its end as a `stream-exit` event.
+/// Start the recorder. Each line it prints reaches the page as a `stream-line` event, and its end as a `stream-exit` event. Only the
+/// commands and options the window uses are accepted (`recorder_args.rs` in app/core), so the page cannot choose where files are written.
 #[tauri::command]
 fn stream_start(app: tauri::AppHandle, args: Vec<String>) -> Result<(), String> {
-    if args.len() > 32 || args.iter().any(|a| a.len() > 2000 || a.contains('\0')) {
+    if args.len() > 64 || args.iter().any(|a| a.len() > 2000 || a.contains('\0')) {
         return Err("Those are not options the recorder can be started with.".into());
     }
+    recorder_args::check(&args)?;
     let program = program::capture_program()?;
     let for_lines = app.clone();
     stream::start(
@@ -295,6 +300,32 @@ fn make_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+// ---- Check for updates (the Help tab)
+
+/// The release this copy was built as, such as 0.1.0-alpha.4, or empty when it was not built by the installer script.
+#[tauri::command]
+fn recorder_release() -> String {
+    updates::release().to_string()
+}
+
+/// Check for updates, when the person asks: whether a newer version is published, in words, with its page. Nothing is installed.
+#[tauri::command]
+async fn check_for_updates() -> Result<String, String> {
+    let program_dir = std::env::current_exe().ok().and_then(|exe| exe.parent().map(Path::to_path_buf));
+    tauri::async_runtime::spawn_blocking(move || updates::check(program_dir.as_deref()).to_string())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Open a page of this program's releases in the person's own browser. Nothing else can be opened from the page.
+#[tauri::command]
+fn open_release_page(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    if !updates::is_release_page(&url) {
+        return Err("Only the pages of OpenStage Recorder's releases can be opened from here.".into());
+    }
+    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
 // ---- the program
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -332,6 +363,9 @@ pub fn run() {
             window_restore,
             tray_set_tooltip,
             copy_text,
+            recorder_release,
+            check_for_updates,
+            open_release_page,
         ])
         .on_window_event(|window, event| {
             // If the window is gone, a recording must not carry on with nothing to command it, and the keys are let go.

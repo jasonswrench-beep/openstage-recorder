@@ -14,8 +14,10 @@ use std::process::Command;
 pub mod files;
 pub mod hotkeys;
 pub mod program;
+pub mod recorder_args;
 pub mod stream;
 pub mod tray;
+pub mod updates;
 
 /// Tests that use the one recorder slot take turns, because the slot is shared by the whole program.
 #[cfg(test)]

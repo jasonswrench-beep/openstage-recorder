@@ -85,7 +85,7 @@ A take holds its media in **one of two ways**. A real screen recording is one `s
     { "file": "mic.wav", "kind": "microphone", "container": "wav" },
     { "file": "system.wav", "kind": "system-audio", "container": "wav" },
     { "file": "webcam.mp4", "kind": "webcam", "container": "fragmented-mp4",
-      "camera": { "name": "NexiGo Iris 4K Webcam" } },
+      "camera": { "name": "USB Camera" } },
     { "file": "events.jsonl", "kind": "interactions", "container": "jsonl",
       "interactions": { "display": 1, "keys": true } }
   ]

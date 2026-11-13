@@ -7,6 +7,7 @@
 
 import type { RecorderBackend } from "./backend.ts";
 import type { CaptureCheck, HotkeyBinding, HotkeyResult, StreamExit, StreamState } from "./recorder.ts";
+import { isReleasePage } from "./updates.ts";
 
 /** What a test can do to the pretend recorder, and see of it. */
 export interface StandInControls {
@@ -38,6 +39,10 @@ export interface StandInControls {
   windowCalls: string[];
   /** The icon's tooltip as last set. */
   tooltip: string;
+  /** What Check for updates answers in the preview (the shell's JSON). The preview never goes online. */
+  updateAnswer: string;
+  /** The release pages the app asked to open. */
+  openedPages: string[];
 }
 
 declare global {
@@ -57,7 +62,7 @@ const REAL_SOURCES = [
   { id: "camera:1", available: true, note: "Camera 1: Pretend webcam. Record it with: record --source screen --camera 1. It goes into webcam.mp4, beside the screen video." },
 ];
 
-const WINDOWS = ["1. notepad.exe: Notes (800 by 600)", "2. WINWORD.EXE: Lesson plan - Word (1920 by 1032)", "3. chrome.exe: Week 3 - Google Chrome (1920 by 1032)"];
+const WINDOWS = ["1. notepad.exe: Notes (800 by 600)", "2. editor.exe: Lesson plan - Editor (1920 by 1032)", "3. browser.exe: Week 3 - Browser (1920 by 1032)"];
 
 const SETUP_CHECKS: [string, string][] = [
   ["windows-version", "Windows 11, build 26200. Screen capture needs Windows 10 version 1903 or later."],
@@ -172,7 +177,7 @@ class PretendRecorder {
           this.emit({ event: "check", check: "pick-window", ok: true, message: "Click the window you want to record. The click only chooses it: the window does not get the click, so nothing in it is pressed. Press Escape to cancel. This waits up to 30 seconds." });
           if (this.pick === "window") {
             this.emit({ event: "check", check: "window", ok: true, message: WINDOWS[1] ?? "" });
-            this.emit({ event: "check", check: "window-chosen", ok: true, message: `Chosen: ${WINDOWS[1] ?? ""}. To record it, use --window "Lesson plan - Word".` });
+            this.emit({ event: "check", check: "window-chosen", ok: true, message: `Chosen: ${WINDOWS[1] ?? ""}. To record it, use --window "Lesson plan - Editor".` });
             this.end(0);
           } else {
             const why = this.pick === "cancel" ? "Escape was pressed, so no window was chosen." : "No window was clicked within 30 seconds, so none was chosen.";
@@ -429,6 +434,12 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     failNextCopy: false,
     windowCalls: [],
     tooltip: "OpenStage Recorder",
+    updateAnswer: JSON.stringify({
+      state: "newer",
+      message: "A newer version is published: 0.1.0 alpha 99 (this copy is 0.1.0 alpha 4). This is the preview's pretend answer: nothing was checked.",
+      url: "https://github.com/jasonswrench-beep/openstage-recorder/releases/tag/v0.1.0-alpha.99",
+    }),
+    openedPages: [],
   };
   if (typeof window !== "undefined") window.__openstageStandIn = controls;
   const recorder = new PretendRecorder(speed, files);
@@ -539,6 +550,16 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     },
     async windowRestore() {
       controls.windowCalls.push("restore");
+    },
+    async recorderRelease() {
+      return "0.1.0-alpha.4";
+    },
+    async checkForUpdates() {
+      return controls.updateAnswer;
+    },
+    async openReleasePage(url) {
+      if (!isReleasePage(url)) throw new Error("Only the pages of OpenStage Recorder's releases can be opened from here.");
+      controls.openedPages.push(url);
     },
     async confirm(message) {
       return window.confirm(message);
