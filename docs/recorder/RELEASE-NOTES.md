@@ -16,7 +16,7 @@ The fixes from an independent security review of 2026-11-13, which found no high
 - **The build workflow on GitHub cannot publish.** It builds unsigned copies for checking; releases are built and signed on the owner's computer, and every program in the setup must be signed and timestamped (`CODE-SIGNING-POLICY.md`).
 - Generic names in the tests and the design documents instead of other companies' product names.
 
-Not tried yet: nobody has installed this release by hand; Check for updates has been tried against GitHub from the program's own code in a test, not from the installed window; no screen reader has been used with the Updates section.
+Tried after it was published: installed over alpha 3 on the publisher's computer, and Check for updates pressed in the installed window; it works. Not tried yet: nobody else has installed this release, and no screen reader has been used with the Updates section.
 
 ## 0.1.0 alpha 3 (2026-11-12)
 
