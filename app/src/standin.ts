@@ -41,6 +41,9 @@ export interface StandInControls {
   tooltip: string;
   /** What Check for updates answers in the preview (the shell's JSON). The preview never goes online. */
   updateAnswer: string;
+  /** While true, Check for updates does not answer until `answerUpdate()` is called: a way to look at the button while it is busy. */
+  holdUpdate: boolean;
+  answerUpdate: () => void;
   /** The release pages the app asked to open. */
   openedPages: string[];
 }
@@ -72,7 +75,7 @@ const SETUP_CHECKS: [string, string][] = [
   ["sound-encoder", "Windows can make AAC sound on this computer."],
   ["microphone", "1 microphone found: Microphone (Pretend USB), the default."],
   ["sound-output", "The computer's own sound can be recorded from Speakers (Pretend)."],
-  ["camera", "1 camera found: Pretend webcam."],
+  ["camera", "1 camera found: Pretend webcam. A webcam is recorded only when you ask for it, with record --camera and its number."],
   ["disk-space", "There is room for about 40 hours of recording."],
 ];
 
@@ -106,6 +109,8 @@ class PretendRecorder {
   pick: "window" | "none" | "cancel" = "window";
   /** What the author asked to have noted (`--interactions`): `off`, `no-keys` or `on`. A practice recording never notes anything. */
   private interactions = "off";
+  /** The recording is a practice (`--source synthetic`): the real program writes `["synthetic"]` for a take's `sources`, and `["screen:N"]` for a real one. */
+  private sourceWords: string[] = ["screen:1"];
   /** The part of the display recorded (`--region`): left, top, width and height; absent for the whole display. */
   private region: { x: number; y: number; width: number; height: number } | undefined;
   /** A video that never finishes by itself: it runs until it is stopped. */
@@ -157,6 +162,7 @@ class PretendRecorder {
     this.system = (opt("--output") ?? "none") !== "none";
     this.gains = { microphoneGainDb: Number(opt("--mic-gain-db") ?? 0), systemGainDb: Number(opt("--system-gain-db") ?? 0) };
     this.interactions = (opt("--source") ?? "") === "synthetic" ? "off" : (opt("--interactions") ?? "off");
+    this.sourceWords = (opt("--source") ?? "") === "synthetic" ? ["synthetic"] : [`screen:${opt("--display") ?? "1"}`];
     this.hidden = args.flatMap((a, i) => (a === "--hide" ? [args[i + 1] ?? ""] : []));
     const box = (opt("--region") ?? "").split(/[,\s]+/).map(Number);
     this.region = box.length === 4 && box.every((n) => Number.isFinite(n)) ? { x: box[0] ?? 0, y: box[1] ?? 0, width: box[2] ?? 0, height: box[3] ?? 0 } : undefined;
@@ -299,7 +305,7 @@ class PretendRecorder {
     for (const t of this.takes) {
       const dir = `${name}/takes/take-${String(t.take).padStart(3, "0")}`;
       const noted = this.interactions !== "off";
-      this.files.set(`${dir}/take.json`, JSON.stringify({ id: t.take, state: t.state, durationMs: t.ms, media: [
+      this.files.set(`${dir}/take.json`, JSON.stringify({ id: t.take, state: t.state, sources: this.sourceWords, durationMs: t.ms, media: [
         { file: "screen.mp4", kind: "screen", mix: this.gains, ...(this.region === undefined ? {} : { region: { display: 1, ...this.region } }) },
         { file: "mic.wav", kind: "microphone" },
         ...(this.system ? [{ file: "system.wav", kind: "system-audio" }] : []),
@@ -439,6 +445,8 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
       message: "A newer version is published: 0.1.0 alpha 99 (this copy is 0.1.0 alpha 4). This is the preview's pretend answer: nothing was checked.",
       url: "https://github.com/jasonswrench-beep/openstage-recorder/releases/tag/v0.1.0-alpha.99",
     }),
+    holdUpdate: false,
+    answerUpdate: () => { /* set while an answer is held */ },
     openedPages: [],
   };
   if (typeof window !== "undefined") window.__openstageStandIn = controls;
@@ -555,6 +563,7 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
       return "0.1.0-alpha.4";
     },
     async checkForUpdates() {
+      if (controls.holdUpdate) await new Promise<void>((resolve) => { controls.answerUpdate = resolve; });
       return controls.updateAnswer;
     },
     async openReleasePage(url) {

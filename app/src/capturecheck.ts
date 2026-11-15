@@ -6,6 +6,7 @@
 // This file is the plain part: reading those lines, naming each check for a person, and saying in one sentence how it went. The screen that
 // shows them is recorderview.ts.
 
+import { plainWords } from "./capturesession.ts";
 import type { StreamExit } from "./recorder.ts";
 
 /** How long the check may take before it is stopped. It takes a few seconds; this is only a safety net. */
@@ -60,7 +61,8 @@ export function parseFinding(line: string): Finding | null {
   if (typeof data !== "object" || data === null) return null;
   const d = data as Record<string, unknown>;
   if (d["event"] !== "check" || typeof d["check"] !== "string" || d["check"] === "" || typeof d["ok"] !== "boolean") return null;
-  const message = typeof d["message"] === "string" ? d["message"].trim().slice(0, MAX_MESSAGE) : "";
+  // The recorder's words were written for a command line: a sentence that names one of its options is put in the words of this window's boxes.
+  const message = typeof d["message"] === "string" ? plainWords(d["message"].trim().slice(0, MAX_MESSAGE)) : "";
   return { check: d["check"].slice(0, 80), label: labelFor(d["check"]), ok: d["ok"], message: message === "" ? "The recorder gave no details." : message };
 }
 

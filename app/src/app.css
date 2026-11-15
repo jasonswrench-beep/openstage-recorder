@@ -308,6 +308,28 @@ body {
   display: none;
 }
 
+/*
+ * The clip list's column headings are short words that must never be broken in the middle ("Star t"). The window lets any text break anywhere so
+ * that a long path cannot push the page wider, but in a table that also lets the browser squeeze the columns until the headings break. The
+ * headings stay whole (the table scrolls sideways if it ever has to), and a long clip name in a cell breaks only when it cannot fit at all.
+ */
+.ev .os-cl-table thead th {
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: nowrap;
+}
+
+.ev .os-cl-table tbody th,
+.ev .os-cl-table tbody td {
+  overflow-wrap: break-word;
+}
+
+/* Whole headings need a little more room; the cells give it up at the sides, so all seven columns, State included, still fit the panel at about 1140 pixels. */
+.ev .os-cl-table th,
+.ev .os-cl-table td {
+  padding-inline: 0.25rem;
+}
+
 .rv-status {
   position: sticky;
   top: 0;

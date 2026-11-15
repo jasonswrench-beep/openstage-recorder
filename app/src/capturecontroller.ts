@@ -162,7 +162,7 @@ export class RecorderController {
     if (this.busy) return "A recording is already going.";
     const problem = settingsProblem(settings);
     if (problem) return problem;
-    this.publish({ ...initialSession(folder), phase: "starting" }, ["Starting the recorder."]);
+    this.publish({ ...initialSession(folder, settings.practice), phase: "starting" }, ["Starting the recorder."]);
     try {
       this.offs.push(await this.b.onStreamLine((line) => this.line(line)));
       this.offs.push(await this.b.onStreamExit((exit) => void this.exited(exit)));

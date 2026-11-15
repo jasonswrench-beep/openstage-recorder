@@ -83,3 +83,13 @@ test("the recorder is asked only for its setup check, with the folder when there
   assert.deepEqual(checkArguments("D:/Courses/Safety"), ["setup-check", "--dir", "D:/Courses/Safety"]);
   assert.ok(CHECK_LIMIT_MS >= 30_000 && CHECK_LIMIT_MS <= 120_000, "long enough for a slow computer, short enough that a stuck check is stopped");
 });
+
+test("a finding that names one of the recorder's command line options is read in the words of this window's boxes", () => {
+  const message = "Camera 1: USB Camera. A webcam is recorded only when you ask for it, with record --camera and its number.";
+  const f = parseFinding(JSON.stringify({ event: "check", check: "camera", ok: true, message }));
+  assert.ok(f !== null);
+  assert.ok(!f.message.includes("--"), f.message);
+  assert.equal(f.message, "Camera 1: USB Camera. A webcam is recorded only when you ask for it, by choosing it in the list called A webcam.");
+  const other = parseFinding(JSON.stringify({ event: "check", check: "disk-space", ok: true, message: "42 GB is free." }));
+  assert.equal(other?.message, "42 GB is free.", "a finding with nothing to change comes back as it was");
+});

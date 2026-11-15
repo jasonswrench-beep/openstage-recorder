@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   applyLine, commandLine, plainWords, soundAdvice, defaultSettings, describeSession, formatTime, initialSession, keyAction, parseProbe, parseWindow, recordArgs, recordingFolderName, recordingPath,
-  hideWords, safeName, settingsProblem, STOP_LINE, type RecordSettings, type Session,
+  hasRecording, hideWords, nameNotice, safeName, settingsProblem, STOP_LINE, uniqueName, type RecordSettings, type Session,
 } from "./capturesession.ts";
 
 const settings = (over: Partial<RecordSettings> = {}): RecordSettings => ({ ...defaultSettings(), ...over });
@@ -434,3 +434,51 @@ test("the notes about the short sounds and the webcam do not name command line o
   assert.equal(plainWords("Something else the recorder says."), "Something else the recorder says.");
 });
 
+
+test("the computer check's camera sentence does not name a command either", () => {
+  const sentence = "Camera 1: USB Camera. A webcam is recorded only when you ask for it, with record --camera and its number.";
+  const said = plainWords(sentence);
+  assert.ok(!said.includes("--"), said);
+  assert.equal(said, "Camera 1: USB Camera. A webcam is recorded only when you ask for it, by choosing it in the list called A webcam.");
+});
+
+// ---- the name of a recording, and what becomes of it ----
+
+test("a name that is kept as typed says nothing; a name that is changed says what it became, and why", () => {
+  assert.equal(nameNotice("Week 3 demo"), "");
+  assert.equal(nameNotice("  Lab_1 - setup  "), "", "spaces round the name are not a change worth saying");
+  assert.equal(nameNotice("Caf\u00e9 \u00e0 Paris"), "", "letters of any language are kept");
+  assert.equal(nameNotice("Week 3: part 1/2"), "This recording will be called Week 3 part 1 2, because its name can have only letters, numbers, spaces, hyphens and underscores, and at most 60 characters.");
+  assert.match(nameNotice("x".repeat(80)), /^This recording will be called x{60}, because/);
+  assert.equal(nameNotice("***"), "", "no name at all is a problem of its own, said by settingsProblem");
+  assert.equal(nameNotice(""), "");
+});
+
+test("a recording folder is found whatever the case of its letters, because Windows does not tell them apart", () => {
+  const folder = ["Week 3.capture", "Recording 2026-11-15 1405.capture"];
+  assert.equal(hasRecording(folder, "Week 3"), true);
+  assert.equal(hasRecording(folder, "week 3"), true);
+  assert.equal(hasRecording(folder, "  WEEK 3  "), true);
+  assert.equal(hasRecording(folder, "Week 4"), false);
+  assert.equal(hasRecording([], "Week 3"), false);
+});
+
+test("a fresh name is never one that is already used: a number is added when it has to be", () => {
+  assert.equal(uniqueName("Recording 2026-11-15 1405", []), "Recording 2026-11-15 1405");
+  assert.equal(uniqueName("Recording 2026-11-15 1405", ["Other.capture"]), "Recording 2026-11-15 1405");
+  assert.equal(uniqueName("Recording 2026-11-15 1405", ["Recording 2026-11-15 1405.capture"]), "Recording 2026-11-15 1405 2");
+  assert.equal(uniqueName("Recording 2026-11-15 1405", ["Recording 2026-11-15 1405.capture", "recording 2026-11-15 1405 2.capture"]), "Recording 2026-11-15 1405 3");
+  const long = "y".repeat(60);
+  const made = uniqueName(long, [`${long}.capture`]);
+  assert.ok(made.length <= 60, "the number does not make the name too long");
+  assert.ok(made.endsWith(" 2"));
+  assert.equal(hasRecording([`${long}.capture`], made), false);
+});
+
+test("a session says whether it was a practice, and keeps saying so as the recorder's lines come in", () => {
+  assert.equal(initialSession("F:/c/Demo.capture").practice, false);
+  const practice = initialSession("F:/c/Demo.capture", true);
+  assert.equal(practice.practice, true);
+  const { session } = play([line({ event: "state", state: "recording", take: 1 })], practice);
+  assert.equal(session.practice, true);
+});

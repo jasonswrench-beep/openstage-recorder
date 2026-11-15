@@ -99,6 +99,23 @@ test("starting asks the recorder for the author's choices and sets up the keys t
   assert.deepEqual(SESSION_KEYS.map((k) => k.keys), ["Ctrl+Shift+F10", "Ctrl+Shift+F11", "Ctrl+Shift+F12"]);
 });
 
+test("a recording started as a practice stays a practice until the author is done with it, and a real one never is", async () => {
+  const { c, fake } = await started({ practice: true });
+  assert.equal(c.session.practice, true);
+  fake.say(line({ event: "hello", protocol: "0.1", program: "openstage-capture" }));
+  fake.say(recording());
+  assert.equal(c.session.practice, true, "it stays one as the recorder's lines come in");
+  fake.say(line({ event: "result", ok: true, project: FOLDER, take: 1, state: "complete", durationMs: 1000, segments: 1 }));
+  fake.end(exit());
+  await settle();
+  assert.equal(c.session.phase, "finished");
+  assert.equal(c.session.practice, true, "and after it finishes, so the screen can say there is nothing to edit");
+  c.dismiss();
+  assert.equal(c.session.practice, false, "being done with it clears it");
+  const real = await started({ practice: false });
+  assert.equal(real.c.session.practice, false);
+});
+
 test("a second recording cannot start while one is going", async () => {
   const { fake, c } = await started();
   assert.equal(await c.start(defaultSettings(), FOLDER), "A recording is already going.");

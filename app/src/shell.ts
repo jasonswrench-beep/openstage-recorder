@@ -64,8 +64,13 @@ export function updatesSection(u: UpdateChecks): HTMLElement {
   const open = h("button", { type: "button", class: "os-cl-button rv-primary", id: "update-open" }, "Open the releases page");
   open.hidden = true;
   let page: string | undefined;
+  let checking = false;
   check.addEventListener("click", () => {
-    check.disabled = true;
+    // The button is only marked busy, never disabled: a disabled button loses keyboard focus, and a keyboard or screen reader user would be
+    // dropped at the top of the window. A second press while the first is still running is answered in words and does nothing.
+    if (checking) { said.textContent = "Still checking. Please wait a moment."; return; }
+    checking = true;
+    check.setAttribute("aria-disabled", "true");
     open.hidden = true;
     page = undefined;
     said.textContent = "Checking...";
@@ -79,7 +84,7 @@ export function updatesSection(u: UpdateChecks): HTMLElement {
           open.hidden = false;
         }
       })
-      .finally(() => { check.disabled = false; });
+      .finally(() => { checking = false; check.removeAttribute("aria-disabled"); });
   });
   open.addEventListener("click", () => {
     if (page === undefined) return;

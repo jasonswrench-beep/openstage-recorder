@@ -18,7 +18,7 @@ import { errorText, type RecorderBackend } from "./backend.ts";
 import { CHECK_LIMIT_MS, checkArguments, parseFinding, summarise, type Finding } from "./capturecheck.ts";
 import { runOneShot, type RecorderController } from "./capturecontroller.ts";
 import {
-  describeSession, formatTime, MAX_COUNTDOWN, MAX_GAIN_DB, MIN_GAIN_DB, parseProbe, parseWindow, recordingFolderName, recordingPath, settingsProblem,
+  describeSession, formatTime, hasRecording, MAX_COUNTDOWN, MAX_GAIN_DB, MIN_GAIN_DB, nameNotice, parseProbe, parseWindow, recordingPath, safeName, settingsProblem, uniqueName,
   type RecordSettings, type Session, type Source, type Target, type WindowChoice,
 } from "./capturesession.ts";
 import { recordingNameOf } from "./recordingfolder.ts";
@@ -72,6 +72,8 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   let checking = false;
   let busyQuery = false;
   let existing: string[] = [];
+  /** The phase the last change of the session showed, so a change into "finished" or "failed" is seen once. */
+  let lastPhase: Session["phase"] = c.session.phase;
   const uid = nextId("rv");
   const id = (name: string): string => `${uid}-${name}`;
 
@@ -266,6 +268,8 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   const markers = h("ul", { class: "rv-list", "aria-label": "Markers" });
   const notes = h("ul", { class: "rv-list", "aria-label": "What the recorder said" });
   const where = h("p", { id: id("where") });
+  const practiceDone = h("p", { class: "rv-note", id: id("practice-done"), hidden: true },
+    "This was a practice. Nothing on your screen was recorded, so there is nothing to edit. Press Done to get ready for a real recording: Practice is then switched off.");
   const show = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "folder-open"), "Show the recording in its folder");
   const done = h("button", { type: "button", class: "os-cl-button" }, uiIcon(document, "circle-check"), "Done");
   const editNow = h("button", { type: "button", class: "os-cl-button rv-primary" }, uiIcon(document, "scissors"), "Edit the recording I just made");
@@ -288,7 +292,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     h("div", { class: "rv-live-cards" },
       h("div", { class: "rv-card" }, h("h3", {}, uiIcon(document, "bookmark-plus"), h("span", {}, "Markers")), markers),
       h("div", { class: "rv-card" }, h("h3", {}, uiIcon(document, "list-checks"), h("span", {}, "What the recorder said")), notes)),
-    where, doneRow);
+    where, practiceDone, doneRow);
 
   // ---- the recordings already made
   const folderText = h("p", { id: id("folder") });
@@ -332,7 +336,8 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
         h("div", { class: "rv-rec-body" },
           h("h3", { class: "rv-rec-name", id: nameId }, s.title),
           h("p", { class: "rv-rec-details" }, detailsText(s, now)),
-          h("p", { class: `rv-rec-badge${s.edited ? " is-edited" : ""}` }, s.edited ? "Edited" : "Not edited yet")),
+          // A practice is said first, in words: it has a made-up picture and sound, whether or not it was ever opened in the editor.
+          h("p", { class: `rv-rec-badge${s.edited && !s.practice ? " is-edited" : ""}` }, s.practice ? "Practice: nothing on the screen was recorded" : s.edited ? "Edited" : "Not edited yet")),
         h("div", { class: "rv-rec-actions" }, edit, reveal));
     }));
     if (focusKey !== "") [...recList.querySelectorAll<HTMLElement>("[data-key]")].find((el) => el.dataset["key"] === focusKey)?.focus();
@@ -403,8 +408,10 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     windowGroup.hidden = chosen !== "window";
     regionGroup.hidden = chosen !== "region";
     const why = busyQuery ? "Looking at what this computer has." : (ready() ?? "");
-    const again = existing.includes(recordingFolderName(name.value)) ? `A recording called ${name.value.trim()} already exists. Recording again adds another take to it. Change the name to start a new recording.` : "";
-    problem.textContent = why !== "" ? why : again;
+    // What the typed name becomes is said before Start is pressed, so the folder's name is never a surprise; and a name already used is said too.
+    const changed = why === "" ? nameNotice(name.value) : "";
+    const again = hasRecording(existing, name.value) ? `A recording called ${safeName(name.value)} already exists. Recording again adds another take to it. Change the name to start a new recording.` : "";
+    problem.textContent = why !== "" ? why : [changed, again].filter((t) => t !== "").join(" ");
     start.setAttribute("aria-disabled", why === "" ? "false" : "true");
     if (why === "") start.removeAttribute("aria-disabled");
     if (opts.quick !== undefined) {
@@ -431,7 +438,9 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     markerRow.hidden = over;
     doneRow.hidden = !over;
     show.hidden = session.phase !== "finished" || session.folder === "";
-    editNow.hidden = show.hidden;
+    // A practice has a made-up picture and sound, so there is nothing in it to edit: the button is not offered, and the heading says why.
+    editNow.hidden = show.hidden || session.practice;
+    practiceDone.hidden = !(session.practice && session.phase === "finished");
     liveTitle.textContent = session.phase === "finished" ? "Finished" : session.phase === "failed" ? "The recording did not finish" : "Recording";
     markers.replaceChildren(...session.markers.map((m) => h("li", {}, `${formatTime(m.elapsedMs)}${m.label ? `: ${m.label}` : ""}`)));
     notes.replaceChildren(...session.notes.map((n) => h("li", {}, h("strong", { class: n.ok ? "rv-pass" : "rv-problem" }, n.ok ? "Note. " : "Problem. "), h("span", {}, n.text))));
@@ -467,11 +476,20 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   });
 
   const unsubscribe = c.subscribe((session, messages) => {
+    const before = lastPhase;
+    lastPhase = session.phase;
+    const isOver = (p: Session["phase"]): boolean => p === "finished" || p === "failed";
+    // When the recording ends, the buttons that had the keyboard's focus (Stop, Pause) are hidden, and a hidden button loses it: the keyboard
+    // would then start again from the top of the window. So when the focus was on one of them, or nowhere, it goes to the heading that says
+    // how it ended ("Finished", or "The recording did not finish"). Focus that is somewhere else, such as another tab, is left alone.
+    const active = document.activeElement;
+    const focusWasHere = !isOver(before) && isOver(session.phase) && (active === null || active === document.body || live.contains(active));
     showSession(session);
     if (messages.length > 0) {
       say(messages);
       opts.announce?.(messages.join(" "));
     }
+    if (focusWasHere) liveTitle.focus();
     if (session.phase === "finished") void refreshRecordings();
   });
 
@@ -489,12 +507,15 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
       say([`The recordings folder could not be used. ${errorText(err)}`]);
       return;
     }
+    const changed = nameNotice(chosen.name);
     const message = await c.start(chosen, recordingPath(library, chosen.name));
     if (message !== null) {
       say([message]);
       return;
     }
     liveTitle.focus();
+    // The name was changed to fit a folder's name: said again here, in the status line, because the note beside the button is not read out by itself.
+    if (changed !== "") say([changed]);
   });
   async function startQuick(fromTray = false): Promise<string | null> {
     const quick = opts.quick;
@@ -542,10 +563,15 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     }
   });
   done.addEventListener("click", () => {
+    const wasPractice = c.session.practice;
+    const justMade = recordingNameOf(c.session.folder);
     c.dismiss();
     opts.quick?.dismiss();
-    name.value = freshName();
-    say([]);
+    // A practice is never meant to be kept as the next choice: the box is cleared, so the next recording is a real one.
+    if (wasPractice) practice.checked = false;
+    // A new name, never the one just used: two recordings in the same minute would otherwise be one recording with two takes.
+    name.value = uniqueName(freshName(), [...existing, justMade]);
+    say(wasPractice ? ["Practice is switched off. The next recording will record your screen."] : []);
     showSetup();
     start.focus();
   });

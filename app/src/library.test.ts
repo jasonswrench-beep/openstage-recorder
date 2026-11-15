@@ -9,7 +9,7 @@ const take = (state: string, durationMs: number) => JSON.stringify({ id: 1, stat
 
 test("a recording's title, date, length and takes are read from its files; a take set aside is kept but not counted", () => {
   const s = summarize("Week 3.capture", capture("Week 3 walkthrough", "2026-11-10T14:00:00Z"), [take("complete", 60_000), take("setAside", 9_000), take("recovered", 18_000)], "{}");
-  assert.deepEqual(s, { name: "Week 3.capture", title: "Week 3 walkthrough", created: "2026-11-10T14:00:00Z", lengthMs: 78_000, takes: 2, edited: true, problem: "" });
+  assert.deepEqual(s, { name: "Week 3.capture", title: "Week 3 walkthrough", created: "2026-11-10T14:00:00Z", lengthMs: 78_000, takes: 2, edited: true, practice: false, problem: "" });
 });
 
 test("a recording without a title is called by its folder; one whose description cannot be read says so", () => {
@@ -32,7 +32,7 @@ test("the line under a card says how long, how many takes, and when it was made"
 });
 
 test("newest first, oldest first, or A to Z; without a date the folder's name (which starts with the date) stands in", () => {
-  const r = (title: string, created: string | null, name = `${title}.capture`): RecordingSummary => ({ name, title, created, lengthMs: 0, takes: 1, edited: false, problem: "" });
+  const r = (title: string, created: string | null, name = `${title}.capture`): RecordingSummary => ({ name, title, created, lengthMs: 0, takes: 1, edited: false, practice: false, problem: "" });
   const list = [r("Beta", "2026-11-09T10:00:00Z"), r("alpha", "2026-11-10T10:00:00Z"), r("Gamma", "2026-11-08T10:00:00Z")];
   assert.deepEqual(sortRecordings(list, "newest").map((s) => s.title), ["alpha", "Beta", "Gamma"]);
   assert.deepEqual(sortRecordings(list, "oldest").map((s) => s.title), ["Gamma", "Beta", "alpha"]);
@@ -43,7 +43,7 @@ test("newest first, oldest first, or A to Z; without a date the folder's name (w
 });
 
 test("the search fits every word typed, anywhere in the title or the folder's name, ignoring case", () => {
-  const s: RecordingSummary = { name: "Recording 2026-11-10 2214.capture", title: "Week 3 walkthrough", created: null, lengthMs: 0, takes: 1, edited: false, problem: "" };
+  const s: RecordingSummary = { name: "Recording 2026-11-10 2214.capture", title: "Week 3 walkthrough", created: null, lengthMs: 0, takes: 1, edited: false, practice: false, problem: "" };
   assert.ok(matchesSearch(s, "week WALK"));
   assert.ok(matchesSearch(s, "2214"));
   assert.ok(matchesSearch(s, "   "));
@@ -56,4 +56,19 @@ test("the count above the cards", () => {
   assert.equal(countText(1, 1, ""), "1 recording.");
   assert.equal(countText(1, 3, "week"), "1 of 3 recordings fits the search.");
   assert.equal(countText(0, 3, "zzz"), "None of the 3 recordings has those words in its name.");
+});
+
+const takeFrom = (state: string, sources: unknown) => JSON.stringify({ id: 1, state, durationMs: 5_000, sources });
+
+test("a recording is a practice only when every take that counts was made from the made-up source", () => {
+  const made = (takes: string[]) => summarize("P.capture", capture("P"), takes, undefined).practice;
+  assert.equal(made([takeFrom("complete", ["synthetic"])]), true);
+  assert.equal(made([takeFrom("complete", ["synthetic"]), takeFrom("complete", ["synthetic"])]), true);
+  assert.equal(made([takeFrom("complete", ["screen:1"])]), false, "a real screen is not a practice");
+  assert.equal(made([takeFrom("complete", ["synthetic"]), takeFrom("complete", ["screen:1"])]), false, "one real take makes it a real recording");
+  assert.equal(made([takeFrom("setAside", ["screen:1"]), takeFrom("complete", ["synthetic"])]), true, "a take set aside does not count");
+  assert.equal(made([]), false, "nothing recorded is not a practice");
+  assert.equal(made([take("complete", 5_000)]), false, "a take that does not say what it was made from is not called a practice");
+  assert.equal(made([takeFrom("complete", [])]), false);
+  assert.equal(made([takeFrom("complete", "synthetic")]), false, "only a list is read");
 });

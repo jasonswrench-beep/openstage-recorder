@@ -18,6 +18,8 @@ export interface RecordingSummary {
   takes: number;
   /** Whether it has a saved edit. */
   edited: boolean;
+  /** It was a practice: every take that counts was made from the recorder's made-up picture and sound (`sources` is `synthetic`), so nothing on the screen was recorded. */
+  practice: boolean;
   /** Why it could not be read, or an empty text. */
   problem: string;
 }
@@ -40,15 +42,19 @@ export function summarize(name: string, captureText: string | undefined, takeTex
   const created = typeof capture?.["created"] === "string" && !Number.isNaN(Date.parse(capture["created"])) ? capture["created"] : null;
   let lengthMs = 0;
   let takes = 0;
+  let practised = 0;
   for (const text of takeTexts) {
     const take = object(text);
     if (take === null || take["state"] === "setAside") continue;
     takes++;
     const ms = Number(take["durationMs"]);
     if (Number.isFinite(ms) && ms > 0) lengthMs += ms;
+    const from = take["sources"];
+    if (Array.isArray(from) && from.length > 0 && from.every((x) => x === "synthetic")) practised++;
   }
   const problem = capture === null ? "Its description (capture.json) could not be read, so it may not open." : "";
-  return { name, title, created, lengthMs, takes, edited: editText !== undefined, problem };
+  // Only when every take that counts is a practice: one real take among them makes it a real recording.
+  return { name, title, created, lengthMs, takes, edited: editText !== undefined, practice: takes > 0 && practised === takes, problem };
 }
 
 /** "Today", "Yesterday", or the date in words (November 10, 2026), in the computer's own time. */

@@ -84,6 +84,36 @@ export function recordingFolderName(name: string): string {
   return `${safeName(name)}.capture`;
 }
 
+/** Whether a recording of this name is already in the folder. Windows does not tell `Week 3` from `week 3`, so neither does this. */
+export function hasRecording(existing: readonly string[], name: string): boolean {
+  const folder = recordingFolderName(name).toLocaleLowerCase();
+  return existing.some((e) => e.toLocaleLowerCase() === folder);
+}
+
+/** A name like `base` that no recording in the folder already has: `base`, or else `base 2`, `base 3` and so on. */
+export function uniqueName(base: string, existing: readonly string[]): string {
+  if (!hasRecording(existing, base)) return base;
+  for (let n = 2; n < 1000; n++) {
+    const suffix = ` ${n}`;
+    const candidate = `${safeName(base).slice(0, 60 - suffix.length).trim()}${suffix}`;
+    if (!hasRecording(existing, candidate)) return candidate;
+  }
+  return base;
+}
+
+/**
+ * What the typed name becomes, said in words, or an empty text when it is kept as typed. A name is kept as letters, numbers, spaces, hyphens and
+ * underscores, at most 60 characters long, because it is also the name of the recording's folder. Anything else is turned into a space or cut off,
+ * and the author is told, so the folder's name never comes as a surprise.
+ */
+export function nameNotice(typed: string): string {
+  const kept = safeName(typed);
+  if (kept === "") return "";
+  const asTyped = typed.normalize("NFKC").replace(/\s+/g, " ").trim();
+  if (kept === asTyped) return "";
+  return `This recording will be called ${kept}, because its name can have only letters, numbers, spaces, hyphens and underscores, and at most 60 characters.`;
+}
+
 const isWhole = (text: string): boolean => /^\d{1,6}$/.test(text.trim());
 
 /** What is wrong with the choices, in words, or null if the recorder can be started with them. */
@@ -213,10 +243,12 @@ export interface Session {
   result: { ok: boolean; take: number; state: string; durationMs: number; segments: number } | null;
   /** Why it failed, in words. */
   problem: string;
+  /** It was started as a practice (a made-up picture and sound), so there is nothing on the screen in it to edit. */
+  practice: boolean;
 }
 
-export function initialSession(folder = ""): Session {
-  return { phase: "idle", take: 0, elapsedMs: 0, watching: false, levels: {}, markers: [], notes: [], setAside: 0, folder, result: null, problem: "" };
+export function initialSession(folder = "", practice = false): Session {
+  return { phase: "idle", take: 0, elapsedMs: 0, watching: false, levels: {}, markers: [], notes: [], setAside: 0, folder, result: null, problem: "", practice };
 }
 
 /** The checks the author is always told about when they come, because they say what is being kept. */
@@ -259,7 +291,8 @@ export function plainWords(message: string): string {
   return message
     .replace(/Turn them off with --cues off, or change the volume with --cue-volume\./, "Turn them off with the box about a short sound for each step, under Starting.")
     .replace(/To change it use --cue-volume with a number from 1 to 100; --cues off turns them off\./, "To turn them off, clear the box about a short sound for each step, under Starting.")
-    .replace(/Leave out --camera to record no webcam\./, "To record without it, choose no webcam in the list called A webcam.");
+    .replace(/Leave out --camera to record no webcam\./, "To record without it, choose no webcam in the list called A webcam.")
+    .replace(/with record --camera and its number\./, "by choosing it in the list called A webcam.");
 }
 
 function parseJson(line: string): Record<string, unknown> | null {

@@ -110,9 +110,10 @@ class Helpers {
 }
 
 /** Start a practice recording with the keyboard and leave the recording going. */
-async function startPractice(page, t, { name = "Keyboard demo" } = {}) {
+async function startPractice(page, t, { name = "Keyboard demo", practice = true } = {}) {
   await page.getByLabel("Name of the recording").fill(name);
-  await page.getByLabel(/^Practice/).check();
+  if (practice) await page.getByLabel(/^Practice/).check();
+  else await page.getByLabel(/^Practice/).uncheck();
   await page.getByLabel(/^Countdown/).fill("0");
   await page.getByRole("button", { name: "Start recording" }).focus();
   await t.key("Enter");
@@ -190,6 +191,25 @@ await check("Check for updates on the Help tab says what it found in words, and 
   assertEqual(await page.getByRole("button", { name: /Open the/ }).count(), 0, "up to date: no page is offered");
 });
 
+await check("Check for updates keeps the keyboard's focus on its button while it asks and when the answer comes, and a second press says it is still checking", async (page, t) => {
+  await page.getByRole("tab", { name: "Help" }).click();
+  await t.standIn(() => { window.__openstageStandIn.holdUpdate = true; });
+  const button = page.getByRole("button", { name: "Check for updates" });
+  await button.focus();
+  await t.key("Enter");
+  await page.getByRole("status").filter({ hasText: "Checking..." }).waitFor();
+  assertEqual(await button.getAttribute("aria-disabled"), "true", "the button says it is busy");
+  assertEqual(await button.evaluate((el) => el.disabled), false, "it is not disabled, because a disabled button loses the keyboard's focus");
+  assertEqual(await t.focusLabel(), "Check for updates", "the focus stays on the button while it checks");
+  await t.key("Enter");
+  assertMatch(await page.locator("#update-said").textContent(), /^Still checking\. Please wait a moment\.$/, "pressing again says so, and starts nothing");
+  await t.standIn(() => { window.__openstageStandIn.holdUpdate = false; window.__openstageStandIn.answerUpdate(); });
+  await page.getByRole("button", { name: "Open the new version's page" }).waitFor();
+  assertEqual(await button.getAttribute("aria-disabled"), null, "the button is ready again when the answer comes");
+  assertEqual(await t.focusLabel(), "Check for updates", "and the focus is still on it, where the answer is said");
+  assertMatch(await page.locator("#update-said").textContent(), /^A newer version is published/, "the answer is said");
+});
+
 await check("every box, choice and button has a name a screen reader can use", async (page) => {
   const unnamed = await page.evaluate(() => {
     const named = (el) => {
@@ -251,13 +271,19 @@ await check("a practice recording is started, paused, marked, resumed and stoppe
   await t.key("Enter");
   await page.getByRole("heading", { name: "Finished" }).waitFor();
   assertMatch(await t.said(), /Finished\. Take 1 is complete/, "the end is said");
-  assertEqual(await page.getByRole("button", { name: "Edit the recording I just made" }).isVisible(), true, "editing is offered");
+  assertEqual(await t.focusLabel(), "Finished", "Stop hides itself, so the focus goes to the heading that says it is finished, not to nothing");
+  assertEqual(await page.evaluate(() => document.activeElement?.tagName), "H2", "and it is the heading itself");
+  assertEqual(await page.getByRole("button", { name: "Edit the recording I just made" }).count() === 0 || await page.getByRole("button", { name: "Edit the recording I just made" }).isHidden(), true, "a practice has nothing to edit, so editing is not offered");
+  assertMatch(await page.locator('[id$="-practice-done"]').textContent(), /^This was a practice\. Nothing on your screen was recorded, so there is nothing to edit\./, "and the screen says why");
   assertMatch(await page.locator(".rv-pretend").textContent(), /pretend recording\. Nothing is being recorded, and nothing will be saved on your computer\. To record for real, open the app with OPEN RECORDER\.bat\./, "the preview says the recording is pretend");
   await page.getByRole("button", { name: "Done" }).focus();
   await t.key("Enter");
   assertEqual(await t.focusLabel(), "Start recording", "Done gives the focus back to Start");
+  assertEqual(await page.getByLabel(/^Practice/).isChecked(), false, "Done after a practice switches Practice off, so the next recording is a real one");
+  assertMatch(await t.said(), /Practice is switched off\. The next recording will record your screen\./, "and says so, because a screen reader would not otherwise know");
   const listed = await page.locator(".rv-rec-name").allTextContents();
   assertEqual(listed, ["Keyboard demo"], "the recording is in the list");
+  assertEqual(await page.locator(".rv-rec-badge").allTextContents(), ["Practice: nothing on the screen was recorded"], "its card says it was a practice");
   assertEqual(await page.getByLabel("Name of the recording").evaluate((el) => /^Recording \d{4}-\d\d-\d\d \d{4}$/.test(el.value)), true, "the next recording has a fresh name");
 });
 
@@ -395,6 +421,56 @@ await check("a recording of the same name warns that it will add a take, and the
   assertMatch(await page.locator('[id$="-folder"]').textContent(), /^This preview keeps only pretend recordings, inside this page, until you close it\. The real app keeps recordings in: C:\\Users\\You\\Videos\\OpenStage Recorder$/, "the preview says what is kept and where the real app would keep it");
 });
 
+await check("a name that has to be changed to fit a folder's name says so before Start and again when recording starts, and the recording has the changed name", async (page, t) => {
+  const problem = page.locator('[id$="-problem"]');
+  await page.getByLabel("Name of the recording").fill("Week 3");
+  assertEqual((await problem.textContent()).trim(), "", "a name that is kept as typed says nothing");
+  await page.getByLabel("Name of the recording").fill("Week 3: part 1/2");
+  assertEqual((await problem.textContent()).trim(), "This recording will be called Week 3 part 1 2, because its name can have only letters, numbers, spaces, hyphens and underscores, and at most 60 characters.", "the change is said beside Start");
+  assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-describedby"), await problem.getAttribute("id"), "and Start is described by it, so it is read when Start is reached");
+  assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-disabled"), null, "it is a note, not a block");
+  await startPractice(page, t, { name: "Week 3: part 1/2" });
+  await t.waitNow(/^Recording take 1/);
+  assertMatch(await t.said(), /This recording will be called Week 3 part 1 2, because/, "starting says it again in the status line, where a screen reader hears it");
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  await page.getByRole("button", { name: "Done" }).click();
+  assertEqual(await page.locator(".rv-rec-name").allTextContents(), ["Week 3 part 1 2"], "the recording is called what the note said");
+});
+
+await check("Done never gives the next recording the name just used, even within the same minute, and ignores the case of letters as Windows does", async (page, t) => {
+  // Every new Date() is the same minute, so the fresh names would be the same without the fix.
+  await page.addInitScript(() => {
+    const RealDate = Date;
+    // eslint-disable-next-line no-global-assign
+    window.Date = class extends RealDate { constructor(...a) { if (a.length === 0) super(2026, 10, 15, 14, 5); else super(...a); } };
+  });
+  await page.reload();
+  await page.waitForFunction(() => /^The recording program was/.test(document.querySelector('[id$="-found"]')?.textContent ?? ""));
+  const nameBox = page.getByLabel("Name of the recording");
+  assertEqual(await nameBox.inputValue(), "Recording 2026-11-15 1405", "the first fresh name");
+  await page.getByLabel(/^Practice/).check();
+  await page.getByLabel(/^Countdown/).fill("0");
+  await page.getByRole("button", { name: "Start recording" }).focus();
+  await t.key("Enter");
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  await page.getByRole("button", { name: "Done" }).click();
+  assertEqual(await nameBox.inputValue(), "Recording 2026-11-15 1405 2", "the next name is not the one just used");
+  assertEqual(await page.getByLabel(/^Practice/).isChecked(), false, "and Practice is off");
+  await page.getByLabel(/^Practice/).check();
+  await page.getByRole("button", { name: "Start recording" }).focus();
+  await t.key("Enter");
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("heading", { name: "Finished" }).waitFor();
+  await page.getByRole("button", { name: "Done" }).click();
+  assertEqual(await nameBox.inputValue(), "Recording 2026-11-15 1405 3", "and the one after that is not either");
+  await nameBox.fill("recording 2026-11-15 1405 2");
+  assertMatch(await page.locator('[id$="-problem"]').textContent(), /already exists\. Recording again adds another take/, "a name that differs only in its letters' case is the same recording on Windows, and is said to be");
+});
+
 // ---- the Recordings tab ----
 
 await check("the Recordings tab has a card for each recording with its length and whether it is edited, a search, an order, and New recording", async (page, t) => {
@@ -403,10 +479,12 @@ await check("the Recordings tab has a card for each recording with its length an
   await page.getByRole("button", { name: "New recording" }).click();
   assertEqual(await page.getByRole("tab", { name: "Record", exact: true }).getAttribute("aria-selected"), "true", "New recording goes to the Record tab");
   assertEqual(await t.focusLabel(), "Start recording", "with the focus on Start");
-  for (const name of ["Week 3 walkthrough", "Alpha demo"]) {
+  // One practice and one (pretend) real recording, so both kinds of card are seen.
+  for (const [name, practice] of [["Week 3 walkthrough", true], ["Alpha demo", false]]) {
     await page.getByLabel("Name of the recording").fill(name);
     await page.getByLabel(/^Countdown/).fill("0");
-    await page.getByLabel(/^Practice/).check();
+    if (practice) await page.getByLabel(/^Practice/).check();
+    else await page.getByLabel(/^Practice/).uncheck();
     await page.getByRole("button", { name: "Start recording" }).click();
     await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
     await page.waitForTimeout(150);
@@ -420,6 +498,8 @@ await check("the Recordings tab has a card for each recording with its length an
   const card = page.getByRole("listitem", { name: "Alpha demo" });
   assertMatch(await card.locator(".rv-rec-details").textContent(), /^\d+ seconds?$/, "the card says how long it is");
   assertEqual(await card.locator(".rv-rec-badge").textContent(), "Not edited yet", "and that it has no edit yet");
+  const practiceCard = page.getByRole("listitem", { name: "Week 3 walkthrough" });
+  assertEqual(await practiceCard.locator(".rv-rec-badge").textContent(), "Practice: nothing on the screen was recorded", "a practice says so on its card, in words");
   assertEqual(await card.getByRole("button", { name: "Show Alpha demo in its folder" }).getAttribute("title"), "Show in its folder", "the folder button has a name and a tooltip");
   await page.getByLabel("Order", { exact: true }).selectOption("name");
   assertEqual(await page.locator(".rv-rec-name").allTextContents(), ["Alpha demo", "Week 3 walkthrough"], "A to Z");
@@ -441,6 +521,9 @@ await check("checking this computer lists what it found and says in a sentence h
   const found = await page.getByRole("list", { name: "What the check found" }).locator("li").allTextContents();
   assertEqual(found.length, 9, "nine findings");
   assertMatch(found[0], /^Passed\. Windows version: /, "a finding is a sentence with its result first");
+  const camera = found.find((f) => /^Passed\. Camera: /.test(f)) ?? "";
+  assertMatch(camera, /A webcam is recorded only when you ask for it, by choosing it in the list called A webcam\.$/, "the camera line says where to choose a webcam, in this window's words");
+  assert(found.every((f) => !f.includes("--") && !/\brecord --/.test(f)), `a finding still names a command: ${found.join(" | ")}`);
 });
 
 await check("a recording program that is not installed is said everywhere it matters, and nothing pretends to work", async (page, t) => {
@@ -541,7 +624,7 @@ const editSaid = async (page) => {
 };
 
 await check("Edit the recording I just made opens the editing screen on a new edit of that take, changes nothing on disk, and Back returns to the button", async (page, t) => {
-  await startPractice(page, t, { name: "Edit me" });
+  await startPractice(page, t, { name: "Edit me", practice: false });
   await t.waitNow(/^Recording take 1/);
   await page.waitForTimeout(150);
   await page.getByRole("button", { name: "Stop" }).click();
@@ -576,6 +659,21 @@ await check("Edit opens the editing screen for a recording, says what it opened,
   assertMatch(await t.focusLabel(), /^Edit /, "the focus is back on the button that was used");
   assertEqual(await page.title(), "OpenStage Recorder", "the title is back");
 });
+
+await check("the clip list's column headings are never broken in the middle of a word, at a window about 1140 pixels wide", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  await page.getByRole("button", { name: "Properties and clip list" }).click();
+  await page.locator(".os-cl-table").waitFor();
+  const heads = await page.evaluate(() => [...document.querySelectorAll(".os-cl-table thead th")].map((th) => {
+    const range = document.createRange();
+    range.selectNodeContents(th);
+    return { text: th.textContent.trim(), lines: new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size };
+  }));
+  assertEqual(heads.map((x) => x.text), ["Name", "Track", "Type", "Start", "Length", "End", "State"], "the headings");
+  assertEqual(heads.filter((x) => x.lines !== 1).map((x) => x.text), [], "every heading is on one line");
+  assertEqual(await page.evaluate(() => { const w = document.querySelector(".os-cl-tablewrap"); return w.scrollWidth <= w.clientWidth; }), true, "and all seven columns fit, so State is not pushed out of sight");
+}, { viewport: { width: 1140, height: 1800 } });
 
 await check("only Blur and Cover are offered among the callouts, with Zoom, and no text, shape or arrow tool", async (page, t) => {
   await makeRecording(page, t);
