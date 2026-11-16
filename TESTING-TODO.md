@@ -35,6 +35,4 @@ Decided by the owner on 2026-11-15: the start key starts a quick recording, as b
 
 - [x] (Dismissed 2026-11-15 at the owner's request.) Dismiss alert 1 on the repository's Security tab (Dependabot) as "Vulnerable code is not actually used". Checked 2026-11-15: `cargo tree --target x86_64-pc-windows-msvc -i glib` finds nothing, so glib is only in the Linux build of the window's framework and is not in the Windows program.
 
-### Items 2, 3 and 4: waiting on the shared core
-
-Nothing to check yet. Captions, "Send to" and audio description need C1 and C5 from `openstage-core`, which do not exist there yet; what the Recorder asked for is in `CORE-REQUESTS.md`.
+Items 2, 3 and 4 (captions, Send to and audio description) were moved to the Roadmap in `docs/recorder/plan.md` on 2026-11-15; there is nothing to check for them until they are built.

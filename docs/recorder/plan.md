@@ -14,6 +14,18 @@ For whoever picks this up next, in plain words:
 - **The owner's own tasks:** make a video from the editing screen and send the `.mp4` (none has been seen yet); make a sound file from the editing screen and listen to it (it should sound like the video's sound, and be as long as the video would be); save a picture from the editing screen and open it (it should be what the preview shows at the playhead); a keyboard-only and a screen reader pass; record something with the mouse noted, make a video with the pointer box ticked and judge the pointer's colours and size (the choices are in `capture/crates/openstage-capture-render/src/cursor.rs`); hand `CARRY-BACK-TO-OPENSTAGE.md` to OpenStage Author's own session when ready.
 - **Done and tried by the owner on Windows:** the installed app records (screen, microphone, computer sound, webcam), and its editing preview; the sound fault he found is fixed in builds 4 and later and he has installed that build.
 
+## Roadmap
+
+Planned, not built. The owner moved these three here on 2026-11-15 from the development list of that day (items 2, 3 and 4). Each waits on a piece of the shared core (`openstage-core`) that does not exist yet; what the Recorder needs from the core is written in `CORE-REQUESTS.md`. None is built here in its own way first.
+
+| Feature | What it would do | Waits on |
+|---|---|---|
+| **Captions** | Make captions from what is said in a recording, on this computer, to check and correct in the editor, and save them beside the video. Until then, the program says at the end of every video that it has no captions. | C5, the speech engine, and C1, what a caption track holds |
+| **Send to** | Open a recording in OpenExplainer, OpenStage Studio or OpenStage Author, without exporting it by hand. | C1, the "send to" path |
+| **Audio description** | Write descriptions of what is on the screen, have them spoken on this computer, and add them to the video's sound or as a second sound file. | C5, the speech engine, and C1, what a description track holds |
+
+The owner is adding the same three to the public Roadmap & Feature Requests page linked from the README.
+
 ## Where the work stands
 
 Written 2026-10-23, and updated 2026-10-24. Checked on Linux, and run once on Windows (see the table).
