@@ -30,6 +30,14 @@ export interface StandInControls {
   /** What clicking a window does when the app asks for one to be picked: it chooses a window, nothing was clicked in time, or Escape was pressed. */
   pick: "window" | "none" | "cancel";
   /** Choose from the menu of the icon in the notification area, as if from the taskbar (`quick` or `stop`). */
+  /** The ids of the keys registered now, as the shell would hold them. */
+  registered: string[];
+  /** Key combinations another program holds: registering one is refused. */
+  takenKeys: string[];
+  /** Pretend the icon in the notification area could not be made (also `?notray=1`). */
+  noTray: boolean;
+  /** Press the window's close button: what the real window would do is put in windowCalls (`hide`, `close` or `ask: ...`). */
+  requestClose(): void;
   pressTray(id: string): void;
   /** Everything put on the clipboard, in order. */
   copied: string[];
@@ -436,6 +444,10 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     holdRender: false,
     pick: "window",
     pressTray: (id) => { for (const l of [...trayListeners]) l(id); },
+    registered: [],
+    takenKeys: [],
+    noTray: params.get("notray") === "1",
+    requestClose: () => { controls.windowCalls.push("close"); },
     copied: [],
     failNextCopy: false,
     windowCalls: [],
@@ -532,9 +544,16 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
       return () => { recorder.exitListeners.delete(listener); };
     },
     async hotkeysSet(bindings: HotkeyBinding[]): Promise<HotkeyResult[]> {
-      return bindings.map((b) => ({ id: b.id, ok: true, message: "" }));
+      // Like the shell: every key from before is let go, and a combination another program holds is refused in words.
+      const results = bindings.map((b) => controls.takenKeys.includes(b.keys)
+        ? { id: b.id, ok: false, message: "Another program already uses those keys. Choose different ones." }
+        : { id: b.id, ok: true, message: "" });
+      controls.registered = results.filter((r) => r.ok).map((r) => r.id);
+      return results;
     },
-    async hotkeysClear() {},
+    async hotkeysClear() {
+      controls.registered = [];
+    },
     async onHotkey(listener) {
       hotkeyListeners.add(listener);
       return () => { hotkeyListeners.delete(listener); };
@@ -559,6 +578,15 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     async windowRestore() {
       controls.windowCalls.push("restore");
     },
+    async windowHide() {
+      controls.windowCalls.push("hide");
+    },
+    async windowClose() {
+      controls.requestClose();
+    },
+    async trayPresent() {
+      return !controls.noTray;
+    },
     async recorderRelease() {
       return "0.1.0-alpha.4";
     },
@@ -576,10 +604,16 @@ export function makePreviewBackend(options: { speed?: number } = {}): RecorderBa
     async setTitle(title) {
       document.title = title;
     },
-    guardClose(question) {
+    guardClose(decide) {
+      // A web page cannot be hidden in a notification area, so the browser's own leaving question stands in for the real one; the checks press
+      // the window's close button with controls.requestClose, which says what the real window would do.
       window.addEventListener("beforeunload", (e) => {
-        if (question() !== null) e.preventDefault();
+        if (decide().kind === "ask") e.preventDefault();
       });
+      controls.requestClose = () => {
+        const d = decide();
+        controls.windowCalls.push(d.kind === "hide" ? "hide" : d.kind === "ask" ? `ask: ${d.question}` : "close");
+      };
     },
   };
 }

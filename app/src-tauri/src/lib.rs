@@ -245,6 +245,34 @@ fn window_restore(app: tauri::AppHandle) {
     show_main(&app);
 }
 
+/// Put the window in the notification area when it is closed and the author chose that: off the screen and the taskbar, still running.
+/// Only when the icon is there to bring it back from.
+#[tauri::command]
+fn window_hide(app: tauri::AppHandle) -> Result<(), String> {
+    if app.tray_by_id(TRAY_ID).is_none() {
+        return Err("There is no icon in the notification area to bring the window back from, so it was not put away.".into());
+    }
+    match app.get_webview_window("main") {
+        Some(window) => window.hide().map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
+}
+
+/// Close the window as its close button does, so the page decides first (Quit in the icon's menu).
+#[tauri::command]
+fn window_close(app: tauri::AppHandle) -> Result<(), String> {
+    match app.get_webview_window("main") {
+        Some(window) => window.close().map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
+}
+
+/// Whether the icon in the notification area was made.
+#[tauri::command]
+fn tray_present(app: tauri::AppHandle) -> bool {
+    app.tray_by_id(TRAY_ID).is_some()
+}
+
 /// Say, in the icon's tooltip, what the recorder is doing.
 #[tauri::command]
 fn tray_set_tooltip(app: tauri::AppHandle, tooltip: String) -> Result<(), String> {
@@ -275,15 +303,10 @@ fn make_tray(app: &tauri::App) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
-            // Quitting is the window closing, so a recording that is still going is asked about in one place (the page).
-            "quit" => {
-                show_main(app);
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.close();
-                }
-            }
+            // Quitting is the window closing, so a recording that is still going is asked about in one place (the page). The page is told
+            // first, because closing the window may only put it away when the author chose that, and Quit has to quit.
             "show" => show_main(app),
-            id @ ("quick" | "stop") => {
+            id @ ("quick" | "stop" | "quit") => {
                 let _ = app.emit("tray", id.to_string());
             }
             _ => {}
@@ -331,6 +354,8 @@ fn open_release_page(app: tauri::AppHandle, url: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // One copy at a time: starting OpenStage Recorder again while it runs (perhaps put away in the notification area) brings it back.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -361,6 +386,9 @@ pub fn run() {
             hotkeys_clear,
             window_minimize,
             window_restore,
+            window_hide,
+            window_close,
+            tray_present,
             tray_set_tooltip,
             copy_text,
             recorder_release,

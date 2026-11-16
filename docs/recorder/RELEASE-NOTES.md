@@ -2,6 +2,14 @@
 
 A light, free screen recorder for Windows, with a simple editor. Every release so far is a pre-release. Each release page gives its setup file, the setup's SHA-256, who signed it, and the commit it was built from (`RELEASING.md` says how a release is made).
 
+## Not released yet
+
+- **A key that starts a recording from any program.** In Settings, "Start a quick recording with Ctrl+Shift+F9 from any program". Off until you switch it on. It does what Quick record in the icon's menu does.
+- **Closing the window can keep the program in the notification area.** In Settings, off until you switch it on. Quit in the icon's menu ends it. Starting OpenStage Recorder again while it runs brings back the window that is running, instead of opening a second copy.
+- **Text and shapes in the editor:** Text, Title, Lower third, Highlight box, Circle and Arrow, beside Blur and Cover.
+
+Not tried on Windows yet; checked in a browser with a pretend recorder.
+
 ## 0.1.0 alpha 4 (2026-11-13)
 
 The fixes from an independent security review of 2026-11-13, which found no high or medium problems, and a Check for updates button.

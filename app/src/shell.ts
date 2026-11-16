@@ -35,9 +35,14 @@ export function appStateWords(recording: Phase, quick: QuickPhase): string {
   }
 }
 
-/** The keys that work while recording, from any program, and what each does (the start key is not offered by this app). */
+/** The keys that work while recording, from any program, and what each does (the start key is listed on its own: it is off until switched on). */
 export function recordingKeys(): { keys: string; does: string }[] {
   return DEFAULT_HOTKEYS.filter((k) => k.id !== "start").map((k) => ({ keys: k.keys, does: k.label }));
+}
+
+/** The key that starts a quick recording from any program, once it is switched on in Settings. */
+export function startKeys(): { keys: string; does: string }[] {
+  return DEFAULT_HOTKEYS.filter((k) => k.id === "start").map((k) => ({ keys: k.keys, does: "Start a quick recording with the choices on the Record screen (switch it on in Settings first)" }));
 }
 
 /** The keys of the window itself and of the editing screen. */
@@ -109,8 +114,9 @@ export function helpScreen(updates?: UpdateChecks): HTMLElement {
     h("h2", { id: "help-title" }, "Help"),
     h("p", { class: "rv-note" }, "OpenStage Recorder records your screen, your voice and the computer's sound, with an optional webcam, and has a simple editor for what you record. Everything stays on this computer: there is no account and your recordings are never sent anywhere. The only time it goes online is when you press Check for updates, below. It is free and open source (Apache 2.0)."),
     table("While recording, from any program", recordingKeys()),
+    table("When no recording is going, from any program", startKeys()),
     table("In this window", WINDOW_KEYS),
-    h("p", { class: "rv-note" }, "A key another program already uses cannot work while recording: the recorder says so when it starts, and the buttons always work."),
+    h("p", { class: "rv-note" }, "A key another program already uses cannot work: the recorder says so when it starts, Settings says so for the start key, and the buttons always work. If closing the window keeps OpenStage Recorder in the notification area (a choice in Settings), Windows+B goes to the notification area from the keyboard, and Quit in its icon's menu ends it."),
     ...(updates ? [updatesSection(updates)] : []));
 }
 

@@ -6,8 +6,9 @@
 // blur, zoom, where the webcam sits). It is saved as `edit.json` inside the recording and never changes the recorded picture or sound.
 //
 // Taken from OpenStage Author's `editor/src/editrecording.ts`, which is a pop-up for a course. This is a page, with no course: nothing is put on
-// a slide, no captions are written and no audio descriptions are made. Only Blur and Cover (a solid box that hides part of the picture completely)
-// are offered among the callouts, because text, shapes and arrows are not part of this product. See docs/recorder/EXTRACTED-FROM-OPENSTAGE.md.
+// a slide, no captions are written and no audio descriptions are made. The callouts offered are the words (text, a title, a lower third), the
+// shapes (a highlight box, a circle, an arrow) and the two that hide something (Blur, and Cover, a solid box that hides part of the picture
+// completely). Text and shapes were left out at first and came back on the development list of 2026-11-15. See docs/recorder/EXTRACTED-FROM-OPENSTAGE.md.
 //
 // The screens have their own F6, which moves between the preview, the timeline and the clip list and says where it arrived, and their own line
 // of announcements, a polite live region. The app's own status line is not used as well, so nothing is read twice.
@@ -54,7 +55,7 @@ export interface EditView {
 export const EXPORT_LIMIT_MS = 4 * 60 * 60 * 1000;
 
 /** The tools of the callout bar this product offers. Zoom is always offered by the screens themselves. */
-export const CALLOUTS_OFFERED = ["blur", "cover"] as const;
+export const CALLOUTS_OFFERED = ["text", "title", "lower-third", "highlight", "circle", "arrow", "blur", "cover"] as const;
 
 /** The question to ask before going back to the recordings or closing the window, or null when nothing would be lost. */
 export function closeQuestion(dirty: boolean, making: boolean, action: "leave" | "close" = "leave", what: "video" | "sound file" | "picture" = "video"): string | null {

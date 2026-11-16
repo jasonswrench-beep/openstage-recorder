@@ -125,6 +125,8 @@ export class RecorderController {
   private readonly listeners = new Set<Listener>();
   private offs: (() => void)[] = [];
   private wasPaused = false;
+  /** The keys to put back when a recording is over (the start key, when it is switched on in Settings). Without any, every key is let go. */
+  idleKeys: HotkeyBinding[] = [];
 
   private readonly b: CaptureBackend;
 
@@ -212,7 +214,8 @@ export class RecorderController {
   }
 
   private async clearKeys(): Promise<void> {
-    await this.b.hotkeysClear().catch(() => undefined);
+    if (this.idleKeys.length > 0) await this.b.hotkeysSet(this.idleKeys).catch(() => undefined);
+    else await this.b.hotkeysClear().catch(() => undefined);
   }
 
   private detach(): void {

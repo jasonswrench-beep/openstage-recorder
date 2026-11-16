@@ -15,7 +15,7 @@ test("a new recording is named for the minute it is made, so it does not land on
 test("with nothing stored, or damage stored, the defaults are used", () => {
   const fresh = { ...defaultSettings(), name: freshName(NOW) };
   for (const raw of [null, undefined, "", "not json", "[1]", "42", "null", '"x"']) {
-    assert.deepEqual(parseSettings(raw, NOW), { library: null, record: fresh }, String(raw));
+    assert.deepEqual(parseSettings(raw, NOW), { library: null, record: fresh, background: { startKey: false, closeToTray: false } }, String(raw));
   }
 });
 
@@ -67,7 +67,7 @@ test("settings are saved and read back, without the choices that are never kept"
   const box = new Map<string, string>();
   const storage = { getItem: (k: string) => box.get(k) ?? null, setItem: (k: string, v: string) => void box.set(k, v) };
   const record = { ...defaultSettings(), name: "A name", practice: true, window: "Notes", target: "window" as const, countdownSeconds: 2 };
-  assert.equal(saveSettings({ library: "D:\\Mine", record }, storage), true);
+  assert.equal(saveSettings({ library: "D:\\Mine", record, background: { startKey: true, closeToTray: false } }, storage), true);
   const raw = JSON.parse(box.get(SETTINGS_KEY) ?? "{}") as { record: { name: string; practice: boolean; window: string } };
   assert.equal(raw.record.name, "");
   assert.equal(raw.record.practice, false);
@@ -76,12 +76,13 @@ test("settings are saved and read back, without the choices that are never kept"
   assert.equal(back.library, "D:\\Mine");
   assert.equal(back.record.target, "window");
   assert.equal(back.record.countdownSeconds, 2);
+  assert.deepEqual(back.background, { startKey: true, closeToTray: false });
 });
 
 test("storage that is missing or refuses is no problem", () => {
-  assert.equal(saveSettings({ library: null, record: defaultSettings() }, undefined), false);
+  assert.equal(saveSettings({ library: null, record: defaultSettings(), background: { startKey: false, closeToTray: false } }, undefined), false);
   const refusing = { setItem: () => { throw new Error("blocked"); } };
-  assert.equal(saveSettings({ library: null, record: defaultSettings() }, refusing), false);
+  assert.equal(saveSettings({ library: null, record: defaultSettings(), background: { startKey: false, closeToTray: false } }, refusing), false);
   const throwing = { getItem: () => { throw new Error("blocked"); } };
   assert.deepEqual(loadSettings(throwing).library, null);
 });
@@ -95,4 +96,12 @@ test("how loud each sound is in the video is kept when it is a whole number in r
     assert.equal(s.systemGainDb, 0, String(bad));
     assert.equal(s.micGainDb, 0, String(bad));
   }
+});
+
+test("the start key and closing into the notification area are off unless they were switched on, and only true switches them on", () => {
+  assert.deepEqual(parseSettings(JSON.stringify({ background: { startKey: true, closeToTray: true } }), NOW).background, { startKey: true, closeToTray: true });
+  for (const bad of ["yes", 1, null, [], {}]) {
+    assert.deepEqual(parseSettings(JSON.stringify({ background: { startKey: bad, closeToTray: bad } }), NOW).background, { startKey: false, closeToTray: false }, JSON.stringify(bad));
+  }
+  assert.deepEqual(parseSettings(JSON.stringify({ background: "on" }), NOW).background, { startKey: false, closeToTray: false });
 });

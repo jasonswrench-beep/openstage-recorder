@@ -34,8 +34,8 @@ test("the first words say what was opened, how long it is, what it holds, and th
   assert.match(openingWords("Demo", 5000, "Caption.", [], [{ message: "A" }, { message: "B" }]), /2 things need a look: A$/);
 });
 
-test("only Blur and Cover are offered among the callouts: text, shapes and arrows are not part of this product", () => {
-  assert.deepEqual([...CALLOUTS_OFFERED], ["blur", "cover"]);
+test("the words, the shapes and the two that hide something are offered among the callouts, in the gallery's order", () => {
+  assert.deepEqual([...CALLOUTS_OFFERED], ["text", "title", "lower-third", "highlight", "circle", "arrow", "blur", "cover"]);
 });
 
 test("a sound file that is still being made is asked about in its own words", () => {

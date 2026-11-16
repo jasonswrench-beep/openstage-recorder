@@ -7,6 +7,7 @@
 // Left, Right, Home and End move between them and show the screen they name.
 
 import { h } from "../../capture-timeline/src/dom.ts";
+import { closeDecision, mountBackgroundSettings, StartKey, startKeyRefusal } from "./background.ts";
 import { backend, errorText } from "./backend.ts";
 import { RecorderController } from "./capturecontroller.ts";
 import { mountEditView, type EditView } from "./editview.ts";
@@ -171,17 +172,16 @@ async function main(): Promise<void> {
       void backend.windowRestore().catch(() => undefined);
     }
   });
-  void backend.onTray(async (id) => {
-    if (id === "stop") {
-      await controller.act("stop");
-      return;
-    }
-    if (id !== "quick") return;
-    if (editing !== undefined) {
+  /** Quick record with the window out of the way: from the icon's menu, or the start key from any program. */
+  const quickFromAway = async (): Promise<void> => {
+    const refusal = startKeyRefusal(editing !== undefined);
+    if (refusal !== null) {
       await backend.windowRestore().catch(() => undefined);
-      statusLine("The editing screen is open. Go back to the recordings with Back to recordings, then use Quick record.");
+      statusLine(refusal);
       return;
     }
+    // The recording and then the finished video and its path are on the Record tab, so that is the tab the window comes back to.
+    showTab("record");
     const message = await view.startQuick(true);
     if (message !== null) {
       await backend.windowRestore().catch(() => undefined);
@@ -190,10 +190,52 @@ async function main(): Promise<void> {
     }
     windowAway = true;
     await backend.windowMinimize().catch(() => { windowAway = false; });
+  };
+  // Quit in the icon's menu quits even when closing the window only puts it away: the close question is still asked when something would be lost.
+  let quitting = false;
+  /** Whether this close came from Quit; asked once per close, so a later press of the window's own close button is not taken for Quit. */
+  const takeQuitting = (): boolean => {
+    const was = quitting;
+    quitting = false;
+    return was;
+  };
+  void backend.onTray(async (id) => {
+    if (id === "stop") {
+      await controller.act("stop");
+      return;
+    }
+    if (id === "quit") {
+      quitting = true;
+      await backend.windowRestore().catch(() => undefined);
+      await backend.windowClose().catch(() => { quitting = false; });
+      return;
+    }
+    if (id === "quick") await quickFromAway();
   }).catch(() => undefined);
 
+  // ---- the start key, and closing into the notification area (Settings, both off to begin with)
+  const startKey = new StartKey(backend, controller);
+  // The start key is only listened for here; while a recording goes on, its own keys replace it, so it cannot start a second one.
+  void backend.onHotkey((id) => {
+    if (id === "start" && startKey.on && !controller.busy && !quick.busy) void quickFromAway();
+  }).catch(() => undefined);
+  const trayPresent = backend.trayPresent().catch(() => false);
+  let trayThere = false;
+  void trayPresent.then((p) => { trayThere = p; });
+  mountBackgroundSettings(panels.get("settings")!, {
+    choices: stored.background,
+    keep: (choices) => {
+      stored.background = choices;
+      keep();
+    },
+    startKey,
+    trayPresent,
+  });
+  if (stored.background.startKey) void startKey.set(true);
+
   showTab("record");
-  backend.guardClose(() => (controller.busy ? "A recording is still going. Closing the window stops it. Close anyway?" : quick.busy ? "The video of your quick recording is still being made. Closing the window stops it. Close anyway?" : editing?.closeQuestion() ?? null));
+  backend.guardClose(() => closeDecision(stored.background, trayThere, takeQuitting(),
+    controller.busy ? "A recording is still going. Closing the window stops it. Close anyway?" : quick.busy ? "The video of your quick recording is still being made. Closing the window stops it. Close anyway?" : editing?.closeQuestion() ?? null));
   view.focus();
   if (library === "") {
     const status = main.querySelector<HTMLElement>("[role=status]");

@@ -2,7 +2,7 @@
 // The word in the navy bar, and the keys the Help tab lists.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { appStateWords, recordingKeys } from "./shell.ts";
+import { appStateWords, recordingKeys, startKeys } from "./shell.ts";
 import { SESSION_KEYS } from "./capturecontroller.ts";
 
 test("the bar says what the recorder is doing in words, for every state", () => {
@@ -32,4 +32,9 @@ test("the large clock shows hours, minutes and seconds, and never less than noth
   assert.equal(clockText(154_900), "00:02:34");
   assert.equal(clockText(3_723_000), "01:02:03");
   assert.equal(clockText(-5), "00:00:00");
+});
+
+test("the Help tab lists the start key on its own, and says it has to be switched on", () => {
+  assert.deepEqual(startKeys().map((k) => k.keys), ["Ctrl+Shift+F9"]);
+  assert.match(startKeys()[0]!.does, /switch it on in Settings/);
 });

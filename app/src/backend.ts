@@ -7,6 +7,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { confirm as confirmDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
+import type { CloseDecision } from "./background.ts";
 import type { CaptureCheck, HotkeyBinding, HotkeyResult, StreamExit, StreamState } from "./recorder.ts";
 import { makePreviewBackend } from "./standin.ts";
 
@@ -75,7 +76,7 @@ export interface RecorderBackend {
 
   /** Put text (a path) on the clipboard. Rejects if it could not be done. */
   copyText(text: string): Promise<void>;
-  /** Called with the id of a choice made in the menu of the icon in the notification area: `quick` or `stop`. */
+  /** Called with the id of a choice made in the menu of the icon in the notification area: `quick`, `stop` or `quit`. */
   onTray(listener: (id: string) => void): Promise<() => void>;
   /** Say, in the icon's tooltip, what the recorder is doing. */
   traySet(tooltip: string): Promise<void>;
@@ -83,6 +84,12 @@ export interface RecorderBackend {
   windowMinimize(): Promise<void>;
   /** Bring the window back in front, ready for the keyboard. */
   windowRestore(): Promise<void>;
+  /** Put the window in the notification area: off the screen and the taskbar, still running. */
+  windowHide(): Promise<void>;
+  /** Close the window as its close button does (so the close question is asked first). */
+  windowClose(): Promise<void>;
+  /** Whether the icon in the notification area was made. Without it, a hidden window could not be brought back. */
+  trayPresent(): Promise<boolean>;
 
   // ---- Check for updates (the Help tab): the only time the program goes online, and only when the button is pressed
 
@@ -97,8 +104,8 @@ export interface RecorderBackend {
 
   confirm(message: string): Promise<boolean>;
   setTitle(title: string): Promise<void>;
-  /** Ask before the window closes: `question` gives what to ask, or null when closing is fine. */
-  guardClose(question: () => string | null): void;
+  /** Decide what happens when the window is asked to close: close, ask a question first, or hide in the notification area. */
+  guardClose(decide: () => CloseDecision): void;
 }
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -156,10 +163,18 @@ const tauriBackend: RecorderBackend = {
   openReleasePage: (url) => invoke<void>("open_release_page", { url }),
   confirm: (message) => confirmDialog(message, { title: "OpenStage Recorder", kind: "warning" }),
   setTitle: (title) => getCurrentWindow().setTitle(title),
-  guardClose(question) {
+  windowHide: () => invoke<void>("window_hide"),
+  windowClose: () => invoke<void>("window_close"),
+  trayPresent: () => invoke<boolean>("tray_present"),
+  guardClose(decide) {
     void getCurrentWindow().onCloseRequested(async (event) => {
-      const ask = question();
-      if (ask !== null && !(await confirmDialog(ask, { title: "OpenStage Recorder", kind: "warning" }))) event.preventDefault();
+      const d = decide();
+      if (d.kind === "hide") {
+        event.preventDefault();
+        await invoke<void>("window_hide");
+      } else if (d.kind === "ask" && !(await confirmDialog(d.question, { title: "OpenStage Recorder", kind: "warning" }))) {
+        event.preventDefault();
+      }
     });
   },
 };

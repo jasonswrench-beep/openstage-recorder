@@ -372,3 +372,18 @@ test("a short job that cannot be started, or never ends, says so and cleans up",
   assert.equal(slow.listening, 0);
   assert.ok(ONE_SHOT_LIMIT_MS >= 30_000);
 });
+
+test("when a recording is over, the keys it is given to put back (the start key) are put back instead of letting every key go", async () => {
+  const fake = new Fake();
+  const c = new RecorderController(fake);
+  c.idleKeys = [{ id: "start", keys: "Ctrl+Shift+F9" }];
+  assert.equal(await c.start({ ...defaultSettings(), name: "Demo" }, FOLDER), null);
+  fake.say(line({ event: "hello", protocol: "0.1", program: "openstage-capture" }));
+  fake.say(recording());
+  fake.say(line({ event: "result", ok: true, project: FOLDER, take: 1, state: "complete", durationMs: 1000, segments: 1 }));
+  await settle();
+  fake.end(exit());
+  await settle();
+  assert.equal(fake.keysCleared, 0, "no key is let go");
+  assert.deepEqual(fake.keysSet.map((set) => set.map((k) => k.id)), [["pause", "stop", "restart"], ["start"], ["start"]], "the recording's keys, then the start key again");
+});

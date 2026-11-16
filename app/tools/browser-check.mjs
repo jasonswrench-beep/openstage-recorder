@@ -147,7 +147,7 @@ await check("the page has a heading, a main region, and a section for each job, 
   await page.getByRole("tab", { name: "Recordings" }).click();
   assertEqual(await page.locator("h2:visible").allTextContents(), ["Your recordings"], "the Recordings tab");
   await page.getByRole("tab", { name: "Settings" }).click();
-  assertEqual(await page.locator("h2:visible").allTextContents(), ["Where recordings are kept", "Is this computer ready to record?"], "the Settings tab");
+  assertEqual(await page.locator("h2:visible").allTextContents(), ["Where recordings are kept", "Is this computer ready to record?", "With the window out of the way"], "the Settings tab");
   for (const name of ["Where recordings are kept", "Is this computer ready to record?"]) {
     assertEqual(await page.getByRole("region", { name, exact: true }).count(), 1, `the ${name} section is a named region`);
   }
@@ -675,14 +675,44 @@ await check("the clip list's column headings are never broken in the middle of a
   assertEqual(await page.evaluate(() => { const w = document.querySelector(".os-cl-tablewrap"); return w.scrollWidth <= w.clientWidth; }), true, "and all seven columns fit, so State is not pushed out of sight");
 }, { viewport: { width: 1140, height: 1800 } });
 
-await check("only Blur and Cover are offered among the callouts, with Zoom, and no text, shape or arrow tool", async (page, t) => {
+await check("the callout bar offers the words, the shapes, Blur and Cover, with Zoom, and no picture, video or sound from a file", async (page, t) => {
   await makeRecording(page, t);
   await openEdit(page, t);
-  assertEqual(await page.locator(".os-ed-callouts button").allTextContents(), ["Blur", "Cover", "Zoom on a part", "Draw a zoom"], "the callout bar");
+  assertEqual(await page.locator(".os-ed-callouts button").allTextContents(),
+    ["Text", "Title", "Lower third", "Highlight box", "Circle", "Arrow", "Blur", "Cover", "Zoom on a part", "Draw a zoom"], "the callout bar");
   const everything = (await page.locator(".os-ed button").allTextContents()).join(" | ");
-  for (const word of ["Text", "Title", "Lower third", "Highlight", "Circle", "Arrow", "Picture", "Video", "Sound"]) {
+  for (const word of ["Picture", "Video", "Sound"]) {
     assert(!new RegExp(`(^|\\| )${word}( |\\||$)`).test(everything), `${word} is offered`);
   }
+});
+
+await check("a Text callout is added from the bar with the keyboard, its words are typed in a named box, and one undo takes it away", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  await page.getByRole("button", { name: "Text", exact: true }).focus();
+  await t.key("Enter");
+  await page.waitForFunction(() => /Added/.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
+  assertEqual(await stateText(page), "There are changes that are not saved.", "adding it is a change to save");
+  const words = page.getByLabel("Words", { exact: true });
+  assertEqual(await words.count(), 1, "the words have a named box");
+  for (const label of ["Left (%)", "Top (%)", "Width (%)", "Height (%)"]) {
+    assertEqual(await page.getByLabel(label, { exact: true }).count(), 1, `${label} can be set`);
+  }
+  await words.fill("Click Save");
+  await words.press("Control+Enter");
+  assertEqual(await words.inputValue(), "Click Save", "the words are kept");
+  await page.locator(".os-ed button", { hasText: /^Undo/ }).first().click();
+  await page.locator(".os-ed button", { hasText: /^Undo/ }).first().click();
+  assertEqual(await stateText(page), "There are no unsaved changes.", "undo takes the words and the callout away");
+});
+
+await check("an Arrow asks what it points out, so a shape is not only a picture", async (page, t) => {
+  await makeRecording(page, t);
+  await openEdit(page, t);
+  await page.getByRole("button", { name: "Arrow", exact: true }).focus();
+  await t.key("Enter");
+  await page.waitForFunction(() => /Added/.test(document.querySelector(".os-cl-status")?.textContent ?? ""));
+  assertEqual(await page.getByLabel(/^What it points out/).count(), 1, "the arrow has a box for what it points out");
 });
 
 await check("a Cover is added from the bar with the keyboard, says it cannot be undone once the video is made, has a colour and a place to set, and one undo takes it away", async (page, t) => {
@@ -1184,6 +1214,67 @@ await check("Stop from the icon with nothing recording says so, and Quick record
   assertEqual(await page.evaluate(() => window.__openstageStandIn.windowCalls), ["restore"], "the window came forward, not away");
   assertEqual(await page.evaluate(() => window.__openstageStandIn.started.filter((a) => a[0] === "record").length), 1, "only the earlier recording was ever started");
 });
+
+await check("the start key is off to begin with; switched on in Settings it is registered, starts a quick recording from any program, and is put back afterwards", async (page, t) => {
+  await page.getByLabel(/^Countdown/).fill("0");
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const box = page.getByLabel("Start a quick recording with Ctrl+Shift+F9 from any program");
+  assertEqual(await box.isChecked(), false, "off to begin with");
+  assertEqual(await t.standIn(() => window.__openstageStandIn.registered), [], "no key is taken from other programs");
+  assertMatch(await page.getByRole("checkbox", { name: /Ctrl\+Shift\+F9/ }).getAttribute("aria-describedby") ?? "", /-note$/, "the sentence is its description");
+  await box.focus();
+  await t.key("Space");
+  await page.waitForFunction(() => /^On\. Ctrl\+Shift\+F9 starts a quick recording/.test(document.querySelector(".app-background .rv-note")?.textContent ?? ""));
+  assertEqual(await t.standIn(() => window.__openstageStandIn.registered), ["start"], "the key is registered");
+  await page.evaluate(() => window.__openstageStandIn.pressKey("start"));
+  await page.waitForFunction(() => window.__openstageStandIn.windowCalls.includes("minimize"));
+  await page.getByRole("heading", { name: "Recording", exact: true }).waitFor();
+  assertEqual(await t.standIn(() => window.__openstageStandIn.registered), ["pause", "stop", "restart"], "while recording, the recording's own keys are in place of it");
+  await page.waitForTimeout(150);
+  await page.evaluate(() => window.__openstageStandIn.pressKey("stop"));
+  await page.getByRole("button", { name: "Copy the path" }).waitFor();
+  assertEqual(await t.standIn(() => window.__openstageStandIn.windowCalls), ["minimize", "restore"], "the window went away and came back to show the video");
+  await page.waitForFunction(() => JSON.stringify(window.__openstageStandIn.registered) === JSON.stringify(["start"]));
+  await page.reload();
+  await page.getByRole("heading", { level: 1, name: "OpenStage Recorder" }).waitFor();
+  await page.waitForFunction(() => JSON.stringify(window.__openstageStandIn.registered) === JSON.stringify(["start"]));
+  await page.getByRole("tab", { name: "Settings" }).click();
+  assertEqual(await page.getByLabel("Start a quick recording with Ctrl+Shift+F9 from any program").isChecked(), true, "the choice is kept for next time");
+  await page.getByLabel("Start a quick recording with Ctrl+Shift+F9 from any program").uncheck();
+  await page.waitForFunction(() => window.__openstageStandIn.registered.length === 0);
+});
+
+await check("a start key another program holds is said in words, with what still works", async (page, t) => {
+  await page.evaluate(() => window.__openstageStandIn.takenKeys.push("Ctrl+Shift+F9"));
+  await page.getByRole("tab", { name: "Settings" }).click();
+  await page.getByLabel("Start a quick recording with Ctrl+Shift+F9 from any program").check();
+  await page.waitForFunction(() => /could not be used: Another program already uses those keys/.test(document.querySelector(".app-background .rv-note")?.textContent ?? ""));
+});
+
+await check("closing the window quits unless the author chose the notification area; then it hides, and Quit in the icon's menu still quits", async (page, t) => {
+  await page.evaluate(() => window.__openstageStandIn.requestClose());
+  assertEqual(await t.standIn(() => window.__openstageStandIn.windowCalls), ["close"], "closing quits to begin with");
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const box = page.getByLabel("Closing the window keeps OpenStage Recorder in the notification area");
+  assertEqual(await box.isChecked(), false, "off to begin with");
+  await box.check();
+  assertMatch(await page.locator(".app-background .rv-note").nth(1).textContent(), /Windows\+B goes to the notification area/, "says how to bring it back from the keyboard");
+  await page.waitForTimeout(50);
+  await page.evaluate(() => window.__openstageStandIn.requestClose());
+  assertEqual(await t.standIn(() => window.__openstageStandIn.windowCalls), ["close", "hide"], "closing puts it away");
+  await page.evaluate(() => window.__openstageStandIn.pressTray("quit"));
+  await page.waitForFunction(() => window.__openstageStandIn.windowCalls.length === 4);
+  assertEqual(await t.standIn(() => window.__openstageStandIn.windowCalls), ["close", "hide", "restore", "close"], "Quit brings it back and closes it");
+  await page.evaluate(() => window.__openstageStandIn.requestClose());
+  assertEqual((await t.standIn(() => window.__openstageStandIn.windowCalls)).at(-1), "hide", "the next close button press puts it away again");
+});
+
+await check("without an icon in the notification area, closing always quits and the box says why", async (page, t) => {
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const box = page.getByLabel("Closing the window keeps OpenStage Recorder in the notification area");
+  await page.waitForFunction(() => /could not be made on this computer/.test(document.querySelectorAll(".app-background .rv-note")[1]?.textContent ?? ""));
+  assertEqual(await box.isDisabled(), true, "it cannot be ticked");
+}, { search: "&notray=1" });
 
 await check("Quick record cannot start without the recording program, and says so", async (page, t) => {
   const quick = page.getByRole("button", { name: "Quick record" });

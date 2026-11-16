@@ -5,6 +5,7 @@
 // defaults and nothing is lost but the author's last choices. Every value read back is checked, so a damaged entry cannot put the
 // recorder into a state it could not have been put in by hand.
 
+import { defaultBackground, type BackgroundChoices } from "./background.ts";
 import { defaultSettings, MAX_GAIN_DB, MIN_GAIN_DB, type Interactions, type RecordSettings, type Target } from "./capturesession.ts";
 
 export const SETTINGS_KEY = "openstage-recorder-settings";
@@ -19,6 +20,8 @@ export interface StoredSettings {
   /** The recordings folder the author chose, or null to use the default. */
   library: string | null;
   record: RecordSettings;
+  /** The start key and closing into the notification area, both off to begin with. */
+  background: BackgroundChoices;
 }
 
 type Reader = Pick<Storage, "getItem">;
@@ -47,12 +50,14 @@ export function parseSettings(raw: string | null | undefined, now: Date = new Da
   } catch {
     data = null;
   }
-  if (typeof data !== "object" || data === null || Array.isArray(data)) return { library: null, record: fresh };
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return { library: null, record: fresh, background: defaultBackground() };
   const d = data as Record<string, unknown>;
   const r = typeof d["record"] === "object" && d["record"] !== null ? (d["record"] as Record<string, unknown>) : {};
   const region = typeof r["region"] === "object" && r["region"] !== null ? (r["region"] as Record<string, unknown>) : {};
   const countdown = r["countdownSeconds"];
+  const bg = typeof d["background"] === "object" && d["background"] !== null ? (d["background"] as Record<string, unknown>) : {};
   return {
+    background: { startKey: bg["startKey"] === true, closeToTray: bg["closeToTray"] === true },
     library: typeof d["library"] === "string" && d["library"].trim() !== "" && d["library"].length <= 1000 ? d["library"] : null,
     record: {
       name: fresh.name, // never kept: recording again under the same name would add a take to the last recording
@@ -91,7 +96,7 @@ export function loadSettings(from: Reader | undefined = storage()): StoredSettin
 export function saveSettings(s: StoredSettings, to: Writer | undefined = storage()): boolean {
   try {
     if (to === undefined) return false;
-    to.setItem(SETTINGS_KEY, JSON.stringify({ library: s.library, record: { ...s.record, name: "", practice: false, window: "" } }));
+    to.setItem(SETTINGS_KEY, JSON.stringify({ library: s.library, background: s.background, record: { ...s.record, name: "", practice: false, window: "" } }));
     return true;
   } catch {
     return false;
