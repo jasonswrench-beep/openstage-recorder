@@ -33,7 +33,7 @@ Whenever a new Windows installer is built, the checks pass, and the installer ha
 - **v0.1.0-alpha.2**, 2026-11-11, built from commit `3ad79c6` by the workflow (the suite's new look). Unsigned.
 - **v0.1.0-alpha.3**, 2026-11-12, the same commit `3ad79c6`, built and signed on the owner's computer. `OpenStage-Recorder_0.1.0_x64-setup.exe`, SHA-256 `42761091ceb2282072e5df03d6f0c02909981ec59148aeb5f84d615498270eda`. The first signed release.
 - **v0.1.0-alpha.4**: the fixes from the security review of 2026-11-13 and Check for updates, built with `build_installer.py --sign`.
-- **v0.1.0-alpha.5**, 2026-11-15, built from commit `1007ed8` and signed on the owner's computer. `OpenStage-Recorder-0.1.0-alpha.5-Setup.exe` (5,486,512 bytes), SHA-256 `4414cbea77319abf9c800842972c98fe2c911881c7234adeeec3ec1bde161618`. Checked after publishing: the tag points at `1007ed8`, GitHub's SHA-256 matches, two files, a published pre-release, and the copy downloaded back is signed by Jason Wrench with a timestamp. Installed on the owner's computer the same day.
+- **v0.1.0-alpha.5**, 2026-11-15, built from commit `1007ed8` and signed on the owner's computer. `OpenStage-Recorder-0.1.0-alpha.5-Setup.exe` (5,486,512 bytes), SHA-256 `4414cbea77319abf9c800842972c98fe2c911881c7234adeeec3ec1bde161618`. Checked after publishing: the tag points at `1007ed8`, GitHub's SHA-256 matches, two files, a published pre-release, and the copy downloaded back is signed by Jason Wrench with a timestamp. Installed on the owner's computer the same day; the owner checked that no user name shows, Copy the full path, and About.
 
 ## Drafts left from the old workflow
 
