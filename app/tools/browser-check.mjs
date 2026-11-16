@@ -168,6 +168,32 @@ await check("the page has a heading, a main region, and a section for each job, 
   assertEqual(await page.locator("html").getAttribute("lang"), "en", "the page language");
 });
 
+await check("Settings and the Record screen say where recordings are kept without the Windows user name, and Copy the full path copies it", async (page, t) => {
+  const keptWhere = await page.locator('[id$="-kept"]').textContent();
+  assert(!/Users|You\b/.test(keptWhere ?? ""), `the Record screen shows no user folder: ${keptWhere}`);
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const folder = await page.locator('[id$="-folder"]').first().textContent();
+  assertMatch(folder ?? "", /OpenStage Recorder, in Videos, in your user folder\.?$/, "the folder in words");
+  assert(!/\\Users\\You/.test(folder ?? ""), "no user name in the folder sentence");
+  const found = await page.locator('[id$="-found"]').textContent();
+  assert(!/\\Users\\/.test(found ?? ""), `no user folder in the recording program's place: ${found}`);
+  await page.getByRole("button", { name: "Copy the full path" }).focus();
+  await t.key("Enter");
+  await page.waitForFunction(() => window.__openstageStandIn.copied.length === 1);
+  assertEqual(await t.standIn(() => window.__openstageStandIn.copied), ["C:\\Users\\You\\Videos\\OpenStage Recorder"], "the full path is copied");
+  assertMatch(await t.said(), /The full path of the recordings folder is copied\./, "and that is said");
+});
+
+await check("the Help tab has an About section: which copy, who makes it, the licence and where the source is", async (page, t) => {
+  await page.getByRole("tab", { name: "Help" }).click();
+  const about = page.getByRole("region", { name: "About OpenStage Recorder" });
+  assertEqual(await about.count(), 1, "About is a named region");
+  const text = await about.textContent();
+  assertMatch(text ?? "", /OpenStage Recorder 0\.1\.0 alpha 4\./, "the version");
+  assertMatch(text ?? "", /Apache License 2\.0/, "the licence");
+  assertMatch(text ?? "", /github\.com\/jasonswrench-beep\/openstage-recorder/, "the source");
+});
+
 await check("Check for updates on the Help tab says what it found in words, and opens only the release page, only when asked", async (page, t) => {
   await page.getByRole("tab", { name: "Help" }).click();
   assertEqual(await page.getByRole("region", { name: "Updates" }).count(), 1, "the Updates section is a named region");
@@ -418,7 +444,7 @@ await check("a recording of the same name warns that it will add a take, and the
   await page.getByLabel("Name of the recording").fill("Same name");
   assertMatch(await page.locator('[id$="-problem"]').textContent(), /A recording called Same name already exists\. Recording again adds another take to it\./, "the warning");
   assertEqual(await page.getByRole("button", { name: "Start recording" }).getAttribute("aria-disabled"), null, "it is a warning, not a block");
-  assertMatch(await page.locator('[id$="-folder"]').textContent(), /^This preview keeps only pretend recordings, inside this page, until you close it\. The real app keeps recordings in: C:\\Users\\You\\Videos\\OpenStage Recorder$/, "the preview says what is kept and where the real app would keep it");
+  assertMatch(await page.locator('[id$="-folder"]').textContent(), /^This preview keeps only pretend recordings, inside this page, until you close it\. The real app keeps recordings in: OpenStage Recorder, in Videos, in your user folder$/, "the preview says what is kept and where the real app would keep it");
 });
 
 await check("a name that has to be changed to fit a folder's name says so before Start and again when recording starts, and the recording has the changed name", async (page, t) => {

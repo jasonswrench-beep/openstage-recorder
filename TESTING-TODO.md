@@ -25,6 +25,16 @@ Things that need a real Windows computer, a real recording, a listener, a screen
 
 Decided by the owner on 2026-11-15: the start key starts a quick recording, as built, and both boxes start off (the owner left that to the builder's judgment).
 
+### Alpha 5: build, sign and publish (the owner said yes on 2026-11-15)
+
+- [ ] On your computer, signed in to the signing service: `python -I app/tools/build_installer.py --sign`, from a copy of `main` at or after the commit that set `RELEASE` to `0.1.0-alpha.5`. It stops on any problem.
+- [ ] Publish it as a pre-release with the two files it writes, as `docs/recorder/RELEASING.md` says (a new session can do the `gh release create` step and the checks after it, once the two files exist). The repository is public, so the release is seen by everyone. The notes are in `docs/recorder/RELEASE-NOTES.md`.
+- [ ] After installing it: Settings and the Record screen should show no `C:\Users\<your name>` anywhere; Copy the full path should paste the whole path; Help should end with About OpenStage Recorder, saying 0.1.0 alpha 5.
+
+### The GitHub alert about glib
+
+- [ ] Dismiss alert 1 on the repository's Security tab (Dependabot) as "Vulnerable code is not actually used". Checked 2026-11-15: `cargo tree --target x86_64-pc-windows-msvc -i glib` finds nothing, so glib is only in the Linux build of the window's framework and is not in the Windows program.
+
 ### Items 2, 3 and 4: waiting on the shared core
 
 Nothing to check yet. Captions, "Send to" and audio description need C1 and C5 from `openstage-core`, which do not exist there yet; what the Recorder asked for is in `CORE-REQUESTS.md`.

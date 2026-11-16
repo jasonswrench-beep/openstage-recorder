@@ -34,7 +34,7 @@ import tomllib
 from pathlib import Path
 
 # The release this build is. Raise it for every release: Check for updates compares it with the newest published tag.
-RELEASE = "0.1.0-alpha.4"
+RELEASE = "0.1.0-alpha.5"
 
 APP = Path(__file__).resolve().parent.parent
 ROOT = APP.parent

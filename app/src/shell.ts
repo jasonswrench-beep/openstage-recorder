@@ -103,7 +103,25 @@ export function updatesSection(u: UpdateChecks): HTMLElement {
     said);
 }
 
-/** The Help tab: the keys, in two tables, a few words about the app, and Check for updates. */
+/** The words of the About section, apart from the version, which is read from the program. */
+export const ABOUT_LINES: readonly string[] = [
+  "Made by the OpenStage Author project and published by Jason Wrench, who signs each release.",
+  "Free and open source under the Apache License 2.0. The licence and the notices for the parts it uses from others are in LICENSE.txt and NOTICE.txt, in the folder the program is installed in.",
+  "Its source code is published at github.com/jasonswrench-beep/openstage-recorder.",
+  "No account, no server: recordings stay on this computer and are never sent anywhere.",
+];
+
+/** About OpenStage Recorder: which copy this is, who makes it, its licence and where its source is. */
+export function aboutSection(u?: Pick<UpdateChecks, "recorderRelease">): HTMLElement {
+  const copy = h("p", { class: "rv-note", id: "about-copy" }, "OpenStage Recorder.");
+  void u?.recorderRelease().then((r) => { copy.textContent = `OpenStage Recorder ${releaseWords(r)}.`; }, () => undefined);
+  return h("section", { class: "app-about", "aria-labelledby": "about-title" },
+    h("h3", { id: "about-title" }, "About OpenStage Recorder"),
+    copy,
+    ...ABOUT_LINES.map((line) => h("p", { class: "rv-note" }, line)));
+}
+
+/** The Help tab: the keys, in two tables, a few words about the app, Check for updates, and About. */
 export function helpScreen(updates?: UpdateChecks): HTMLElement {
   const table = (caption: string, rows: readonly { keys: string; does: string }[]) =>
     h("table", { class: "app-keys" },
@@ -117,7 +135,8 @@ export function helpScreen(updates?: UpdateChecks): HTMLElement {
     table("When no recording is going, from any program", startKeys()),
     table("In this window", WINDOW_KEYS),
     h("p", { class: "rv-note" }, "A key another program already uses cannot work: the recorder says so when it starts, Settings says so for the start key, and the buttons always work. If closing the window keeps OpenStage Recorder in the notification area (a choice in Settings), Windows+B goes to the notification area from the keyboard, and Quit in its icon's menu ends it."),
-    ...(updates ? [updatesSection(updates)] : []));
+    ...(updates ? [updatesSection(updates)] : []),
+    aboutSection(updates));
 }
 
 /** The time of a recording as a clock shows it: 00:02:34. For the large clock while recording, which is only to look at. */

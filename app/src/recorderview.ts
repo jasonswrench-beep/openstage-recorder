@@ -25,6 +25,7 @@ import { recordingNameOf } from "./recordingfolder.ts";
 import { describeQuick, quickSettings, type QuickRecord, type QuickState } from "./quickrecord.ts";
 import { freshName } from "./settings.ts";
 import { uiIcon, type UiIconName } from "./uiicons.gen.ts";
+import { pathWords } from "./paths.ts";
 import { appStateWords, clockText } from "./shell.ts";
 import { countText as recordingsCountText, detailsText, matchesSearch, sortRecordings, summarize, type RecordingSummary, type SortOrder } from "./library.ts";
 
@@ -353,7 +354,15 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   }
   changeFolder.prepend(uiIcon(document, "folder-input"));
   const folderTitle = h("h2", { id: id("folder-title") }, "Where recordings are kept");
-  const folderBox = h("section", { class: "rv-section", "aria-labelledby": id("folder-title") }, folderTitle, folderText, h("div", { class: "rv-actions" }, changeFolder));
+  // The folder is said in words, without the Windows user name (paths.ts); the full path is there to copy, never shown.
+  const copyFolder = h("button", { type: "button", class: "os-cl-button" }, "Copy the full path");
+  copyFolder.addEventListener("click", () => {
+    void b.copyText(library).then(
+      () => say(["The full path of the recordings folder is copied."]),
+      (err: unknown) => say([`The path could not be copied. ${errorText(err)}`]),
+    );
+  });
+  const folderBox = h("section", { class: "rv-section", "aria-labelledby": id("folder-title") }, folderTitle, folderText, h("div", { class: "rv-actions" }, changeFolder, copyFolder));
 
   // ---- the check
   const found = h("p", { id: id("found") });
@@ -380,9 +389,10 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     // The preview keeps nothing on the disk, so it must not say "kept in" as if it did.
     folderText.textContent =
       library === "" ? "No recordings folder is chosen yet."
-      : b.preview ? `This preview keeps only pretend recordings, inside this page, until you close it. The real app keeps recordings in: ${library}`
-      : `Recordings are kept in: ${library}`;
-    keptWhere.textContent = library === "" ? "No recordings folder is chosen yet." : b.preview ? "This preview keeps pretend recordings only, inside this page." : `In ${library}`;
+      : b.preview ? `This preview keeps only pretend recordings, inside this page, until you close it. The real app keeps recordings in: ${pathWords(library)}`
+      : `Recordings are kept in: ${pathWords(library)}`;
+    keptWhere.textContent = library === "" ? "No recordings folder is chosen yet." : b.preview ? "This preview keeps pretend recordings only, inside this page." : `In ${pathWords(library)}`;
+    copyFolder.hidden = library === "";
   }
 
   // ---- showing the state
@@ -447,8 +457,8 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
     const asideWords = session.setAside > 0 ? `. ${session.setAside} earlier ${session.setAside === 1 ? "take was" : "takes were"} set aside, not erased.` : "";
     where.textContent =
       session.folder === "" ? ""
-      : b.preview ? `This is a pretend recording. Nothing is kept on your computer: it stays inside this page until you close it. The real app would keep it in: ${session.folder}${asideWords}`
-      : `Kept in: ${session.folder}${asideWords}`;
+      : b.preview ? `This is a pretend recording. Nothing is kept on your computer: it stays inside this page until you close it. The real app would keep it in: ${pathWords(session.folder)}${asideWords}`
+      : `Kept in: ${pathWords(session.folder)}${asideWords}`;
   }
 
   function showQuick(state: QuickState): void {
@@ -698,7 +708,7 @@ export function mountRecorderView(host: HTMLElement, opts: RecorderViewOptions):
   void (async () => {
     const located = await b.captureCheck().catch((err: unknown) => ({ ok: false as const, message: `Could not look for the recording program. ${errorText(err)}` }));
     usable = located.ok;
-    found.textContent = located.ok ? `The recording program was found: ${located.path}` : located.message;
+    found.textContent = located.ok ? `The recording program was found: ${pathWords(located.path)}` : located.message;
     computerText.textContent = located.ok ? "The recording program is here. Settings has a check that the screen, the sound and the folder all work." : located.message;
     if (located.ok && !checking) check.removeAttribute("aria-disabled");
     if (located.ok && !c.busy) {

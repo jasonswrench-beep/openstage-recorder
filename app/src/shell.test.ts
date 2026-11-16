@@ -2,7 +2,7 @@
 // The word in the navy bar, and the keys the Help tab lists.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { appStateWords, recordingKeys, startKeys } from "./shell.ts";
+import { ABOUT_LINES, appStateWords, recordingKeys, startKeys } from "./shell.ts";
 import { SESSION_KEYS } from "./capturecontroller.ts";
 
 test("the bar says what the recorder is doing in words, for every state", () => {
@@ -37,4 +37,13 @@ test("the large clock shows hours, minutes and seconds, and never less than noth
 test("the Help tab lists the start key on its own, and says it has to be switched on", () => {
   assert.deepEqual(startKeys().map((k) => k.keys), ["Ctrl+Shift+F9"]);
   assert.match(startKeys()[0]!.does, /switch it on in Settings/);
+});
+
+test("About says who makes it, its licence, where its source is and that nothing is sent, in plain words", () => {
+  const all = ABOUT_LINES.join(" ");
+  assert.match(all, /Apache License 2\.0/);
+  assert.match(all, /LICENSE\.txt and NOTICE\.txt/);
+  assert.match(all, /github\.com\/jasonswrench-beep\/openstage-recorder/);
+  assert.match(all, /never sent anywhere/);
+  assert.ok(!all.includes("\u2014"), "no em dashes");
 });
