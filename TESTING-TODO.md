@@ -22,8 +22,8 @@ Things that need a real Windows computer, a real recording, a listener, a screen
 - [ ] **Quit from the icon's menu** with that box ticked: it should end the program, asking first if a recording is still going.
 - [ ] **The start key while the window is put away** in the notification area: Ctrl+Shift+F9 should still start a quick recording, and the window should come back when the video is ready.
 - [ ] **Text and shapes in a real video.** In the editing screen, add a Text, a Title, a Lower third, a Highlight box, a Circle and an Arrow from the bar under the picture, give each its words or what it points out, and make a video. Check each is drawn where the preview shows it, and the words are readable.
-- [ ] **A decision for you:** the start key starts a **quick** recording (it makes the video and copies its path when stopped), with the Record screen's choices, because that is what can run with the window out of the way. It could instead start an ordinary recording that waits for you to edit it. Say if you want that instead.
-- [ ] **A decision for you:** both new boxes start off. The start key takes Ctrl+Shift+F9 from every other program while the app runs, and a window that does not quit when closed can be forgotten, so I left the choice to the person. Say if either should start on.
+
+Decided by the owner on 2026-11-15: the start key starts a quick recording, as built, and both boxes start off (the owner left that to the builder's judgment).
 
 ### Items 2, 3 and 4: waiting on the shared core
 
