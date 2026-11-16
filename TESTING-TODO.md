@@ -29,7 +29,7 @@ Decided by the owner on 2026-11-15: the start key starts a quick recording, as b
 
 - [x] On your computer, signed in to the signing service: `python -I app/tools/build_installer.py --sign`, from a copy of `main` at or after the commit that set `RELEASE` to `0.1.0-alpha.5`. It stops on any problem.
 - [x] (Done 2026-11-15: https://github.com/jasonswrench-beep/openstage-recorder/releases/tag/v0.1.0-alpha.5) Publish it as a pre-release with the two files it writes, as `docs/recorder/RELEASING.md` says (a new session can do the `gh release create` step and the checks after it, once the two files exist). The repository is public, so the release is seen by everyone. The notes are in `docs/recorder/RELEASE-NOTES.md`.
-- [ ] After installing it: Settings and the Record screen should show no `C:\Users\<your name>` anywhere; Copy the full path should paste the whole path; Help should end with About OpenStage Recorder, saying 0.1.0 alpha 5.
+- [ ] (Installed on the owner's computer 2026-11-15; these three not reported yet.) After installing it: Settings and the Record screen should show no `C:\Users\<your name>` anywhere; Copy the full path should paste the whole path; Help should end with About OpenStage Recorder, saying 0.1.0 alpha 5.
 
 ### The GitHub alert about glib
 
