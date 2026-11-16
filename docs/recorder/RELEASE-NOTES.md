@@ -2,9 +2,9 @@
 
 A light, free screen recorder for Windows, with a simple editor. Every release so far is a pre-release. Each release page gives its setup file, the setup's SHA-256, who signed it, and the commit it was built from (`RELEASING.md` says how a release is made).
 
-## 0.1.0 alpha 5 (prepared 2026-11-15, not built yet)
+## 0.1.0 alpha 5 (2026-11-15)
 
-The owner said yes to this pre-release on 2026-11-15. It is built and signed on the owner's computer (`RELEASING.md`).
+Built and signed on the owner's computer from commit `1007ed8`, and published as a pre-release on 2026-11-15.
 
 - **Seven fixes from testing alpha 4 with the keyboard:** Check for updates keeps the keyboard's place while it checks; when a recording ends the focus goes to its heading instead of a button that has just gone; a name changed to fit a folder is said before Start and when recording starts; the computer check's camera line says what to choose on the Record screen instead of naming a command; a practice offers nothing to edit and its card says it is a practice; Done after a practice switches Practice off, and the next name is never one already used; the clip list's column headings are no longer broken in the middle of a word.
 - **No Windows user name on the screens.** Where recordings are kept, and where the recording program is, are said in words, such as "OpenStage Recorder, in Videos, in your user folder", so the user name is not shown to anyone looking at the screen or at a recording of it. **Copy the full path**, in Settings, copies the whole path for anyone who needs it.
