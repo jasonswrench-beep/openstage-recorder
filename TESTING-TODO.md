@@ -33,7 +33,7 @@ Decided by the owner on 2026-11-15: the start key starts a quick recording, as b
 
 ### The GitHub alert about glib
 
-- [ ] Dismiss alert 1 on the repository's Security tab (Dependabot) as "Vulnerable code is not actually used". Checked 2026-11-15: `cargo tree --target x86_64-pc-windows-msvc -i glib` finds nothing, so glib is only in the Linux build of the window's framework and is not in the Windows program.
+- [x] (Dismissed 2026-11-15 at the owner's request.) Dismiss alert 1 on the repository's Security tab (Dependabot) as "Vulnerable code is not actually used". Checked 2026-11-15: `cargo tree --target x86_64-pc-windows-msvc -i glib` finds nothing, so glib is only in the Linux build of the window's framework and is not in the Windows program.
 
 ### Items 2, 3 and 4: waiting on the shared core
 
