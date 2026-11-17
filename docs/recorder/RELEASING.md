@@ -20,7 +20,7 @@ Whenever a new Windows installer is built, the checks pass, and the installer ha
 
 ## The rules it follows
 
-1. The commit the installer is built from is pushed and tagged first, before the build. The tag points at that exact commit. **A tag is never reused or moved**, apart from the one move the owner asked for on 2026-11-17 (below).
+1. The commit the installer is built from is pushed and tagged first, before the build. The tag points at that exact commit. **A tag is never reused or moved**, apart from the two moves the owner asked for on 2026-11-17 (below).
 2. The version is the app's version number with `-alpha.N` while nobody has run the installer by hand, for example `v0.1.0-alpha.4`, the next number each time. (If the alpha rule stops fitting, change it here, with the owner.)
 3. It is a pre-release. The title is "OpenStage Recorder X.Y.Z alpha N".
 4. Only two files are attached: the setup `.exe` and its `.sha256.txt`. Nothing else: not the portable zip, not logs.
@@ -36,19 +36,21 @@ Whenever a new Windows installer is built, the checks pass, and the installer ha
 - **v0.1.0-alpha.4**: the fixes from the security review of 2026-11-13 and Check for updates, built with `build_installer.py --sign`.
 - **v0.1.0-alpha.5**, 2026-11-15, built from commit `1007ed8` and signed on the owner's computer. `OpenStage-Recorder-0.1.0-alpha.5-Setup.exe` (5,486,512 bytes), SHA-256 `4414cbea77319abf9c800842972c98fe2c911881c7234adeeec3ec1bde161618`. Checked after publishing: the tag points at `1007ed8`, GitHub's SHA-256 matches, two files, a published pre-release, and the copy downloaded back is signed by Jason Wrench with a timestamp. Installed on the owner's computer the same day; the owner checked that no user name shows, Copy the full path, and About.
 
-## The history rewritten on 2026-11-16, and the tags moved on 2026-11-17
+## The history rewritten on 2026-11-16 and 2026-11-17, and the tags moved
 
 At the owner's request, the Claude co-author line was taken out of every commit message on `main`, and `main` was force-pushed on 2026-11-16. The files are the same; every commit has a new ID. On 2026-11-17, also at the owner's request, each release tag was moved onto the rewritten commit with the same files and the same message (apart from the removed line), and only the tags were force-pushed. The releases' files, notes and titles were not changed. The commit IDs named above and in older documents are the old ones:
 
-| Tag | Old commit | Commit now |
-|---|---|---|
-| v0.1.0 (draft only) | `6eba1d2` | `3f6069f` |
-| v0.1.0-alpha.1 | `f0bd700` | `e3e3625` |
-| v0.1.0-alpha.2 and alpha.3 | `3ad79c6` | `3f42483` |
-| v0.1.0-alpha.4 | `6dfbda8` | `5c44567` |
-| v0.1.0-alpha.5 | `1007ed8` | `cd80783` |
+Later on 2026-11-17, also at the owner's request, the 21 commits whose author was "Claude" or "Jason Wrench" with an Anthropic address were given the owner's identity (`jasonswrench-beep`, GitHub's private address), `main` was force-pushed again, and the tags were moved again the same way. Files, dates and messages did not change.
 
-The full list, every old commit beside its new one, with how to undo the move, is in `C:\Dev\openstage-recorder-tag-move-20261117.tsv` on the owner's computer, beside a copy of the whole repository as it was before (`C:\Dev\openstage-recorder-before-coauthor-removal-20261116.bundle`). Each release's "target" on GitHub still names the old commit as text; the tag is what GitHub uses. The old commits GitHub still serves although nothing points to them (93: 57 from this rewrite and 36 from the rewrite of 2026-11-05) are listed for GitHub Support in `C:\Dev\openstage-recorder-commits-to-purge-20261117.txt`.
+| Tag | Commit built from | After 2026-11-16 | Commit now |
+|---|---|---|---|
+| v0.1.0 (draft only) | `6eba1d2` | `3f6069f` | `e0dfdc6` |
+| v0.1.0-alpha.1 | `f0bd700` | `e3e3625` | `ef19985` |
+| v0.1.0-alpha.2 and alpha.3 | `3ad79c6` | `3f42483` | `7eb32d8` |
+| v0.1.0-alpha.4 | `6dfbda8` | `5c44567` | `496ca65` |
+| v0.1.0-alpha.5 | `1007ed8` | `cd80783` | `46b5d96` |
+
+The full list, every old commit beside its new one, with how to undo the move, is in `C:\Dev\openstage-recorder-tag-move-20261117.tsv` (the first move) and `C:\Dev\openstage-recorder-author-rewrite-20261117.tsv` (the second) on the owner's computer, beside copies of the whole repository as it was before each rewrite (`C:\Dev\openstage-recorder-before-coauthor-removal-20261116.bundle` and `C:\Dev\openstage-recorder-before-author-rewrite-20261117.bundle`). Each release's "target" on GitHub still names the old commit as text; the tag is what GitHub uses. The old commits GitHub still serves although nothing points to them (153: 60 from the author rewrite, 57 from the co-author rewrite and 36 from the rewrite of 2026-11-05) are listed for GitHub Support in `C:\Dev\openstage-recorder-commits-to-purge-20261117.txt`.
 
 ## Drafts left from the old workflow
 
