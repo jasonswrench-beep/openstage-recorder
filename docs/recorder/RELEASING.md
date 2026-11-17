@@ -35,6 +35,10 @@ Whenever a new Windows installer is built, the checks pass, and the installer ha
 - **v0.1.0-alpha.4**: the fixes from the security review of 2026-11-13 and Check for updates, built with `build_installer.py --sign`.
 - **v0.1.0-alpha.5**, 2026-11-15, built from commit `1007ed8` and signed on the owner's computer. `OpenStage-Recorder-0.1.0-alpha.5-Setup.exe` (5,486,512 bytes), SHA-256 `4414cbea77319abf9c800842972c98fe2c911881c7234adeeec3ec1bde161618`. Checked after publishing: the tag points at `1007ed8`, GitHub's SHA-256 matches, two files, a published pre-release, and the copy downloaded back is signed by Jason Wrench with a timestamp. Installed on the owner's computer the same day; the owner checked that no user name shows, Copy the full path, and About.
 
+## The history rewritten on 2026-11-16
+
+At the owner's request, the Claude co-author line was taken out of every commit message on `main`, and `main` was force-pushed. The files are the same; every commit has a new ID. The commit IDs named above and in other documents (`1007ed8`, `6dfbda8`, `3ad79c6`, `a4ce118`) are the old ones. They still exist, because each release's tag keeps pointing at the commit it was built from (a tag is never moved), but they are no longer in `main`'s history. A copy of the whole repository as it was before is in `C:\Dev\openstage-recorder-before-coauthor-removal-20261116.bundle` on the owner's computer.
+
 ## Drafts left from the old workflow
 
 The old workflow made a draft release each time a version tag was pushed. Four drafts with unsigned files are still on the Releases page (only the owner and collaborators can see drafts): `v0.1.0` (two), `v0.1.0-alpha.1` and `v0.1.0-alpha.3`. They were never published. Deleting them is the owner's to do, from the Releases page. The workflow no longer makes drafts.
