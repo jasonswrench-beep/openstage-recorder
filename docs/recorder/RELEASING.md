@@ -48,7 +48,7 @@ At the owner's request, the Claude co-author line was taken out of every commit 
 | v0.1.0-alpha.4 | `6dfbda8` | `5c44567` |
 | v0.1.0-alpha.5 | `1007ed8` | `cd80783` |
 
-The full list, every old commit beside its new one, with how to undo the move, is in `C:\Dev\openstage-recorder-tag-move-20261117.tsv` on the owner's computer, beside a copy of the whole repository as it was before (`C:\Dev\openstage-recorder-before-coauthor-removal-20261116.bundle`). Each release's "target" on GitHub still names the old commit as text; the tag is what GitHub uses.
+The full list, every old commit beside its new one, with how to undo the move, is in `C:\Dev\openstage-recorder-tag-move-20261117.tsv` on the owner's computer, beside a copy of the whole repository as it was before (`C:\Dev\openstage-recorder-before-coauthor-removal-20261116.bundle`). Each release's "target" on GitHub still names the old commit as text; the tag is what GitHub uses. The old commits GitHub still serves although nothing points to them (93: 57 from this rewrite and 36 from the rewrite of 2026-11-05) are listed for GitHub Support in `C:\Dev\openstage-recorder-commits-to-purge-20261117.txt`.
 
 ## Drafts left from the old workflow
 
