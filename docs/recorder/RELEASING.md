@@ -12,14 +12,15 @@ Whenever a new Windows installer is built, the checks pass, and the installer ha
 
 1. Raise `RELEASE` in `app/tools/build_installer.py` to the new version, for example `0.1.0-alpha.4`. Check for updates compares it with the published releases (`UPDATE-CHECK.md`).
 2. Run the checks (`app/RUN CHECKS.bat`, `cargo test` in `app/core`, `app/src-tauri` and `capture`, `python -I app/tools/check_app_licences.py` and `capture/tools/check_rules.py`), commit, and push the commit to `main` first.
-3. On the owner's computer, signed in to the signing service, with the account's details in the environment (the top of `app/tools/sign_windows.py` names them): `python -I app/tools/build_installer.py --sign`. It stops on any problem. It writes `app/dist/release/OpenStage-Recorder-<release>-Setup.exe` and its `.sha256.txt`.
-4. Make the pre-release with exactly those two files, tagged at the pushed commit (the full hash):
-   `gh release create v<release> --repo jasonswrench-beep/openstage-recorder --target <full commit hash> --prerelease --title "OpenStage Recorder X.Y.Z alpha N" --notes-file <notes> <setup> <setup>.sha256.txt`
+3. Tag that commit before anything is built (the owner's rule, 2026-11-17): `git tag v<release> <full commit hash>` and `git push origin refs/tags/v<release>`, with nothing uncommitted. Then build from a clean copy at that tag.
+4. On the owner's computer, signed in to the signing service, with the account's details in the environment (the top of `app/tools/sign_windows.py` names them): `python -I app/tools/build_installer.py --sign`. It stops on any problem. It writes `app/dist/release/OpenStage-Recorder-<release>-Setup.exe` and its `.sha256.txt`.
+5. Make the pre-release with exactly those two files, on the tag made in step 3 (`--verify-tag`, so a missing tag stops it instead of making a new one):
+   `gh release create v<release> --repo jasonswrench-beep/openstage-recorder --verify-tag --prerelease --title "OpenStage Recorder X.Y.Z alpha N" --notes-file <notes> <setup> <setup>.sha256.txt`
    Pushing the tag starts the workflow, which only builds; it makes no draft.
 
 ## The rules it follows
 
-1. The commit the installer is built from is pushed first. The tag points at that exact commit. **A tag is never reused or moved.**
+1. The commit the installer is built from is pushed and tagged first, before the build. The tag points at that exact commit. **A tag is never reused or moved**, apart from the one move the owner asked for on 2026-11-17 (below).
 2. The version is the app's version number with `-alpha.N` while nobody has run the installer by hand, for example `v0.1.0-alpha.4`, the next number each time. (If the alpha rule stops fitting, change it here, with the owner.)
 3. It is a pre-release. The title is "OpenStage Recorder X.Y.Z alpha N".
 4. Only two files are attached: the setup `.exe` and its `.sha256.txt`. Nothing else: not the portable zip, not logs.
@@ -35,9 +36,19 @@ Whenever a new Windows installer is built, the checks pass, and the installer ha
 - **v0.1.0-alpha.4**: the fixes from the security review of 2026-11-13 and Check for updates, built with `build_installer.py --sign`.
 - **v0.1.0-alpha.5**, 2026-11-15, built from commit `1007ed8` and signed on the owner's computer. `OpenStage-Recorder-0.1.0-alpha.5-Setup.exe` (5,486,512 bytes), SHA-256 `4414cbea77319abf9c800842972c98fe2c911881c7234adeeec3ec1bde161618`. Checked after publishing: the tag points at `1007ed8`, GitHub's SHA-256 matches, two files, a published pre-release, and the copy downloaded back is signed by Jason Wrench with a timestamp. Installed on the owner's computer the same day; the owner checked that no user name shows, Copy the full path, and About.
 
-## The history rewritten on 2026-11-16
+## The history rewritten on 2026-11-16, and the tags moved on 2026-11-17
 
-At the owner's request, the Claude co-author line was taken out of every commit message on `main`, and `main` was force-pushed. The files are the same; every commit has a new ID. The commit IDs named above and in other documents (`1007ed8`, `6dfbda8`, `3ad79c6`, `a4ce118`) are the old ones. They still exist, because each release's tag keeps pointing at the commit it was built from (a tag is never moved), but they are no longer in `main`'s history. A copy of the whole repository as it was before is in `C:\Dev\openstage-recorder-before-coauthor-removal-20261116.bundle` on the owner's computer.
+At the owner's request, the Claude co-author line was taken out of every commit message on `main`, and `main` was force-pushed on 2026-11-16. The files are the same; every commit has a new ID. On 2026-11-17, also at the owner's request, each release tag was moved onto the rewritten commit with the same files and the same message (apart from the removed line), and only the tags were force-pushed. The releases' files, notes and titles were not changed. The commit IDs named above and in older documents are the old ones:
+
+| Tag | Old commit | Commit now |
+|---|---|---|
+| v0.1.0 (draft only) | `6eba1d2` | `3f6069f` |
+| v0.1.0-alpha.1 | `f0bd700` | `e3e3625` |
+| v0.1.0-alpha.2 and alpha.3 | `3ad79c6` | `3f42483` |
+| v0.1.0-alpha.4 | `6dfbda8` | `5c44567` |
+| v0.1.0-alpha.5 | `1007ed8` | `cd80783` |
+
+The full list, every old commit beside its new one, with how to undo the move, is in `C:\Dev\openstage-recorder-tag-move-20261117.tsv` on the owner's computer, beside a copy of the whole repository as it was before (`C:\Dev\openstage-recorder-before-coauthor-removal-20261116.bundle`). Each release's "target" on GitHub still names the old commit as text; the tag is what GitHub uses.
 
 ## Drafts left from the old workflow
 
