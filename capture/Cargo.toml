@@ -14,7 +14,7 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["OpenStage Capture contributors"]
-repository = "https://github.com/jasonswrench-beep/claude-test"
+repository = "https://github.com/jasonswrench-beep/openstage-recorder"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

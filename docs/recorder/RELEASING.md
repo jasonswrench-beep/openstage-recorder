@@ -11,7 +11,7 @@ Whenever a new Windows installer is built, the checks pass, and the installer ha
 ## How
 
 1. Raise `RELEASE` in `app/tools/build_installer.py` to the new version, for example `0.1.0-alpha.4`. Check for updates compares it with the published releases (`UPDATE-CHECK.md`).
-2. Run the checks (`app/RUN CHECKS.bat`, `cargo test` in `app/core`, `app/src-tauri` and `capture`, `python -I app/tools/check_app_licences.py` and `capture/tools/check_rules.py`), commit, and push the commit to `main` first.
+2. Run the checks (`app/RUN CHECKS.bat`, `cargo test` in `app/core`, `app/src-tauri` and `capture`, `python -I app/tools/check_app_licences.py` and `capture/tools/check_rules.py`), commit, run `python -I app/tools/check_commit_identity.py` (the author, the committer and the message of every commit not yet pushed), and push the commit to `main` first.
 3. Tag that commit before anything is built (the owner's rule, 2026-11-17): `git tag v<release> <full commit hash>` and `git push origin refs/tags/v<release>`, with nothing uncommitted. Then build from a clean copy at that tag.
 4. On the owner's computer, signed in to the signing service, with the account's details in the environment (the top of `app/tools/sign_windows.py` names them): `python -I app/tools/build_installer.py --sign`. It stops on any problem. It writes `app/dist/release/OpenStage-Recorder-<release>-Setup.exe` and its `.sha256.txt`.
 5. Make the pre-release with exactly those two files, on the tag made in step 3 (`--verify-tag`, so a missing tag stops it instead of making a new one):

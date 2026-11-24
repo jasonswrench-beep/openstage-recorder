@@ -49,6 +49,7 @@ The same checks as in OpenStage, run from this folder:
 - Rust: `cargo test --workspace` in `capture/` (needs `rust-setup.bat` first on a Windows computer without Rust on the PATH).
 - TypeScript: `tsc` and `node --test "test/*.test.ts"` in `capture-edit/` and `capture-timeline/`.
 - The app: in `app/`, `npm install`, then `npx tsc --noEmit`, `node --test src/*.test.ts`, `npm run build` and `node tools/browser-check.mjs` (needs Playwright); `cargo test` in `app/core`; `python -I app/tools/check_app_licences.py` for the licences of the app's libraries.
+- The owner's own copy only: `python -I app/tools/check_commit_identity.py`, before commits are pushed (the author, the committer and the message).
 
 `capture/README.md` lists the double-click scripts for Windows.
 
