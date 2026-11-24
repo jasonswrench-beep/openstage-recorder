@@ -39,7 +39,7 @@ The paths are the same as in OpenStage Author on purpose.
 - `docs/recorder/plan.md`
 - `docs/recorder/IMPORT-MANIFEST.md` (this file)
 
-`CLAUDE.md` is new and was written for this product. Its accessibility, licensing and working-style rules follow OpenStage Author's. Please read it, because it records choices on your behalf.
+`CLAUDE.md` is new and was written for this product (since 2026-11-24 it is kept on the owner's computer only, as `CLAUDE.local.md`). Its accessibility, licensing and working-style rules follow OpenStage Author's. Please read it, because it records choices on your behalf.
 
 ## Checks run on this base, on Linux
 

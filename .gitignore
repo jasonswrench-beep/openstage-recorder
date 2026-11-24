@@ -9,6 +9,7 @@ models/
 
 # Personal AI-assistant instructions, not shared with the project
 CLAUDE.local.md
+CLAUDE.md
 
 # OS cruft
 .DS_Store
