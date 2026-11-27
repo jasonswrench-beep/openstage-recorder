@@ -267,6 +267,50 @@ pub fn role_name(control_type: i32) -> &'static str {
     }
 }
 
+/// How many steps up from the item under a click the recorder looks for the control that holds it.
+pub const CLICK_PARENT_STEPS: usize = 3;
+
+/// Whether this kind of item is only the words or the picture on something else (text, image). Many programs, WPF
+/// among them, put a text item inside a button, and that text item is what lies under the pointer.
+pub fn is_content_only(control_type: i32) -> bool {
+    matches!(control_type, 50020 | 50006)
+}
+
+/// Whether this kind of item is a control people click: button, check box, link, list item, menu item, radio
+/// button, tab item, tree item, split button.
+fn is_clickable(control_type: i32) -> bool {
+    matches!(control_type, 50000 | 50002 | 50005 | 50007 | 50011 | 50013 | 50019 | 50024 | 50031)
+}
+
+/// Whether the look upwards may go on past this kind of item: only wrappers that sit between a control and its words
+/// (group, custom). Anything else means the words were not on a control.
+fn is_wrapper(control_type: i32) -> bool {
+    matches!(control_type, 50026 | 50025)
+}
+
+/// The name and kind to note for a click, from the item under the pointer (first) and the items that hold it, nearest
+/// first, each as its name and UI Automation control type.
+///
+/// When the item under the pointer is only text or an image and the nearest control holding it, at most
+/// [`CLICK_PARENT_STEPS`] steps up and with only wrappers in between, is one people click, that control is noted: "the
+/// button Start", not "the text Start". If that control has no name, the text's own words are kept. In every other
+/// case the item under the pointer is noted as it is.
+pub fn clicked_item(chain: &[(String, i32)]) -> Option<(String, String)> {
+    let (own_name, own_type) = chain.first()?;
+    if is_content_only(*own_type) {
+        for (name, kind) in chain.iter().skip(1).take(CLICK_PARENT_STEPS) {
+            if is_clickable(*kind) {
+                let name = if name.trim().is_empty() { own_name } else { name };
+                return Some((name.clone(), role_name(*kind).to_string()));
+            }
+            if !is_wrapper(*kind) {
+                break;
+            }
+        }
+    }
+    Some((own_name.clone(), role_name(*own_type).to_string()))
+}
+
 /// The two questions the recorder asks Windows' accessibility information. Asking can take a while (a program that
 /// is busy answers late), so this is only ever asked from the thread that does the noting, never from the thread that
 /// looks at the screen.
@@ -983,6 +1027,57 @@ mod tests {
         for id in 50000..=50040 {
             assert_ne!(role_name(id), "unknown", "{id}");
         }
+    }
+
+    fn item(name: &str, control_type: i32) -> (String, i32) {
+        (name.to_string(), control_type)
+    }
+
+    fn noted(name: &str, role: &str) -> Option<(String, String)> {
+        Some((name.to_string(), role.to_string()))
+    }
+
+    #[test]
+    fn a_click_on_the_words_of_a_button_is_noted_as_the_button() {
+        // A WPF button whose content is a plain string: the text item lies under the pointer.
+        assert_eq!(clicked_item(&[item("Start", 50020), item("Start", 50000)]), noted("Start", "button"));
+        // The button's own name is used when it has one.
+        assert_eq!(clicked_item(&[item("Go", 50020), item("Start timer", 50000)]), noted("Start timer", "button"));
+        // The text's words are kept when the button has no name.
+        assert_eq!(clicked_item(&[item("Stop", 50020), item(" ", 50000)]), noted("Stop", "button"));
+        // An icon on a menu item, and words inside a wrapper inside a tab.
+        assert_eq!(clicked_item(&[item("", 50006), item("Open", 50011)]), noted("Open", "menu item"));
+        assert_eq!(
+            clicked_item(&[item("Notes", 50020), item("", 50026), item("Notes", 50019)]),
+            noted("Notes", "tab item")
+        );
+        for (kind, role) in [
+            (50002, "check box"),
+            (50005, "link"),
+            (50007, "list item"),
+            (50013, "radio button"),
+            (50024, "tree item"),
+            (50031, "split button"),
+        ] {
+            assert_eq!(clicked_item(&[item("x", 50020), item("Y", kind)]), noted("Y", role), "{role}");
+        }
+    }
+
+    #[test]
+    fn a_click_on_other_items_is_noted_as_it_is() {
+        // Not text or an image: no look upwards.
+        assert_eq!(clicked_item(&[item("Start", 50000)]), noted("Start", "button"));
+        assert_eq!(clicked_item(&[item("Name", 50004), item("Form", 50000)]), noted("Name", "edit"));
+        // Text that no control holds.
+        assert_eq!(clicked_item(&[item("Hello", 50020)]), noted("Hello", "text"));
+        assert_eq!(
+            clicked_item(&[item("Hello", 50020), item("Main", 50033), item("B", 50000)]),
+            noted("Hello", "text")
+        );
+        // Too far up.
+        let deep = [item("t", 50020), item("", 50026), item("", 50026), item("", 50025), item("B", 50000)];
+        assert_eq!(clicked_item(&deep), noted("t", "text"));
+        assert_eq!(clicked_item(&[]), None);
     }
 
     #[test]

@@ -22,8 +22,8 @@
 //! Unproven until the owner runs it: written and type-checked without a Windows computer.
 
 use crate::interactions::{
-    classify_focus, role_name, Button, Drained, FocusKind, InteractionFilter, InteractionPlatform, InteractionSetup,
-    InteractionSource, Lookups, Mods, Raw, SharedTimeline, WindowState,
+    classify_focus, clicked_item, is_content_only, Button, Drained, FocusKind, InteractionFilter, InteractionPlatform,
+    InteractionSetup, InteractionSource, Lookups, Mods, Raw, SharedTimeline, WindowState, CLICK_PARENT_STEPS,
 };
 use crate::win_windows::program_name;
 use openstage_capture_project::LogEvent;
@@ -39,7 +39,7 @@ use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::GetCurrentThreadId;
-use windows::Win32::UI::Accessibility::{CUIAutomation, IUIAutomation};
+use windows::Win32::UI::Accessibility::{CUIAutomation, IUIAutomation, IUIAutomationElement};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetCursorPos, GetForegroundWindow, GetMessageW, GetWindowRect, GetWindowTextW,
@@ -216,10 +216,24 @@ impl Lookups for WindowsLookups {
     fn element_at(&mut self, x: i32, y: i32) -> Option<(String, String)> {
         let automation = self.automation.as_ref()?;
         unsafe {
-            let element = automation.ElementFromPoint(POINT { x, y }).ok()?;
-            let name = element.CurrentName().ok()?.to_string();
-            let role = role_name(element.CurrentControlType().ok()?.0).to_string();
-            Some((name, role))
+            let mut element = automation.ElementFromPoint(POINT { x, y }).ok()?;
+            let describe = |e: &IUIAutomationElement| -> Option<(String, i32)> {
+                Some((e.CurrentName().ok()?.to_string(), e.CurrentControlType().ok()?.0))
+            };
+            let mut chain = vec![describe(&element)?];
+            // Only words or a picture send the look upwards (to the button that holds them); anything else is noted
+            // as it is.
+            if is_content_only(chain[0].1) {
+                if let Ok(walker) = automation.ControlViewWalker() {
+                    for _ in 0..CLICK_PARENT_STEPS {
+                        let Ok(parent) = walker.GetParentElement(&element) else { break };
+                        let Some(described) = describe(&parent) else { break };
+                        chain.push(described);
+                        element = parent;
+                    }
+                }
+            }
+            clicked_item(&chain)
         }
     }
 }

@@ -101,6 +101,7 @@ These are listed, with the reason for each, in `docs/recorder/EXTRACTED-FROM-OPE
 - `callouts` on the editor: which callout kinds the bar under the picture offers. OpenStage Author does not need it; the Recorder offers Blur and Cover only.
 - Webcam place: `setWebcamPlace` and two boxes in a webcam clip's form, "Webcam picture: where" and "how big". The edit model, the preview and the exporter could already place a webcam, but no screen set it.
 - The loudness carried into a new edit, and the sound balance (item 3).
+- A click on a button's words is noted as the button, not as "text" (2026-11-27). This one is in `openstage-core` already (commit f94df79), so OpenStage Author gets it by moving to the core's capture code, or by copying the two files `interactions.rs` and `win_interactions.rs` from there.
 
 ## Suggested order
 

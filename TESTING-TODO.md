@@ -2,6 +2,10 @@
 
 Things that need a real Windows computer, a real recording, a listener, a screen reader or a decision from the owner. Everything else is checked by `app\RUN CHECKS.bat`. Newest round first. Tick an item by deleting it, or write what you found under it.
 
+## A click on a button's words (2026-11-27, not yet in a build)
+
+- [ ] **Clicks on buttons are noted as buttons.** In the next build, record Tea Timer (or any program with plain buttons) with "Note where the mouse goes and where I click" ticked, and click Start and Stop. The recording's notes should say "button" and Start or Stop, not "text". Also try a menu item and a tab if a program at hand has them. The rule is tested only with made-up lists of items, not with what Windows really answers.
+
 ## From the development list of 2026-11-15
 
 ### Item 1: your checks on the installed app (alpha 4, or the next build)
