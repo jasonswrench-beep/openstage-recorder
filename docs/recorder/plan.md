@@ -25,7 +25,7 @@ Planned, not built. The owner moved these three here on 2026-11-15 from the deve
 | **Send to** | Open a recording in OpenExplainer, OpenStage Studio or OpenStage Author, without exporting it by hand. | C1, the "send to" path |
 | **Audio description** | Write descriptions of what is on the screen, have them spoken on this computer, and add them to the video's sound or as a second sound file. | C5, the speech engine, and C1, what a description track holds |
 
-The same three are in the shared core's `ROADMAP.md` (openstage-core), and the owner is adding them to the public Roadmap & Feature Requests page linked from the README.
+The same three are in the shared core's `ROADMAP.md` (openstage-core), and they are on the public Roadmap & Feature Requests page linked from the README, under Planned on the OpenStage Recorder board (captions and audio description as one item, Send to as another; posted 2026-11-15).
 
 ## Where the work stands
 
